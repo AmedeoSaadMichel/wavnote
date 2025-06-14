@@ -1,0 +1,239 @@
+lib/
+├── main.dart                           # App entry point
+
+# ==== CORE ARCHITECTURE ====
+├── core/
+│   ├── constants/
+│   │   ├── app_constants.dart         # App-wide constants (colors, sizes, etc.)
+│   │   ├── audio_constants.dart       # Audio settings (sample rates, bitrates)
+│   │   └── storage_constants.dart     # File paths, database constants
+│   ├── enums/
+│   │   ├── audio_format.dart          # AudioFormat enum (WAV, M4A, FLAC) ✅ CREATE THIS
+│   │   ├── folder_type.dart           # FolderType enum (default, custom) ✅ CREATE THIS
+│   │   ├── recording_quality.dart     # Quality settings enum
+│   │   ├── sort_type.dart             # Sorting options enum
+│   │   └── view_type.dart             # View types enum (grid, list)
+│   ├── errors/
+│   │   ├── audio_exceptions.dart      # Custom audio-related exceptions
+│   │   ├── storage_exceptions.dart    # File/database exceptions
+│   │   └── permission_exceptions.dart # Permission-related exceptions
+│   ├── utils/
+│   │   ├── date_formatter.dart        # Date/time formatting utilities
+│   │   ├── file_utils.dart           # File operations helper
+│   │   ├── audio_utils.dart          # Audio format conversion, validation
+│   │   └── duration_formatter.dart    # Audio duration formatting
+│   └── extensions/
+│       ├── string_extensions.dart     # String helper methods
+│       ├── datetime_extensions.dart   # DateTime helper methods
+│       └── duration_extensions.dart   # Duration formatting extensions
+
+# ==== DATA LAYER ====
+├── data/
+│   ├── models/
+│   │   ├── folder_model.dart          # Folder data model
+│   │   ├── recording_model.dart       # Recording data model
+│   │   ├── app_settings_model.dart    # App settings model
+│   │   └── metadata_model.dart        # Audio metadata model
+│   ├── database/
+│   │   ├── database_helper.dart       # SQLite database setup
+│   │   ├── tables/
+│   │   │   ├── folders_table.dart     # Folders table schema
+│   │   │   ├── recordings_table.dart  # Recordings table schema
+│   │   │   └── settings_table.dart    # Settings table schema
+│   │   └── migrations/
+│   │       └── migration_v1_to_v2.dart # Future database migrations
+│   ├── repositories/
+│   │   ├── folder_repository.dart     # Folder CRUD operations
+│   │   ├── recording_repository.dart  # Recording CRUD operations
+│   │   ├── settings_repository.dart   # Settings CRUD operations
+│   │   └── file_repository.dart       # File system operations
+│   └── datasources/
+│       ├── local/
+│       │   ├── folder_local_datasource.dart   # Local folder operations
+│       │   ├── recording_local_datasource.dart # Local recording operations
+│       │   └── file_local_datasource.dart     # Local file operations
+│       └── external/
+│           ├── audio_recorder_datasource.dart # Audio recording interface
+│           ├── audio_player_datasource.dart   # Audio playback interface
+│           └── file_picker_datasource.dart    # Import files interface
+
+# ==== BUSINESS LOGIC LAYER ====
+├── domain/
+│   ├── entities/
+│   │   ├── folder_entity.dart         # Pure folder business object ✅ CREATE THIS
+│   │   ├── recording_entity.dart      # Pure recording business object
+│   │   └── app_settings_entity.dart   # Pure settings business object
+│   ├── usecases/
+│   │   ├── folder/
+│   │   │   ├── create_folder_usecase.dart      # Create custom folder
+│   │   │   ├── delete_folder_usecase.dart      # Delete custom folder
+│   │   │   ├── get_folders_usecase.dart        # Get all folders
+│   │   │   └── update_folder_count_usecase.dart # Update folder counts
+│   │   ├── recording/
+│   │   │   ├── start_recording_usecase.dart    # Start new recording
+│   │   │   ├── stop_recording_usecase.dart     # Stop recording
+│   │   │   ├── pause_recording_usecase.dart    # Pause/resume recording
+│   │   │   ├── play_recording_usecase.dart     # Play recording
+│   │   │   ├── delete_recording_usecase.dart   # Delete recording
+│   │   │   ├── import_recording_usecase.dart   # Import external file
+│   │   │   ├── export_recording_usecase.dart   # Export/share recording
+│   │   │   ├── search_recordings_usecase.dart  # Search functionality
+│   │   │   ├── filter_recordings_usecase.dart  # Filter by criteria
+│   │   │   ├── move_recording_usecase.dart     # Move between folders
+│   │   │   └── bulk_operations_usecase.dart    # Bulk delete/move
+│   │   ├── audio/
+│   │   │   ├── convert_format_usecase.dart     # Convert audio formats
+│   │   │   ├── trim_audio_usecase.dart         # Trim audio file
+│   │   │   ├── merge_audio_usecase.dart        # Merge multiple files
+│   │   │   └── adjust_quality_usecase.dart     # Change quality settings
+│   │   └── settings/
+│   │       ├── update_audio_format_usecase.dart # Change default format
+│   │       ├── update_quality_usecase.dart      # Change quality settings
+│   │       └── get_settings_usecase.dart        # Get current settings
+│   └── repositories/
+│       ├── i_folder_repository.dart            # Folder repository interface
+│       ├── i_recording_repository.dart         # Recording repository interface
+│       ├── i_settings_repository.dart          # Settings repository interface
+│       └── i_audio_service_repository.dart     # Audio service interface
+
+# ==== PRESENTATION LAYER ====
+├── presentation/
+│   ├── blocs/                          # ⚠️ CORRECTED: Changed from "providers" to "blocs"
+│   │   ├── folder/
+│   │   │   ├── folder_bloc.dart       # Folder state management ✅ CREATE THIS
+│   │   │   ├── folder_event.dart      # Folder events ✅ CREATE THIS
+│   │   │   └── folder_state.dart      # Folder states ✅ CREATE THIS
+│   │   ├── recording/
+│   │   │   ├── recording_bloc.dart    # Recording state management
+│   │   │   ├── recording_event.dart   # Recording events
+│   │   │   └── recording_state.dart   # Recording states
+│   │   ├── audio_player/
+│   │   │   ├── audio_player_bloc.dart # Audio playback state
+│   │   │   ├── audio_player_event.dart# Audio player events
+│   │   │   └── audio_player_state.dart# Audio player states
+│   │   ├── audio_recorder/
+│   │   │   ├── audio_recorder_bloc.dart # Recording session state
+│   │   │   ├── audio_recorder_event.dart# Recorder events
+│   │   │   └── audio_recorder_state.dart# Recorder states
+│   │   └── settings/
+│   │       ├── settings_bloc.dart     # App settings state
+│   │       ├── settings_event.dart    # Settings events
+│   │       └── settings_state.dart    # Settings states
+│   ├── screens/
+│   │   ├── main/
+│   │   │   ├── main_screen.dart       # Main folders view
+│   │   │   └── main_screen_viewmodel.dart # Main screen logic
+│   │   ├── recording/
+│   │   │   ├── recording_screen.dart   # Active recording screen
+│   │   │   ├── recording_list_screen.dart # List of recordings in folder
+│   │   │   ├── recording_detail_screen.dart # Single recording details
+│   │   │   └── recording_player_screen.dart # Full-screen player
+│   │   ├── onboarding/
+│   │   │   ├── onboarding_screen.dart # App introduction
+│   │   │   ├── permission_screen.dart # Permission requests
+│   │   │   └── welcome_screen.dart    # Welcome message
+│   │   ├── settings/
+│   │   │   ├── settings_screen.dart   # App settings
+│   │   │   ├── audio_settings_screen.dart # Audio quality settings
+│   │   │   └── export_settings_screen.dart # Export preferences
+│   │   └── import/
+│   │       ├── import_screen.dart     # File import interface
+│   │       └── file_browser_screen.dart # Browse and select files
+│   ├── widgets/
+│   │   ├── common/
+│   │   │   ├── custom_button.dart     # Reusable button component
+│   │   │   ├── custom_dialog.dart     # Base dialog component
+│   │   │   ├── loading_indicator.dart # Loading spinner
+│   │   │   ├── empty_state.dart       # Empty list state
+│   │   │   └── error_widget.dart      # Error display widget
+│   │   ├── folder/
+│   │   │   ├── folder_item.dart       # Individual folder widget
+│   │   │   ├── folder_grid.dart       # Grid view of folders
+│   │   │   └── folder_header.dart     # Folder section header
+│   │   ├── recording/
+│   │   │   ├── recording_item.dart    # Individual recording widget
+│   │   │   ├── recording_list.dart    # List of recordings
+│   │   │   ├── waveform_widget.dart   # Audio waveform display
+│   │   │   ├── player_controls.dart   # Play/pause/seek controls
+│   │   │   ├── recording_timer.dart   # Recording duration timer
+│   │   │   └── audio_visualizer.dart  # Real-time recording visual
+│   │   ├── dialogs/
+│   │   │   ├── create_folder_dialog.dart      # Create folder dialog ✅ MOVE YOUR EXISTING FILE HERE
+│   │   │   ├── audio_format_dialog.dart       # Select audio format ✅ MOVE YOUR EXISTING FILE HERE
+│   │   │   ├── recording_options_dialog.dart  # Recording settings
+│   │   │   ├── rename_dialog.dart             # Rename recording/folder
+│   │   │   ├── delete_confirmation_dialog.dart # Confirm delete action
+│   │   │   └── export_options_dialog.dart     # Export format options
+│   │   └── inputs/
+│   │       ├── search_bar.dart        # Search input field
+│   │       ├── duration_slider.dart   # Audio position slider
+│   │       ├── volume_slider.dart     # Volume control
+│   │       └── quality_selector.dart  # Audio quality picker
+│   └── theme/
+│       ├── app_theme.dart            # App-wide theme definition
+│       ├── app_colors.dart           # Color palette
+│       ├── app_text_styles.dart      # Typography styles
+│       └── app_dimensions.dart       # Spacing and sizing
+
+# ==== SERVICES LAYER ====
+├── services/
+│   ├── audio/
+│   │   ├── audio_recorder_service.dart        # Audio recording implementation
+│   │   ├── audio_player_service.dart          # Audio playback implementation
+│   │   ├── audio_processor_service.dart       # Audio editing/conversion
+│   │   └── background_audio_service.dart      # Background recording
+│   ├── file/
+│   │   ├── file_manager_service.dart          # File operations
+│   │   ├── import_service.dart                # Import external files
+│   │   ├── export_service.dart                # Export/share files
+│   │   └── metadata_service.dart              # Extract audio metadata
+│   ├── permission/
+│   │   ├── permission_service.dart            # Handle permissions ✅ MOVE YOUR EXISTING permission_handler.dart HERE AND RENAME
+│   │   └── permission_handler.dart            # Permission UI logic
+│   ├── storage/
+│   │   ├── database_service.dart              # Database operations ✅ MOVE YOUR EXISTING folder_persistence_service.dart HERE AND RENAME
+│   │   ├── file_storage_service.dart          # File system operations
+│   │   └── cache_service.dart                 # Temporary file cache
+│   └── platform/
+│       ├── native_bridge_service.dart         # iOS native integration
+│       ├── files_app_service.dart             # Files app integration
+│       └── sharing_service.dart               # System sharing sheet
+
+# ==== CONFIGURATION ====
+├── config/
+│   ├── app_config.dart               # App configuration
+│   ├── database_config.dart          # Database configuration
+│   ├── audio_config.dart             # Audio settings configuration
+│   └── dependency_injection.dart     # DI container setup
+
+# ============================================
+# FILES TO CREATE/MOVE MAPPING:
+# ============================================
+
+✅ CREATE THESE NEW FILES:
+├── core/enums/folder_type.dart        # Move your FolderType enum here
+├── core/enums/audio_format.dart       # Move your AudioFormat enum here
+├── domain/entities/folder_entity.dart # Create new clean entity
+├── presentation/blocs/folder/folder_bloc.dart       # New Bloc implementation
+├── presentation/blocs/folder/folder_event.dart      # Bloc events (part of bloc file)
+├── presentation/blocs/folder/folder_state.dart      # Bloc states (part of bloc file)
+
+🔄 MOVE YOUR EXISTING FILES:
+├── dialogs/create_folder_dialog.dart  → presentation/widgets/dialogs/create_folder_dialog.dart
+├── dialogs/audio_format_dialog.dart   → presentation/widgets/dialogs/audio_format_dialog.dart
+├── models/folder_model.dart           → data/models/folder_model.dart
+├── services/folder_service.dart       → services/storage/database_service.dart (rename and refactor)
+├── services/permission_handler.dart   → services/permission/permission_service.dart (rename)
+├── widgets/voicememo_item.dart        → presentation/widgets/folder/folder_item.dart (rename)
+├── voicememo_screen.dart              → presentation/screens/main/main_screen.dart (refactor to use Bloc)
+
+# ==== TECHNOLOGY STACK ====
+State Management: flutter_bloc ^8.1.3       # ✅ Add to pubspec.yaml
+Audio Recording: flutter_sound ^9.2.13      # Best quality, professional features
+Audio Playback: just_audio ^0.9.36          # Excellent performance, many features
+Database: sqflite ^2.3.0                    # ✅ You already have this
+File Operations: path_provider ^2.1.1
+Waveforms: audio_waveforms ^1.0.5            # Real-time visualization
+Testing: mockito ^5.4.2, bloc_test ^9.1.4   # For comprehensive testing
+Functional Programming: dartz ^0.10.1        # For Either<Failure, Success> pattern
+Equality: equatable ^2.0.5                  # For Bloc state/event comparison

@@ -1,14 +1,29 @@
-// File: main.dart - Added RecordingBloc provider
-
+// File: main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'presentation/blocs/folder/folder_bloc.dart';
-import 'presentation/blocs/recording/recording_bloc.dart';  // ✅ Added import
 import 'presentation/screens/main/main_screen.dart';
-import 'services/audio/audio_recorder_service.dart';  // ✅ Added import
+import 'data/repositories/folder_repository.dart';
+import 'data/database/database_helper.dart';
 
 /// Main entry point for the WavNote voice recording app
-void main() {
+void main() async {
+  // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize database before running app
+  try {
+    final db = await DatabaseHelper.database;
+    print('✅ Database initialized successfully');
+
+    // Print database info for debugging
+    final dbInfo = await DatabaseHelper.getDatabaseInfo();
+    print('📊 Database Info: $dbInfo');
+
+  } catch (e) {
+    print('❌ Database initialization error: $e');
+  }
+
   runApp(const WavNoteApp());
 }
 
@@ -70,59 +85,47 @@ class WavNoteApp extends StatelessWidget {
         ),
       ),
 
-      // ✅ FIXED: Added MultiBlocProvider with both FolderBloc and RecordingBloc
-      home: MultiBlocProvider(
-        providers: [
-          // Folder management
-          BlocProvider<FolderBloc>(
-            create: (context) => FolderBloc()..add(const LoadFolders()),
-          ),
-
-          // Recording management
-          BlocProvider<RecordingBloc>(
-            create: (context) {
-              final audioService = AudioRecorderService();
-              return RecordingBloc(audioService: audioService)
-                ..add(const CheckRecordingPermissions());
-            },
-          ),
-        ],
-        child: const AudioServiceInitializer(),
-      ),
+      home: const DatabaseInitializer(),
     );
   }
 }
 
-/// Widget to initialize audio service and show main screen
-class AudioServiceInitializer extends StatefulWidget {
-  const AudioServiceInitializer({super.key});
+/// Widget to initialize database and show main screen
+class DatabaseInitializer extends StatefulWidget {
+  const DatabaseInitializer({super.key});
 
   @override
-  State<AudioServiceInitializer> createState() => _AudioServiceInitializerState();
+  State<DatabaseInitializer> createState() => _DatabaseInitializerState();
 }
 
-class _AudioServiceInitializerState extends State<AudioServiceInitializer> {
+class _DatabaseInitializerState extends State<DatabaseInitializer> {
   bool _isInitialized = false;
   String? _initError;
 
   @override
   void initState() {
     super.initState();
-    _initializeAudioService();
+    _initializeDatabase();
   }
 
-  Future<void> _initializeAudioService() async {
+  Future<void> _initializeDatabase() async {
     try {
-      // Get the audio service from the RecordingBloc
-      final recordingBloc = context.read<RecordingBloc>();
-      // For now, just mark as initialized since our service is simple
+      // Ensure database is ready
+      final db = await DatabaseHelper.database;
+
+      // Get database info for debugging
+      final dbInfo = await DatabaseHelper.getDatabaseInfo();
+      print('📊 Database ready: $dbInfo');
+
       setState(() {
         _isInitialized = true;
       });
+
     } catch (e) {
+      print('❌ Database initialization failed: $e');
       setState(() {
         _isInitialized = false;
-        _initError = 'Audio service error: $e';
+        _initError = 'Database error: $e';
       });
     }
   }
@@ -150,7 +153,7 @@ class _AudioServiceInitializerState extends State<AudioServiceInitializer> {
                 CircularProgressIndicator(color: Colors.yellowAccent),
                 SizedBox(height: 24),
                 Text(
-                  'Initializing Audio Service...',
+                  'Initializing Database...',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -197,7 +200,7 @@ class _AudioServiceInitializerState extends State<AudioServiceInitializer> {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: _initializeAudioService,
+                  onPressed: _initializeDatabase,
                   child: const Text('Retry'),
                 ),
               ],
@@ -207,6 +210,10 @@ class _AudioServiceInitializerState extends State<AudioServiceInitializer> {
       );
     }
 
-    return const MainScreen();
+    // Database is ready, show main app with BLoC
+    return BlocProvider(
+      create: (context) => FolderBloc()..add(const LoadFolders()),
+      child: const MainScreen(),
+    );
   }
 }
