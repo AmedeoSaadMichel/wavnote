@@ -77,7 +77,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
             Text(
               'Folder name (required)',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues( alpha: 0.8),
                 fontSize: 14,
               ),
             ),
@@ -88,7 +88,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'Enter folder name',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                hintStyle: TextStyle(color: Colors.white.withValues( alpha: 0.5)),
                 enabledBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: Colors.yellowAccent),
                 ),
@@ -109,7 +109,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
                   child: Text(
                     'Cancel',
                     style: TextStyle(
-                      color: Colors.cyanAccent.withOpacity(0.7),
+                      color: Colors.cyanAccent.withValues( alpha: 0.7),
                       fontSize: 16,
                     ),
                   ),
@@ -119,7 +119,7 @@ class _CreateFolderDialogState extends State<CreateFolderDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isValidName
                         ? Colors.transparent
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues( alpha: 0.3),
                     foregroundColor: Colors.pinkAccent,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(

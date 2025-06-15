@@ -74,7 +74,7 @@ class WavNoteApp extends StatelessWidget {
         ),
         inputDecorationTheme: InputDecorationTheme(
           hintStyle: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues( alpha: 0.5),
           ),
           enabledBorder: const UnderlineInputBorder(
             borderSide: BorderSide(color: Colors.yellowAccent),

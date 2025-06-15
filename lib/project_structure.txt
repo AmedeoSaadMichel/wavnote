@@ -1,0 +1,65 @@
+lib/
+├── main.dart                           # App entry point
+
+# ==== CORE ARCHITECTURE ====
+├── core/
+│   └── enums/
+│       ├── audio_format.dart          # AudioFormat enum (WAV, M4A, FLAC)
+│       └── folder_type.dart           # FolderType enum (default, custom)
+
+# ==== DATA LAYER ====
+├── data/
+│   ├── database/
+│   │   └── database_helper.dart       # SQLite database setup
+│   ├── models/
+│   │   └── folder_model.dart          # Folder data model
+│   └── repositories/
+│       └── folder_repository.dart     # Folder CRUD operations
+
+# ==== BUSINESS LOGIC LAYER ====
+├── domain/
+│   ├── entities/
+│   │   ├── folder_entity.dart         # Pure folder business object
+│   │   └── recording_entity.dart      # Pure recording business object
+│   └── repositories/
+│       ├── i_audio_service_repository.dart     # Audio service interface
+│       └── i_folder_repository.dart            # Folder repository interface
+
+# ==== PRESENTATION LAYER ====
+├── presentation/
+│   ├── blocs/
+│   │   ├── folder/
+│   │   │   ├── folder_bloc.dart       # Folder state management
+│   │   │   ├── folder_event.dart      # Folder events (part of folder_bloc.dart)
+│   │   │   └── folder_state.dart      # Folder states (part of folder_bloc.dart)
+│   │   └── recording/
+│   │       ├── recording_bloc.dart    # Recording state management
+│   │       ├── recording_event.dart   # Recording events (part of recording_bloc.dart)
+│   │       └── recording_state.dart   # Recording states (part of recording_bloc.dart)
+│   ├── screens/
+│   │   ├── main/
+│   │   │   └── main_screen.dart       # Main folders view
+│   │   └── recording/
+│   │       ├── recording_entry_screen.dart # Recording entry point
+│   │       ├── recording_list_screen.dart  # List of recordings in folder
+│   │       └── recording_screen.dart       # Active recording screen (basic version)
+│   └── widgets/
+│       ├── dialogs/
+│       │   ├── audio_format_dialog.dart    # Select audio format
+│       │   └── create_folder_dialog.dart   # Create folder dialog
+│       └── folder/
+│           └── folder_item.dart       # Individual folder widget
+
+# ==== SERVICES LAYER ====
+├── services/
+│   ├── audio/
+│   │   └── audio_recorder_service.dart        # Audio recording implementation
+│   ├── permission/
+│   │   └── permission_service.dart            # Handle permissions
+│   └── storage/
+│       └── database_service.dart              # Database operations
+
+# ==== PROJECT DOCUMENTATION ====
+├── idea_project_structure.txt         # Planned project structure
+├── project_structure.txt              # Current project structure
+└── pubspec.yaml                       # Dependencies configuration

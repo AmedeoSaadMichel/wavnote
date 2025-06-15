@@ -1,30 +1,45 @@
 // File: services/audio/audio_recorder_service.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';  // ✅ Added for debugPrint
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../core/enums/audio_format.dart';
 
-/// Simplified audio recording service
+/// Simplified audio recording service for WavNote
 ///
-/// Basic implementation without flutter_sound for now
-/// This allows the app to compile and you can add flutter_sound later
+/// Focuses on providing a working recording interface with mock functionality
+/// that can be enhanced with real audio recording later.
+/// This version avoids flutter_sound API compatibility issues.
 class AudioRecorderService implements IAudioServiceRepository {
+
+  // Stream controllers for real-time updates
   StreamController<double>? _amplitudeController;
   StreamController<Duration>? _positionController;
   StreamController<void>? _completionController;
 
-  Timer? _mockTimer;
+  // Recording state
+  Timer? _amplitudeTimer;
+  Timer? _durationTimer;
   String? _currentRecordingPath;
   DateTime? _recordingStartTime;
-  int _currentSampleRate = 44100; // ✅ Store sample rate
+  Duration _pausedDuration = Duration.zero;
+  DateTime? _pauseStartTime;
 
+  // Recording settings
+  int _currentSampleRate = 44100;
+  int _currentBitRate = 128000;
+  AudioFormat _currentFormat = AudioFormat.m4a;
+
+  // Service state
   bool _isInitialized = false;
   bool _isRecording = false;
+  bool _isRecordingPaused = false;
   bool _isPlaying = false;
+  bool _isPlaybackPaused = false;
 
   // ==== INITIALIZATION ====
 
@@ -49,7 +64,8 @@ class AudioRecorderService implements IAudioServiceRepository {
   @override
   Future<void> dispose() async {
     try {
-      _mockTimer?.cancel();
+      _amplitudeTimer?.cancel();
+      _durationTimer?.cancel();
 
       await _amplitudeController?.close();
       await _positionController?.close();
@@ -83,26 +99,37 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
 
     try {
-      // Create directory if it doesn't exist
-      final file = File(await _getFullPath(filePath));
+      // Store settings
+      _currentFormat = format;
+      _currentSampleRate = sampleRate;
+      _currentBitRate = bitRate;
+
+      // Get full file path
+      final fullPath = await _getFullPath(filePath);
+      final file = File(fullPath);
       await file.parent.create(recursive: true);
 
-      // Create empty file (mock recording)
-      await file.writeAsString('Mock recording data');
+      // Create a mock audio file with some metadata
+      await _createMockAudioFile(file, format);
 
-      _currentRecordingPath = file.path;
+      _currentRecordingPath = fullPath;
       _recordingStartTime = DateTime.now();
-      _currentSampleRate = sampleRate; // ✅ Store sample rate
+      _pausedDuration = Duration.zero;
       _isRecording = true;
+      _isRecordingPaused = false;
 
       // Start mock amplitude monitoring
-      _startMockAmplitudeMonitoring();
+      _startAmplitudeMonitoring();
 
-      debugPrint('✅ Mock recording started: ${file.path}');
+      // Start duration monitoring
+      _startDurationMonitoring();
+
+      debugPrint('✅ Recording started (mock): $fullPath');
       return true;
 
     } catch (e) {
       debugPrint('❌ Failed to start recording: $e');
+      _isRecording = false;
       return false;
     }
   }
@@ -115,9 +142,15 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
 
     try {
-      // Stop mock monitoring
-      _stopMockAmplitudeMonitoring();
+      // Stop monitoring
+      _stopAmplitudeMonitoring();
+      _stopDurationMonitoring();
+
+      // Calculate total duration
+      final totalDuration = _calculateTotalRecordingDuration();
+
       _isRecording = false;
+      _isRecordingPaused = false;
 
       // Get file info
       final file = File(_currentRecordingPath!);
@@ -126,24 +159,26 @@ class AudioRecorderService implements IAudioServiceRepository {
         return null;
       }
 
+      // Update file with duration info
+      await _updateMockAudioFile(file, totalDuration);
       final fileSize = await file.length();
-      final duration = DateTime.now().difference(_recordingStartTime!);
 
       // Create recording entity
       final recording = RecordingEntity.create(
         name: _generateDefaultName(),
         filePath: _currentRecordingPath!,
         folderId: 'all_recordings',
-        format: _getFormatFromPath(_currentRecordingPath!),
-        duration: duration,
+        format: _currentFormat,
+        duration: totalDuration,
         fileSize: fileSize,
-        sampleRate: _currentSampleRate, // ✅ Use stored sample rate
+        sampleRate: _currentSampleRate,
       );
 
       _currentRecordingPath = null;
       _recordingStartTime = null;
+      _pausedDuration = Duration.zero;
 
-      debugPrint('✅ Mock recording stopped: ${recording.name}');
+      debugPrint('✅ Recording stopped (mock): ${recording.name}');
       return recording;
 
     } catch (e) {
@@ -155,18 +190,43 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> pauseRecording() async {
-    if (!_isRecording) return false;
-    _stopMockAmplitudeMonitoring();
-    debugPrint('⏸️ Mock recording paused');
-    return true;
+    if (!_isRecording || _isRecordingPaused) return false;
+
+    try {
+      _isRecordingPaused = true;
+      _pauseStartTime = DateTime.now();
+      _stopAmplitudeMonitoring();
+
+      debugPrint('⏸️ Recording paused (mock)');
+      return true;
+
+    } catch (e) {
+      debugPrint('❌ Failed to pause recording: $e');
+      return false;
+    }
   }
 
   @override
   Future<bool> resumeRecording() async {
-    if (!_isRecording) return false;
-    _startMockAmplitudeMonitoring();
-    debugPrint('▶️ Mock recording resumed');
-    return true;
+    if (!_isRecording || !_isRecordingPaused) return false;
+
+    try {
+      // Add paused time to total paused duration
+      if (_pauseStartTime != null) {
+        _pausedDuration += DateTime.now().difference(_pauseStartTime!);
+        _pauseStartTime = null;
+      }
+
+      _isRecordingPaused = false;
+      _startAmplitudeMonitoring();
+
+      debugPrint('▶️ Recording resumed (mock)');
+      return true;
+
+    } catch (e) {
+      debugPrint('❌ Failed to resume recording: $e');
+      return false;
+    }
   }
 
   @override
@@ -174,8 +234,11 @@ class AudioRecorderService implements IAudioServiceRepository {
     if (!_isRecording) return false;
 
     try {
-      _stopMockAmplitudeMonitoring();
+      _stopAmplitudeMonitoring();
+      _stopDurationMonitoring();
+
       _isRecording = false;
+      _isRecordingPaused = false;
 
       // Delete the file
       if (_currentRecordingPath != null) {
@@ -187,8 +250,10 @@ class AudioRecorderService implements IAudioServiceRepository {
 
       _currentRecordingPath = null;
       _recordingStartTime = null;
+      _pausedDuration = Duration.zero;
+      _pauseStartTime = null;
 
-      debugPrint('🚫 Mock recording cancelled');
+      debugPrint('🚫 Recording cancelled (mock)');
       return true;
 
     } catch (e) {
@@ -198,17 +263,14 @@ class AudioRecorderService implements IAudioServiceRepository {
   }
 
   @override
-  Future<bool> isRecording() async => _isRecording;
+  Future<bool> isRecording() async => _isRecording && !_isRecordingPaused;
 
   @override
-  Future<bool> isRecordingPaused() async => false; // Simplified
+  Future<bool> isRecordingPaused() async => _isRecordingPaused;
 
   @override
   Future<Duration> getCurrentRecordingDuration() async {
-    if (!_isRecording || _recordingStartTime == null) {
-      return Duration.zero;
-    }
-    return DateTime.now().difference(_recordingStartTime!);
+    return _calculateTotalRecordingDuration();
   }
 
   @override
@@ -234,12 +296,14 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> pausePlaying() async {
+    _isPlaybackPaused = true;
     debugPrint('⏸️ Mock playback paused');
     return true;
   }
 
   @override
   Future<bool> resumePlaying() async {
+    _isPlaybackPaused = false;
     debugPrint('▶️ Mock playback resumed');
     return true;
   }
@@ -254,10 +318,10 @@ class AudioRecorderService implements IAudioServiceRepository {
   Future<bool> setVolume(double volume) async => true;
 
   @override
-  Future<bool> isPlaying() async => _isPlaying;
+  Future<bool> isPlaying() async => _isPlaying && !_isPlaybackPaused;
 
   @override
-  Future<bool> isPlaybackPaused() async => false;
+  Future<bool> isPlaybackPaused() async => _isPlaybackPaused;
 
   @override
   Future<Duration> getCurrentPlaybackPosition() async => Duration.zero;
@@ -321,7 +385,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     return format.supportedSampleRates;
   }
 
-  // ==== AUDIO FILE OPERATIONS (Stubs) ====
+  // ==== AUDIO FILE OPERATIONS ====
 
   @override
   Future<AudioFileInfo?> getAudioFileInfo(String filePath) async {
@@ -333,21 +397,40 @@ class AudioRecorderService implements IAudioServiceRepository {
       final format = _getFormatFromPath(filePath);
       final stat = await file.stat();
 
+      // Try to get duration from mock file content
+      Duration duration = const Duration(seconds: 30);
+      try {
+        final content = await file.readAsString();
+        final lines = content.split('\n');
+        for (final line in lines) {
+          if (line.startsWith('Duration:')) {
+            final durationStr = line.split(':')[1].trim();
+            final seconds = int.tryParse(durationStr) ?? 30;
+            duration = Duration(seconds: seconds);
+            break;
+          }
+        }
+      } catch (e) {
+        // Use default duration
+      }
+
       return AudioFileInfo(
         filePath: filePath,
         format: format,
-        duration: const Duration(minutes: 1),
+        duration: duration,
         fileSize: fileSize,
-        sampleRate: 44100,
-        bitRate: 128000,
+        sampleRate: _currentSampleRate,
+        bitRate: _currentBitRate,
         channels: 1,
         createdAt: stat.changed,
       );
     } catch (e) {
+      debugPrint('❌ Error getting audio file info: $e');
       return null;
     }
   }
 
+  // Stub implementations for advanced features
   @override
   Future<String?> convertAudioFile({
     required String inputPath,
@@ -374,7 +457,9 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100}) async {
-    return List.generate(sampleCount, (index) => 0.5);
+    // Generate mock waveform data
+    final random = math.Random(42);
+    return List.generate(sampleCount, (index) => random.nextDouble());
   }
 
   @override
@@ -388,22 +473,82 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== PRIVATE HELPER METHODS ====
 
-  /// Start mock amplitude monitoring for visualization
-  void _startMockAmplitudeMonitoring() {
-    _mockTimer?.cancel();
-    _mockTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (_isRecording) {
-        // Generate mock amplitude data
-        final amplitude = (DateTime.now().millisecondsSinceEpoch % 1000) / 1000.0;
-        _amplitudeController?.add(amplitude.clamp(0.0, 1.0));
+  /// Create a mock audio file with metadata
+  Future<void> _createMockAudioFile(File file, AudioFormat format) async {
+    final content = '''Mock Audio File
+Format: ${format.name}
+Sample Rate: $_currentSampleRate
+Bit Rate: $_currentBitRate
+Created: ${DateTime.now().toIso8601String()}
+Duration: 0
+Status: Recording...
+''';
+    await file.writeAsString(content);
+  }
+
+  /// Update mock audio file with final duration
+  Future<void> _updateMockAudioFile(File file, Duration duration) async {
+    final content = '''Mock Audio File
+Format: ${_currentFormat.name}
+Sample Rate: $_currentSampleRate
+Bit Rate: $_currentBitRate
+Created: ${DateTime.now().toIso8601String()}
+Duration: ${duration.inSeconds}
+Status: Completed
+''';
+    await file.writeAsString(content);
+  }
+
+  /// Start amplitude monitoring for visualization
+  void _startAmplitudeMonitoring() {
+    _amplitudeTimer?.cancel();
+    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (_isRecording && !_isRecordingPaused) {
+        // Generate realistic amplitude data
+        final baseAmplitude = 0.3 + (math.sin(DateTime.now().millisecondsSinceEpoch / 200) * 0.2);
+        final noise = (math.Random().nextDouble() - 0.5) * 0.3;
+        final amplitude = (baseAmplitude + noise).clamp(0.0, 1.0);
+
+        _amplitudeController?.add(amplitude);
       }
     });
   }
 
-  /// Stop mock amplitude monitoring
-  void _stopMockAmplitudeMonitoring() {
-    _mockTimer?.cancel();
+  /// Stop amplitude monitoring
+  void _stopAmplitudeMonitoring() {
+    _amplitudeTimer?.cancel();
     _amplitudeController?.add(0.0);
+  }
+
+  /// Start duration monitoring
+  void _startDurationMonitoring() {
+    _durationTimer?.cancel();
+    _durationTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (_isRecording) {
+        // Duration updates are handled by the bloc through getCurrentRecordingDuration
+      }
+    });
+  }
+
+  /// Stop duration monitoring
+  void _stopDurationMonitoring() {
+    _durationTimer?.cancel();
+  }
+
+  /// Calculate total recording duration accounting for pauses
+  Duration _calculateTotalRecordingDuration() {
+    if (_recordingStartTime == null) return Duration.zero;
+
+    final now = DateTime.now();
+    final totalElapsed = now.difference(_recordingStartTime!);
+
+    // Subtract paused time
+    var adjustedPausedDuration = _pausedDuration;
+    if (_isRecordingPaused && _pauseStartTime != null) {
+      adjustedPausedDuration += now.difference(_pauseStartTime!);
+    }
+
+    return totalElapsed - adjustedPausedDuration;
   }
 
   /// Get full file system path
@@ -427,7 +572,7 @@ class AudioRecorderService implements IAudioServiceRepository {
       case 'flac':
         return AudioFormat.flac;
       default:
-        return AudioFormat.wav;
+        return AudioFormat.m4a;
     }
   }
 

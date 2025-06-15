@@ -6,14 +6,15 @@ import '../../blocs/folder/folder_bloc.dart';
 import '../../widgets/folder/folder_item.dart';
 import '../../widgets/dialogs/create_folder_dialog.dart';
 import '../../widgets/dialogs/audio_format_dialog.dart';
-import '../recording/recording_entry_screen.dart';
+import '../recording/recording_list_screen.dart';
+
 import '../../../domain/entities/folder_entity.dart';
 import '../../../core/enums/audio_format.dart';
 
-/// Main screen displaying voice memo folders
+/// Main screen displaying voice memo folders with enhanced recording integration
 ///
 /// This screen shows default and custom folders using the Bloc pattern
-/// for state management and follows clean architecture principles.
+/// for state management and includes a floating action button for quick recording.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -22,21 +23,22 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  String _selectedAudioFormat = 'WAV';
+  String _selectedAudioFormat = 'M4A'; // Default to M4A for iOS
+  FolderEntity? _selectedFolder;
 
   @override
   void initState() {
     super.initState();
+
     // Load folders when screen initializes
     BlocProvider.of<FolderBloc>(context).add(const LoadFolders());
     _loadAudioFormat();
   }
 
   /// Load current audio format from settings
-  /// TODO: Replace with actual settings service when implemented
   void _loadAudioFormat() {
     setState(() {
-      _selectedAudioFormat = 'WAV';
+      _selectedAudioFormat = 'M4A'; // Default for iOS
     });
   }
 
@@ -47,7 +49,6 @@ class _MainScreenState extends State<MainScreen> {
       builder: (BuildContext dialogContext) {
         return CreateFolderDialog(
           onFolderCreated: (String name, Color color, IconData icon) {
-            // Create folder using BLoC - use BlocProvider.of instead of context.read
             BlocProvider.of<FolderBloc>(context).add(CreateFolder(
               name: name,
               color: color,
@@ -71,7 +72,6 @@ class _MainScreenState extends State<MainScreen> {
               _selectedAudioFormat = format.name;
             });
             // TODO: Save to settings service when implemented
-            print('Audio format changed to: ${format.name}');
           },
         );
       },
@@ -88,17 +88,22 @@ class _MainScreenState extends State<MainScreen> {
       case 'flac':
         return AudioFormat.flac;
       default:
-        return AudioFormat.wav;
+        return AudioFormat.m4a; // Default to M4A for iOS
     }
   }
 
   /// Handle folder tap navigation
   void _onFolderTap(FolderEntity folder) {
-    print('Navigate to ${folder.name}');
-    // TODO: Navigate to folder content screen
-    // Navigator.push(context, MaterialPageRoute(
-    //   builder: (context) => RecordingListScreen(folder: folder),
-    // ));
+    setState(() {
+      _selectedFolder = folder;
+    });
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RecordingListScreen(folder: folder),
+      ),
+    );
   }
 
   /// Handle folder deletion with confirmation
@@ -113,10 +118,8 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    // Store reference to the main screen context
     final mainContext = context;
 
-    // Show confirmation dialog
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -142,7 +145,6 @@ class _MainScreenState extends State<MainScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                // Use the main context that has access to FolderBloc
                 BlocProvider.of<FolderBloc>(mainContext).add(DeleteFolder(folderId: folder.id));
               },
               style: TextButton.styleFrom(
@@ -192,84 +194,138 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
       ),
-
-      // ✅ REMOVED: Floating Action Button for Recording
+      // Remove the FAB - recording will be handled in folder screens
     );
   }
 
-  /// Build the header with title and format selector
+
+  /// Build the header with title, format selector, and quick record button
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
+          // Main header row
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Voice Memos',
-                style: TextStyle(
-                  color: Colors.yellowAccent,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Audio Format Selector
-              GestureDetector(
-                onTap: _showAudioFormatDialog,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      width: 1,
+              Row(
+                children: [
+                  const Text(
+                    'Voice Memos',
+                    style: TextStyle(
+                      color: Colors.yellowAccent,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.graphic_eq,
-                        color: Colors.cyan,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _selectedAudioFormat,
-                        style: const TextStyle(
-                          color: Colors.cyan,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                  const SizedBox(width: 8),
+                  // Audio Format Selector
+                  GestureDetector(
+                    onTap: _showAudioFormatDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1,
                         ),
                       ),
-                    ],
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getAudioFormatFromString(_selectedAudioFormat).icon,
+                            color: _getAudioFormatFromString(_selectedAudioFormat).color,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _selectedAudioFormat,
+                            style: TextStyle(
+                              color: _getAudioFormatFromString(_selectedAudioFormat).color,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
+              ),
+              // Edit Button and Quick Record
+              Row(
+                children: [
+                  // Edit Button
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Text(
+                      'Edit',
+                      style: TextStyle(
+                        color: Colors.cyan,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          // Edit Button (placeholder for future functionality)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 1,
+
+          // Selected folder indicator (if any)
+          if (_selectedFolder != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _selectedFolder!.color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _selectedFolder!.color.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _selectedFolder!.icon,
+                    color: _selectedFolder!.color,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Selected: ${_selectedFolder!.name}',
+                    style: TextStyle(
+                      color: _selectedFolder!.color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedFolder = null),
+                    child: Icon(
+                      Icons.close,
+                      color: _selectedFolder!.color,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: const Text(
-              'Edit',
-              style: TextStyle(
-                color: Colors.cyan,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -318,7 +374,6 @@ class _MainScreenState extends State<MainScreen> {
           return _buildLoadedState(state);
         }
 
-        // Initial state
         return _buildInitialState();
       },
     );
@@ -371,7 +426,7 @@ class _MainScreenState extends State<MainScreen> {
           Text(
             state.message,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withValues( alpha:0.7),
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -394,16 +449,20 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Build loaded state with folders (REMOVED ADD FOLDER BUTTON)
+  /// Build loaded state with folders
   Widget _buildLoadedState(FolderLoaded state) {
     return Column(
       children: [
         // Default Folders
         ...state.defaultFolders.map((folder) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: FolderItem(
-            folder: folder,
+          child: GestureDetector(
             onTap: () => _onFolderTap(folder),
+            onLongPress: () => setState(() => _selectedFolder = folder),
+            child: FolderItem(
+              folder: folder,
+              onTap: () => _onFolderTap(folder),
+            ),
           ),
         )),
 
@@ -415,7 +474,7 @@ class _MainScreenState extends State<MainScreen> {
             child: Text(
               'MY FOLDERS',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withValues( alpha:0.7),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -444,22 +503,25 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               confirmDismiss: (direction) async {
-                // Use dialog instead of directly dismissing
                 _onFolderDelete(folder);
                 return false; // Don't auto-dismiss, let the Bloc handle it
               },
-              child: FolderItem(
-                folder: folder,
+              child: GestureDetector(
                 onTap: () => _onFolderTap(folder),
+                onLongPress: () => setState(() => _selectedFolder = folder),
+                child: FolderItem(
+                  folder: folder,
+                  onTap: () => _onFolderTap(folder),
+                ),
               ),
             ),
           )),
         ],
 
-        // ✅ RESTORED: Add Folder Button
+        // Add Folder Button
         const Spacer(),
         _buildAddFolderButton(),
-        const SizedBox(height: 32),
+        const SizedBox(height: 32), // Regular bottom padding
       ],
     );
   }
