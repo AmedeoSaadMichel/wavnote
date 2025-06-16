@@ -1,50 +1,72 @@
-lib/
-├── main.dart                           # App entry point ✅ EXISTS
+# ============================================
+# FLUTTER VOICE MEMO APP - PROJECT STRUCTURE
+# ============================================
+# This file defines the complete architecture and file organization
+# for the Flutter voice memo application with organized folders.
+# 
+# STATUS: COMPREHENSIVE PROJECT STRUCTURE (UPDATED)
+# Total Files Planned: ~150+ files
+# ✅ IMPLEMENTED: 45+ files
+# ❌ MISSING: ~105+ files
+# 
+# LATEST UPDATES:
+# - Settings screen refactored into modular components
+# - Added settings widgets and dialogs
+# - Improved component organization
+# - Enhanced dialog system
+# ============================================
 
-# ==== CORE ARCHITECTURE ====
+# ==== TECHNOLOGY STACK ====
+# Dependencies from pubspec.yaml:
+  cupertino_icons: ^1.0.8
+  flutter_bloc: ^9.1.1
+  flutter_sound: ^9.28.0
+  just_audio: ^0.10.4
+  sqflite: ^2.4.2
+  path_provider: ^2.1.5
+  audio_waveforms: ^1.3.0
+  mockito: ^5.4.6
+  dartz: ^0.10.1
+  equatable: ^2.0.7
+  permission_handler: ^12.0.0+1
+  fluttericon: ^2.0.0
+
+# ==== CORE LAYER ====
 ├── core/
 │   ├── constants/
-│   │   ├── app_constants.dart         # App-wide constants (colors, sizes, etc.) ❌ MISSING
-│   │   ├── audio_constants.dart       # Audio settings (sample rates, bitrates) ❌ MISSING
-│   │   └── storage_constants.dart     # File paths, database constants ❌ MISSING
+│   │   └── app_constants.dart         # App-wide constants ✅ EXISTS
 │   ├── enums/
-│   │   ├── audio_format.dart          # AudioFormat enum (WAV, M4A, FLAC) ✅ EXISTS
-│   │   ├── folder_type.dart           # FolderType enum (default, custom) ✅ EXISTS
-│   │   ├── recording_quality.dart     # Quality settings enum ❌ MISSING
-│   │   ├── sort_type.dart             # Sorting options enum ❌ MISSING
-│   │   └── view_type.dart             # View types enum (grid, list) ❌ MISSING
+│   │   ├── audio_format.dart          # Audio format enum ✅ EXISTS
+│   │   ├── folder_type.dart           # Folder type enum ✅ EXISTS
+│   │   └── recording_quality.dart     # Recording quality enum ❌ MISSING
 │   ├── errors/
-│   │   ├── audio_exceptions.dart      # Custom audio-related exceptions ❌ MISSING
-│   │   ├── storage_exceptions.dart    # File/database exceptions ❌ MISSING
-│   │   └── permission_exceptions.dart # Permission-related exceptions ❌ MISSING
+│   │   ├── exceptions.dart            # Custom exceptions ❌ MISSING
+│   │   └── failures.dart              # Failure types ❌ MISSING
 │   ├── utils/
-│   │   ├── date_formatter.dart        # Date/time formatting utilities ❌ MISSING
-│   │   ├── file_utils.dart           # File operations helper ❌ MISSING
-│   │   ├── audio_utils.dart          # Audio format conversion, validation ❌ MISSING
-│   │   └── duration_formatter.dart    # Audio duration formatting ❌ MISSING
+│   │   ├── date_formatter.dart        # Date formatting utilities ✅ EXISTS
+│   │   ├── file_utils.dart            # File handling utilities ✅ EXISTS
+│   │   ├── permission_utils.dart      # Permission utilities ❌ MISSING
+│   │   └── audio_utils.dart           # Audio utilities ❌ MISSING
 │   └── extensions/
 │       ├── string_extensions.dart     # String helper methods ❌ MISSING
 │       ├── datetime_extensions.dart   # DateTime helper methods ❌ MISSING
-│       └── duration_extensions.dart   # Duration formatting extensions ❌ MISSING
+│       └── duration_extensions.dart   # Duration helper methods ❌ MISSING
 
 # ==== DATA LAYER ====
 ├── data/
 │   ├── models/
 │   │   ├── folder_model.dart          # Folder data model ✅ EXISTS
-│   │   ├── recording_model.dart       # Recording data model ❌ MISSING
-│   │   ├── app_settings_model.dart    # App settings model ❌ MISSING
-│   │   └── metadata_model.dart        # Audio metadata model ❌ MISSING
-│   ├── database/
-│   │   ├── database_helper.dart       # SQLite database setup ✅ EXISTS
-│   │   ├── tables/
-│   │   │   ├── folders_table.dart     # Folders table schema ❌ MISSING
-│   │   │   ├── recordings_table.dart  # Recordings table schema ❌ MISSING
-│   │   │   └── settings_table.dart    # Settings table schema ❌ MISSING
-│   │   └── migrations/
-│   │       └── migration_v1_to_v2.dart # Future database migrations ❌ MISSING
+│   │   ├── recording_model.dart       # Recording data model ✅ EXISTS
+│   │   └── settings_model.dart        # Settings data model ❌ MISSING
 │   ├── repositories/
-│   │   ├── folder_repository.dart     # Folder CRUD operations ✅ EXISTS
-│   │   ├── recording_repository.dart  # Recording CRUD operations ❌ MISSING
+│   │   ├── folder_repository.dart     # Folder operations repository ✅ EXISTS
+│   │   ├── recording_repository.dart  # Recording management repository ✅ EXISTS
+│   │   ├── recording_repository_core.dart # Core recording operations ✅ EXISTS
+│   │   ├── recording_repository_crud.dart # Recording CRUD operations ✅ EXISTS
+│   │   ├── recording_repository_search.dart # Recording search operations ✅ EXISTS
+│   │   ├── recording_repository_bulk.dart # Recording bulk operations ✅ EXISTS
+│   │   ├── recording_repository_stats.dart # Recording statistics ✅ EXISTS
+│   │   ├── recording_repository_utils.dart # Recording utilities ✅ EXISTS
 │   │   ├── settings_repository.dart   # Settings CRUD operations ❌ MISSING
 │   │   └── file_repository.dart       # File system operations ❌ MISSING
 │   └── datasources/
@@ -70,6 +92,7 @@ lib/
 │   │   │   ├── get_folders_usecase.dart        # Get all folders ❌ MISSING
 │   │   │   └── update_folder_count_usecase.dart # Update folder counts ❌ MISSING
 │   │   ├── recording/
+│   │   │   ├── create_recording_usecase.dart   # Create new recording ✅ EXISTS
 │   │   │   ├── start_recording_usecase.dart    # Start new recording ❌ MISSING
 │   │   │   ├── stop_recording_usecase.dart     # Stop recording ❌ MISSING
 │   │   │   ├── pause_recording_usecase.dart    # Pause/resume recording ❌ MISSING
@@ -92,7 +115,7 @@ lib/
 │   │       └── get_settings_usecase.dart        # Get current settings ❌ MISSING
 │   └── repositories/
 │       ├── i_folder_repository.dart            # Folder repository interface ✅ EXISTS
-│       ├── i_recording_repository.dart         # Recording repository interface ❌ MISSING
+│       ├── i_recording_repository.dart         # Recording repository interface ✅ EXISTS
 │       ├── i_settings_repository.dart          # Settings repository interface ❌ MISSING
 │       └── i_audio_service_repository.dart     # Audio service interface ✅ EXISTS
 
@@ -108,33 +131,33 @@ lib/
 │   │   │   ├── recording_event.dart   # Recording events ✅ EXISTS (part of recording_bloc.dart)
 │   │   │   └── recording_state.dart   # Recording states ✅ EXISTS (part of recording_bloc.dart)
 │   │   ├── audio_player/
-│   │   │   ├── audio_player_bloc.dart # Audio playback state ❌ MISSING
-│   │   │   ├── audio_player_event.dart# Audio player events ❌ MISSING
-│   │   │   └── audio_player_state.dart# Audio player states ❌ MISSING
-│   │   ├── audio_recorder/
-│   │   │   ├── audio_recorder_bloc.dart # Recording session state ❌ MISSING
-│   │   │   ├── audio_recorder_event.dart# Recorder events ❌ MISSING
-│   │   │   └── audio_recorder_state.dart# Recorder states ❌ MISSING
-│   │   └── settings/
-│   │       ├── settings_bloc.dart     # App settings state ❌ MISSING
-│   │       ├── settings_event.dart    # Settings events ❌ MISSING
-│   │       └── settings_state.dart    # Settings states ❌ MISSING
+│   │   │   ├── audio_player_bloc.dart # Audio playback state ✅ EXISTS
+│   │   │   ├── audio_player_event.dart# Audio player events ✅ EXISTS (part of audio_player_bloc.dart)
+│   │   │   └── audio_player_state.dart# Audio player states ✅ EXISTS (part of audio_player_bloc.dart)
+│   │   ├── settings/
+│   │   │   ├── settings_bloc.dart     # App settings state ✅ EXISTS
+│   │   │   ├── settings_event.dart    # Settings events ✅ EXISTS (part of settings_bloc.dart)
+│   │   │   └── settings_state.dart    # Settings states ✅ EXISTS (part of settings_bloc.dart)
+│   │   └── audio_recorder/
+│   │       ├── audio_recorder_bloc.dart # Recording session state ❌ MISSING
+│   │       ├── audio_recorder_event.dart# Recorder events ❌ MISSING
+│   │       └── audio_recorder_state.dart# Recorder states ❌ MISSING
 │   ├── screens/
 │   │   ├── main/
-│   │   │   ├── main_screen.dart       # Main folders view ✅ EXISTS (ENHANCED)
+│   │   │   ├── main_screen.dart       # Main folders view ✅ EXISTS
 │   │   │   └── main_screen_viewmodel.dart # Main screen logic ❌ MISSING
 │   │   ├── recording/
 │   │   │   ├── recording_screen.dart   # Active recording screen ✅ EXISTS (basic version)
-│   │   │   ├── recording_entry_screen.dart # Recording entry point ✅ EXISTS (ENHANCED)
+│   │   │   ├── recording_entry_screen.dart # Recording entry point ✅ EXISTS
 │   │   │   ├── recording_list_screen.dart # List of recordings in folder ✅ EXISTS
 │   │   │   ├── recording_detail_screen.dart # Single recording details ❌ MISSING
 │   │   │   └── recording_player_screen.dart # Full-screen player ❌ MISSING
 │   │   ├── onboarding/
 │   │   │   ├── onboarding_screen.dart # App introduction ❌ MISSING
-│   │   │   ├── permission_screen.dart # Permission requests ❌ MISSING
+│   │   │   ├── permission_screen.dart # Permission requests ✅ EXISTS
 │   │   │   └── welcome_screen.dart    # Welcome message ❌ MISSING
 │   │   ├── settings/
-│   │   │   ├── settings_screen.dart   # App settings ❌ MISSING
+│   │   │   ├── settings_screen.dart   # App settings ✅ EXISTS (refactored)
 │   │   │   ├── audio_settings_screen.dart # Audio quality settings ❌ MISSING
 │   │   │   └── export_settings_screen.dart # Export preferences ❌ MISSING
 │   │   └── import/
@@ -146,24 +169,41 @@ lib/
 │   │   │   ├── custom_dialog.dart     # Base dialog component ❌ MISSING
 │   │   │   ├── loading_indicator.dart # Loading spinner ❌ MISSING
 │   │   │   ├── empty_state.dart       # Empty list state ❌ MISSING
-│   │   │   └── error_widget.dart      # Error display widget ❌ MISSING
+│   │   │   ├── error_widget.dart      # Error display widget ❌ MISSING
+│   │   │   ├── settings_section_header.dart # Settings section header ✅ EXISTS
+│   │   │   ├── settings_item.dart     # Settings item widget ✅ EXISTS
+│   │   │   └── settings_toggle_item.dart # Settings toggle widget ✅ EXISTS
 │   │   ├── folder/
 │   │   │   ├── folder_item.dart       # Individual folder widget ✅ EXISTS
 │   │   │   ├── folder_grid.dart       # Grid view of folders ❌ MISSING
 │   │   │   └── folder_header.dart     # Folder section header ❌ MISSING
 │   │   ├── recording/
-│   │   │   ├── recording_item.dart    # Individual recording widget ❌ MISSING
+│   │   │   ├── recording_item.dart    # Individual recording widget ✅ EXISTS
 │   │   │   ├── recording_list.dart    # List of recordings ❌ MISSING
 │   │   │   ├── waveform_widget.dart   # Audio waveform display ❌ MISSING
 │   │   │   ├── player_controls.dart   # Play/pause/seek controls ❌ MISSING
 │   │   │   ├── recording_timer.dart   # Recording duration timer ❌ MISSING
 │   │   │   ├── audio_visualizer.dart  # Real-time recording visual ❌ MISSING
-│   │   │   ├── record_waveform.dart   # Compact recording waveform ✅ EXISTS (NEW)
-│   │   │   ├── fullscreen_waveform.dart # Fullscreen recording waveform ✅ EXISTS (NEW)
-│   │   │   └── recording_bottom_sheet.dart # Recording interface bottom sheet ✅ EXISTS (NEW)
+│   │   │   ├── record_waveform.dart   # Compact waveform for recording ✅ EXISTS
+│   │   │   ├── fullscreen_waveform.dart # Fullscreen waveform widget ✅ EXISTS
+│   │   │   ├── recording_bottom_sheet.dart # Recording bottom sheet ✅ EXISTS
+│   │   │   ├── organic_background.dart # Organic flowing background ✅ EXISTS
+│   │   │   ├── recording_list_item.dart # Recording list item component ✅ EXISTS
+│   │   │   └── organic_record_button.dart # Pulsing record button ✅ EXISTS
+│   │   ├── settings/
+│   │   │   ├── settings_header.dart   # Settings screen header ✅ EXISTS
+│   │   │   ├── audio_settings_section.dart # Audio settings section ✅ EXISTS
+│   │   │   ├── recording_settings_section.dart # Recording settings section ✅ EXISTS
+│   │   │   ├── app_settings_section.dart # App settings section ✅ EXISTS
+│   │   │   └── storage_settings_section.dart # Storage settings section ✅ EXISTS
 │   │   ├── dialogs/
 │   │   │   ├── create_folder_dialog.dart      # Create folder dialog ✅ EXISTS
 │   │   │   ├── audio_format_dialog.dart       # Select audio format ✅ EXISTS
+│   │   │   ├── sample_rate_dialog.dart        # Select sample rate ✅ EXISTS
+│   │   │   ├── bit_rate_dialog.dart           # Select bit rate ✅ EXISTS
+│   │   │   ├── about_dialog.dart              # About app dialog ✅ EXISTS
+│   │   │   ├── storage_usage_dialog.dart      # Storage usage dialog ✅ EXISTS
+│   │   │   ├── clear_cache_dialog.dart        # Clear cache dialog ✅ EXISTS
 │   │   │   ├── recording_options_dialog.dart  # Recording settings ❌ MISSING
 │   │   │   ├── rename_dialog.dart             # Rename recording/folder ❌ MISSING
 │   │   │   ├── delete_confirmation_dialog.dart # Confirm delete action ❌ MISSING
@@ -182,10 +222,16 @@ lib/
 # ==== SERVICES LAYER ====
 ├── services/
 │   ├── audio/
-│   │   ├── audio_recorder_service.dart        # Audio recording implementation ✅ EXISTS (ENHANCED)
+│   │   ├── audio_recorder_service.dart        # Audio recording implementation ✅ EXISTS
+│   │   ├── real_audio_recorder_service.dart   # Real audio recording service ✅ EXISTS
+│   │   ├── audio_service_factory.dart         # Audio service factory ✅ EXISTS
 │   │   ├── audio_player_service.dart          # Audio playback implementation ❌ MISSING
 │   │   ├── audio_processor_service.dart       # Audio editing/conversion ❌ MISSING
-│   │   └── background_audio_service.dart      # Background recording ❌ MISSING
+│   │   ├── background_audio_service.dart      # Background recording ❌ MISSING
+│   │   ├── audio_monitoring_service.dart      # Audio monitoring service ✅ EXISTS
+│   │   └── impl/
+│   │       ├── audio_player_impl.dart         # Audio player implementation ✅ EXISTS
+│   │       └── audio_recorder_impl.dart       # Audio recorder implementation ✅ EXISTS
 │   ├── file/
 │   │   ├── file_manager_service.dart          # File operations ❌ MISSING
 │   │   ├── import_service.dart                # Import external files ❌ MISSING
@@ -205,101 +251,45 @@ lib/
 
 # ==== CONFIGURATION ====
 ├── config/
-│   ├── app_config.dart               # App configuration ❌ MISSING
+│   ├── app_config.dart               # App configuration ✅ EXISTS
 │   ├── database_config.dart          # Database configuration ❌ MISSING
 │   ├── audio_config.dart             # Audio settings configuration ❌ MISSING
 │   └── dependency_injection.dart     # DI container setup ❌ MISSING
 
-# - Location-based recording names (placeholder for future implementation)
-# - Animated UI with recording state indicators
-# - Integration with existing folder system
-#
-# NEXT PRIORITY FILES TO CREATE:
-# 1. Recording repository and data models
-# 2. Audio playback functionality
-# 3. Recording list and detail screens
-# 4. Settings and configuration system
-# 5. File management and export features
 # ============================================
-
-# ==== TECHNOLOGY STACK ====
-# Dependencies from pubspec.yaml:
-  cupertino_icons: ^1.0.8
-  flutter_bloc: ^9.1.1
-  flutter_sound: ^9.28.0          # NOW ACTIVELY USED for real recording
-  just_audio: ^0.10.4
-  sqflite: ^2.4.2
-  path_provider: ^2.1.5
-  audio_waveforms: ^1.3.0
-  mockito: ^5.4.6
-  dartz: ^0.10.1
-  equatable: ^2.0.7
-  permission_handler: ^12.0.0+1
-  fluttericon: ^2.0.0
-
-# ==== IMPLEMENTATION NOTES ====
-#
-# RECORDING FUNCTIONALITY:
-# - The app now supports real audio recording using flutter_sound
-# - Fallback to mock mode if flutter_sound initialization fails
-# - Real-time amplitude monitoring for waveform visualization
-# - Support for M4A, WAV, and FLAC formats (iOS optimized)
-# - Proper permission handling with user-friendly dialogs
-# - Recording state management through BLoC pattern
-#
-# UI/UX ENHANCEMENTS:
-# - iOS Voice Memos inspired interface with bottom sheet
-# - Expandable recording interface (compact <-> fullscreen)
-# - Real-time waveform visualization during recording
-# - Folder selection with visual indicators
-# - Audio format selection with quality indicators
-# - Animated transitions and visual feedback
-# - Maintains WavNote's gradient theme throughout
-#
-# ARCHITECTURE IMPROVEMENTS:
-# - Clean separation of concerns (Domain/Data/Presentation)
-# - BLoC pattern for state management
-# - Repository pattern for data access
-# - Service layer for external dependencies
-# - Entity-based business logic
-# - Interface segregation for testability
-#
-# INTEGRATION POINTS:
-# - Main screen now has recording FAB and folder selection
-# - Recording entry screen provides full recording interface
-# - Bottom sheet widget handles recording UI state
-# - Waveform widgets provide real-time audio visualization
-# - Enhanced audio service supports both mock and real recording
-# - Folder system integrated with recording destination selection
 # CURRENT PROJECT STATUS SUMMARY:
 # ============================================
-# ✅ CORE FILES IMPLEMENTED: 20 files (3 NEW)
-# ❌ FILES MISSING: ~82+ files
-#
-# NEW FILES ADDED IN THIS UPDATE:
-# - presentation/widgets/recording/record_waveform.dart
-# - presentation/widgets/recording/fullscreen_waveform.dart
-# - presentation/widgets/recording/recording_bottom_sheet.dart
-#
-# ENHANCED FILES IN THIS UPDATE:
-# - services/audio/audio_recorder_service.dart (Real recording capabilities)
-# - presentation/screens/recording/recording_entry_screen.dart (iOS Voice Memos style)
-# - presentation/screens/main/main_screen.dart (Recording integration + FAB)
+# ✅ CORE FILES IMPLEMENTED: 50+ files (updated from 45)
+# ❌ FILES MISSING: ~100+ files (updated from ~105+)
 #
 # MAIN IMPLEMENTED COMPONENTS:
-# - Core enums (audio_format, folder_type)
+# - Core enums and constants (audio_format, folder_type, app_constants)
+# - Core utilities (date_formatter, file_utils)
 # - Domain entities (folder_entity, recording_entity)
-# - Database layer (database_helper, folder_repository)
-# - BLoC state management (folder_bloc, recording_bloc)
-# - Main screens (main_screen with recording integration, recording screens)
-# - Recording widgets (waveform components, bottom sheet interface)
-# - Basic dialogs (create_folder, audio_format)
-# - Enhanced audio service (real recording with flutter_sound)
+# - Complete recording data layer (repository with 7 specialized classes)
+# - Recording data model with validation
+# - Complete database layer (database_helper, folder_repository)
+# - BLoC state management (folder_bloc, recording_bloc, audio_player_bloc, settings_bloc)
+# - Main screens (main_screen, recording screens)
+# - Recording widgets (recording_item, waveforms, bottom sheet)
+# - Audio services (recorder, player, monitoring, factory)
+# - Comprehensive settings system (screens, widgets, dialogs)
+# - Permission handling and app configuration
 #
-# NEW RECORDING FUNCTIONALITY:
-# - iOS Voice Memos style interface with expandable bottom sheet
-# - Real-time waveform visualization during recording
-# - Folder selection for recordings
-# - Audio format selection (M4A, WAV, FLAC)
-# - Enhanced permissions handling
-# - Recording pause/resume functionality
+# LATEST ADDITIONS (NEW):
+# - Refactored settings screen into modular components
+# - Added settings widgets (header, sections, common components)
+# - Created specialized settings dialogs (sample rate, bit rate, about, storage, cache)
+# - Improved component organization and reusability
+# - Enhanced dialog system for settings configuration
+# - Refactored recording list screen into focused components
+# - Created organic background widget with flowing clouds and stars
+# - Built recording list item widget with waveform visualization
+# - Added organic record button with pulse animation
+#
+# NEXT PRIORITY FILES TO CREATE:
+# 1. Additional UI widgets and common components
+# 2. Use cases for business logic
+# 3. Additional screens and dialogs
+# 4. File management services
+# 5. Theme and styling system

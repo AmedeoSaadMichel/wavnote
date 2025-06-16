@@ -1,5 +1,7 @@
 // File: data/repositories/folder_repository.dart
 import 'package:flutter/material.dart';
+import 'package:fluttericon/font_awesome5_icons.dart';
+import 'package:fluttericon/font_awesome_icons.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/repositories/i_folder_repository.dart';
@@ -29,7 +31,7 @@ class FolderRepository implements IFolderRepository {
       FolderEntity.defaultFolder(
         id: 'recently_deleted',
         name: 'Recently Deleted',
-        icon: Icons.delete,
+        icon: FontAwesome5.skull,
         color: Colors.yellow,
       ),
     ];

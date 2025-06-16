@@ -3,39 +3,64 @@ lib/
 
 # ==== CORE ARCHITECTURE ====
 ├── core/
-│   └── enums/
-│       ├── audio_format.dart          # AudioFormat enum (WAV, M4A, FLAC)
-│       └── folder_type.dart           # FolderType enum (default, custom)
+│   ├── constants/
+│   │   └── app_constants.dart         # App-wide constants (colors, sizes, etc.)
+│   ├── enums/
+│   │   ├── audio_format.dart          # AudioFormat enum (WAV, M4A, FLAC)
+│   │   └── folder_type.dart           # FolderType enum (default, custom)
+│   └── utils/
+│       ├── date_formatter.dart        # Date/time formatting utilities
+│       └── file_utils.dart           # File operations helper
 
 # ==== DATA LAYER ====
 ├── data/
 │   ├── database/
 │   │   └── database_helper.dart       # SQLite database setup
 │   ├── models/
-│   │   └── folder_model.dart          # Folder data model
+│   │   ├── folder_model.dart          # Folder data model
+│   │   └── recording_model.dart       # Recording data model
 │   └── repositories/
-│       └── folder_repository.dart     # Folder CRUD operations
+│       ├── folder_repository.dart     # Folder CRUD operations
+│       ├── recording_repository.dart  # Main recording repository coordinator
+│       ├── recording_repository_base.dart # Base recording repository class
+│       ├── recording_repository_crud.dart # Recording CRUD operations
+│       ├── recording_repository_search.dart # Recording search operations
+│       ├── recording_repository_bulk.dart # Recording bulk operations
+│       ├── recording_repository_stats.dart # Recording statistics
+│       └── recording_repository_utils.dart # Recording utilities
 
 # ==== BUSINESS LOGIC LAYER ====
 ├── domain/
 │   ├── entities/
 │   │   ├── folder_entity.dart         # Pure folder business object
 │   │   └── recording_entity.dart      # Pure recording business object
+│   ├── usecases/
+│   │   └── recording/
+│   │       └── create_recording_usecase.dart # Create new recording use case
 │   └── repositories/
-│       ├── i_audio_service_repository.dart     # Audio service interface
-│       └── i_folder_repository.dart            # Folder repository interface
+│       ├── i_folder_repository.dart   # Folder repository interface
+│       ├── i_recording_repository.dart # Recording repository interface
+│       └── i_audio_service_repository.dart # Audio service interface
 
 # ==== PRESENTATION LAYER ====
 ├── presentation/
 │   ├── blocs/
+│   │   ├── audio_player/
+│   │   │   ├── audio_player_bloc.dart # Audio playback state
+│   │   │   ├── audio_player_event.dart# Audio player events (part of bloc)
+│   │   │   └── audio_player_state.dart# Audio player states (part of bloc)
 │   │   ├── folder/
 │   │   │   ├── folder_bloc.dart       # Folder state management
-│   │   │   ├── folder_event.dart      # Folder events (part of folder_bloc.dart)
-│   │   │   └── folder_state.dart      # Folder states (part of folder_bloc.dart)
-│   │   └── recording/
-│   │       ├── recording_bloc.dart    # Recording state management
-│   │       ├── recording_event.dart   # Recording events (part of recording_bloc.dart)
-│   │       └── recording_state.dart   # Recording states (part of recording_bloc.dart)
+│   │   │   ├── folder_event.dart      # Folder events (part of bloc)
+│   │   │   └── folder_state.dart      # Folder states (part of bloc)
+│   │   ├── recording/
+│   │   │   ├── recording_bloc.dart    # Recording state management
+│   │   │   ├── recording_event.dart   # Recording events (part of bloc)
+│   │   │   └── recording_state.dart   # Recording states (part of bloc)
+│   │   └── settings/
+│   │       ├── settings_bloc.dart     # App settings state
+│   │       ├── settings_event.dart    # Settings events (part of bloc)
+│   │       └── settings_state.dart    # Settings states (part of bloc)
 │   ├── screens/
 │   │   ├── main/
 │   │   │   └── main_screen.dart       # Main folders view
@@ -47,19 +72,29 @@ lib/
 │       ├── dialogs/
 │       │   ├── audio_format_dialog.dart    # Select audio format
 │       │   └── create_folder_dialog.dart   # Create folder dialog
-│       └── folder/
-│           └── folder_item.dart       # Individual folder widget
+│       ├── folder/
+│       │   └── folder_item.dart       # Individual folder widget
+│       └── recording/
+│           ├── recording_item.dart    # Individual recording widget
+│           ├── record_waveform.dart   # Compact waveform for recording
+│           ├── fullscreen_waveform.dart # Fullscreen waveform widget
+│           └── recording_bottom_sheet.dart # Recording bottom sheet
 
 # ==== SERVICES LAYER ====
 ├── services/
 │   ├── audio/
-│   │   └── audio_recorder_service.dart        # Audio recording implementation
+│   │   ├── audio_recorder_service.dart        # Audio recording implementation
+│   │   ├── real_audio_recorder_service.dart   # Real audio recording service
+│   │   ├── audio_service_factory.dart         # Audio service factory
+│   │   ├── audio_monitoring_service.dart      # Audio monitoring service
+│   │   └── impl/
+│   │       ├── audio_player_impl.dart         # Audio player implementation
+│   │       └── audio_recorder_impl.dart       # Audio recorder implementation
 │   ├── permission/
 │   │   └── permission_service.dart            # Handle permissions
 │   └── storage/
 │       └── database_service.dart              # Database operations
 
-# ==== PROJECT DOCUMENTATION ====
-├── idea_project_structure.txt         # Planned project structure
-├── project_structure.txt              # Current project structure
-└── pubspec.yaml                       # Dependencies configuration
+# ==== CONFIGURATION ====
+└── config/
+    └── app_config.dart               # App configuration
