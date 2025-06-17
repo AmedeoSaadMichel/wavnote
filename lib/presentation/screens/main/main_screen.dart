@@ -183,21 +183,16 @@ class _MainScreenState extends State<MainScreen> {
               // Header Section
               _buildHeader(),
 
-              // Folders List Section
+              // Folders List Section - Made scrollable
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildFoldersContent(),
-                ),
+                child: _buildFoldersContent(),
               ),
             ],
           ),
         ),
       ),
-      // Remove the FAB - recording will be handled in folder screens
     );
   }
-
 
   /// Build the header with title, format selector, and quick record button
   Widget _buildHeader() {
@@ -255,10 +250,9 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ],
               ),
-              // Edit Button and Quick Record
+              // Edit Button
               Row(
                 children: [
-                  // Edit Button
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
@@ -426,7 +420,7 @@ class _MainScreenState extends State<MainScreen> {
           Text(
             state.message,
             style: TextStyle(
-              color: Colors.white.withValues( alpha:0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 14,
             ),
             textAlign: TextAlign.center,
@@ -449,79 +443,112 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Build loaded state with folders
+  /// Build loaded state with folders - SCROLLABLE CONTENT WITHOUT ADD BUTTON
   Widget _buildLoadedState(FolderLoaded state) {
     return Column(
       children: [
-        // Default Folders
-        ...state.defaultFolders.map((folder) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: GestureDetector(
-            onTap: () => _onFolderTap(folder),
-            onLongPress: () => setState(() => _selectedFolder = folder),
-            child: FolderItem(
-              folder: folder,
-              onTap: () => _onFolderTap(folder),
+        // SCROLLABLE FOLDERS SECTION
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: CustomScrollView(
+              slivers: [
+                // Default Folders Section
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      final folder = state.defaultFolders[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GestureDetector(
+                          onTap: () => _onFolderTap(folder),
+                          onLongPress: () => setState(() => _selectedFolder = folder),
+                          child: FolderItem(
+                            folder: folder,
+                            onTap: () => _onFolderTap(folder),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: state.defaultFolders.length,
+                  ),
+                ),
+
+                // Custom Folders Section Header
+                if (state.hasCustomFolders) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 20, bottom: 16),
+                      child: Text(
+                        'MY FOLDERS',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Custom Folders List - SCROLLABLE
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                        final folder = state.customFolders[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Dismissible(
+                            key: Key(folder.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(
+                                FontAwesome5.skull,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              _onFolderDelete(folder);
+                              return false; // Don't auto-dismiss, let the Bloc handle it
+                            },
+                            child: GestureDetector(
+                              onTap: () => _onFolderTap(folder),
+                              onLongPress: () => setState(() => _selectedFolder = folder),
+                              child: FolderItem(
+                                folder: folder,
+                                onTap: () => _onFolderTap(folder),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      childCount: state.customFolders.length,
+                    ),
+                  ),
+                ],
+
+                // Extra space at bottom for better scrolling
+                SliverToBoxAdapter(
+                  child: SizedBox(height: 20),
+                ),
+              ],
             ),
           ),
-        )),
+        ),
 
-        // Custom Folders Section
-        if (state.hasCustomFolders) ...[
-          const SizedBox(height: 20),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'MY FOLDERS',
-              style: TextStyle(
-                color: Colors.white.withValues( alpha:0.7),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Custom Folders List with swipe-to-delete
-          ...state.customFolders.map((folder) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Dismissible(
-              key: Key(folder.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  FontAwesome5.skull,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              confirmDismiss: (direction) async {
-                _onFolderDelete(folder);
-                return false; // Don't auto-dismiss, let the Bloc handle it
-              },
-              child: GestureDetector(
-                onTap: () => _onFolderTap(folder),
-                onLongPress: () => setState(() => _selectedFolder = folder),
-                child: FolderItem(
-                  folder: folder,
-                  onTap: () => _onFolderTap(folder),
-                ),
-              ),
-            ),
-          )),
-        ],
-
-        // Add Folder Button
-        const Spacer(),
-        _buildAddFolderButton(),
-        const SizedBox(height: 32), // Regular bottom padding
+        // FIXED ADD FOLDER BUTTON AT BOTTOM
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildAddFolderButton(),
+        ),
+        const SizedBox(height: 32),
       ],
     );
   }

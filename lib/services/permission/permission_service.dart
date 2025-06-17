@@ -1,459 +1,316 @@
-import 'package:flutter/material.dart';
+// File: services/permission/permission_service.dart
+import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/foundation.dart';
 
-class AppPermissionHandler {
-  // Request microphone permission
-  static Future<bool> requestMicrophonePermission() async {
-    PermissionStatus status = await Permission.microphone.request();
-    return status == PermissionStatus.granted;
-  }
+/// Enhanced permission service for handling microphone and storage permissions
+///
+/// Provides robust permission checking and requesting with platform-specific
+/// handling and detailed error information for the voice memo app.
+class PermissionService {
+  static const String _tag = 'PermissionService';
 
-  // Request location permission
-  static Future<bool> requestLocationPermission() async {
-    PermissionStatus status = await Permission.location.request();
-    return status == PermissionStatus.granted;
-  }
+  // ==== MICROPHONE PERMISSIONS ====
 
-  // Request storage permission
-  static Future<bool> requestStoragePermission() async {
-    PermissionStatus status = await Permission.storage.request();
-    if (status != PermissionStatus.granted) {
-      // Try manage external storage for Android 11+
-      status = await Permission.manageExternalStorage.request();
+  /// Check if microphone permission is granted
+  static Future<bool> hasMicrophonePermission() async {
+    try {
+      debugPrint('$_tag: Checking microphone permission...');
+
+      final status = await Permission.microphone.status;
+      final hasPermission = status == PermissionStatus.granted;
+
+      debugPrint('$_tag: Microphone permission status: $status (granted: $hasPermission)');
+      return hasPermission;
+
+    } catch (e) {
+      debugPrint('$_tag: Error checking microphone permission: $e');
+      return false;
     }
-    return status == PermissionStatus.granted;
   }
 
-  // Request all permissions
-  static Future<Map<String, bool>> requestAllPermissions() async {
-    bool microphoneGranted = await requestMicrophonePermission();
-    bool locationGranted = await requestLocationPermission();
-    bool storageGranted = await requestStoragePermission();
+  /// Request microphone permission with detailed handling
+  static Future<PermissionResult> requestMicrophonePermission() async {
+    try {
+      debugPrint('$_tag: Requesting microphone permission...');
 
-    return {
-      'microphone': microphoneGranted,
-      'location': locationGranted,
-      'storage': storageGranted,
-    };
-  }
+      // Check current status first
+      final currentStatus = await Permission.microphone.status;
+      debugPrint('$_tag: Current microphone status: $currentStatus');
 
-  // Request specific permission (generic method)
-  static Future<bool> requestPermission(Permission permission) async {
-    PermissionStatus status = await permission.request();
-    return status == PermissionStatus.granted;
-  }
-
-  // Check if a specific permission is granted
-  static Future<bool> isPermissionGranted(Permission permission) async {
-    PermissionStatus status = await permission.status;
-    return status == PermissionStatus.granted;
-  }
-
-  // Open app settings if permission is permanently denied
-  static Future<void> openAppSettings() async {
-    await openAppSettings();
-  }
-}
-
-class PermissionScreen extends StatefulWidget {
-  final VoidCallback onPermissionsGranted;
-
-  const PermissionScreen({Key? key, required this.onPermissionsGranted}) : super(key: key);
-
-  @override
-  _PermissionScreenState createState() => _PermissionScreenState();
-}
-
-class _PermissionScreenState extends State<PermissionScreen> {
-  bool _microphoneGranted = false;
-  bool _locationGranted = false;
-  bool _storageGranted = false;
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkCurrentPermissions();
-  }
-
-  Future<void> _checkCurrentPermissions() async {
-    _microphoneGranted = await AppPermissionHandler.isPermissionGranted(Permission.microphone);
-    _locationGranted = await AppPermissionHandler.isPermissionGranted(Permission.location);
-    _storageGranted = await AppPermissionHandler.isPermissionGranted(Permission.storage) ||
-        await AppPermissionHandler.isPermissionGranted(Permission.manageExternalStorage);
-    setState(() {});
-  }
-
-  Future<void> _requestPermission(Permission permission) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    bool granted = await AppPermissionHandler.requestPermission(permission);
-
-    if (!granted) {
-      PermissionStatus status = await permission.status;
-      if (status == PermissionStatus.permanentlyDenied) {
-        _showPermissionDeniedDialog(permission);
+      // If already granted, return success
+      if (currentStatus == PermissionStatus.granted) {
+        debugPrint('$_tag: Microphone permission already granted');
+        return PermissionResult.granted();
       }
-    }
 
-    await _checkCurrentPermissions();
-    setState(() {
-      _isLoading = false;
-    });
+      // If permanently denied, direct user to settings
+      if (currentStatus == PermissionStatus.permanentlyDenied) {
+        debugPrint('$_tag: Microphone permission permanently denied');
+        return PermissionResult.permanentlyDenied();
+      }
 
-    // Check if essential permissions are granted (microphone + storage)
-    if (_microphoneGranted && _storageGranted) {
-      widget.onPermissionsGranted();
-    }
-  }
+      // Request permission
+      debugPrint('$_tag: Showing permission request dialog...');
+      final requestStatus = await Permission.microphone.request();
+      debugPrint('$_tag: Permission request result: $requestStatus');
 
-  void _showPermissionDeniedDialog(Permission permission) {
-    String permissionName = _getPermissionName(permission);
+      // Handle the result
+      switch (requestStatus) {
+        case PermissionStatus.granted:
+          debugPrint('$_tag: ✅ Microphone permission granted!');
+          return PermissionResult.granted();
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Color(0xFF2D1B69),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Permission Required',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            '$permissionName permission is required for the app to function properly. Please enable it in the app settings.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                openAppSettings();
-              },
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.yellowAccent.withValues( alpha: 0.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text(
-                'Open Settings',
-                style: TextStyle(color: Colors.yellowAccent),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
+        case PermissionStatus.denied:
+          debugPrint('$_tag: ❌ Microphone permission denied');
+          return PermissionResult.denied();
 
-  String _getPermissionName(Permission permission) {
-    switch (permission) {
-      case Permission.microphone:
-        return 'Microphone';
-      case Permission.location:
-        return 'Location';
-      case Permission.storage:
-      case Permission.manageExternalStorage:
-        return 'Storage';
-      default:
-        return 'Unknown';
+        case PermissionStatus.permanentlyDenied:
+          debugPrint('$_tag: ❌ Microphone permission permanently denied');
+          return PermissionResult.permanentlyDenied();
+
+        case PermissionStatus.restricted:
+          debugPrint('$_tag: ❌ Microphone permission restricted (parental controls?)');
+          return PermissionResult.restricted();
+
+        case PermissionStatus.limited:
+          debugPrint('$_tag: ⚠️ Microphone permission limited');
+          return PermissionResult.limited();
+
+        case PermissionStatus.provisional:
+          debugPrint('$_tag: ⚠️ Microphone permission provisional');
+          return PermissionResult.provisional();
+      }
+
+    } catch (e) {
+      debugPrint('$_tag: ❌ Error requesting microphone permission: $e');
+      return PermissionResult.error('Failed to request permission: $e');
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF8E2DE2),
-              Color(0xFFDA22FF),
-              Color(0xFFFF4E50),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 40),
-                Text(
-                  'Permissions Required',
-                  style: TextStyle(
-                    color: Colors.yellowAccent,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'To provide the best voice memo experience, we need access to the following permissions:',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha:0.8),
-                    fontSize: 16,
-                    height: 1.5,
-                  ),
-                ),
-                SizedBox(height: 40),
+  // ==== STORAGE PERMISSIONS ====
 
-                // Microphone Permission
-                PermissionCard(
-                  icon: Icons.mic,
-                  title: 'Microphone Access',
-                  description: 'Required to record voice memos',
-                  isGranted: _microphoneGranted,
-                  onTap: () => _requestPermission(Permission.microphone),
-                  isLoading: _isLoading,
-                  isRequired: true,
-                ),
-                SizedBox(height: 16),
+  /// Check if storage permission is granted (Android only)
+  static Future<bool> hasStoragePermission() async {
+    if (!Platform.isAndroid) return true; // iOS handles this automatically
 
-                // Storage Permission
-                PermissionCard(
-                  icon: Icons.storage,
-                  title: 'Storage Access',
-                  description: 'Required to save and manage your voice memos',
-                  isGranted: _storageGranted,
-                  onTap: () => _requestPermission(Permission.storage),
-                  isLoading: _isLoading,
-                  isRequired: true,
-                ),
-                SizedBox(height: 16),
+    try {
+      debugPrint('$_tag: Checking storage permission...');
 
-                // Location Permission
-                PermissionCard(
-                  icon: Icons.location_on,
-                  title: 'Location Access',
-                  description: 'Optional: Add location data to your recordings',
-                  isGranted: _locationGranted,
-                  onTap: () => _requestPermission(Permission.location),
-                  isLoading: _isLoading,
-                  isRequired: false,
-                ),
+      // For Android 13+ (API 33+), use media permissions
+      if (Platform.isAndroid) {
+        final audioStatus = await Permission.audio.status;
+        debugPrint('$_tag: Audio permission status: $audioStatus');
+        return audioStatus == PermissionStatus.granted;
+      }
 
-                Spacer(),
+      return true;
 
-                // Continue Button
-                Container(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: (_microphoneGranted && _storageGranted)
-                        ? widget.onPermissionsGranted
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: (_microphoneGranted && _storageGranted)
-                          ? Colors.yellowAccent
-                          : Colors.grey.withValues(alpha:0.3),
-                      foregroundColor: Colors.black,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Continue to Voice Memos',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16),
+    } catch (e) {
+      debugPrint('$_tag: Error checking storage permission: $e');
+      return false;
+    }
+  }
 
-                // Progress indicator
-                Center(
-                  child: Text(
-                    '${(_microphoneGranted ? 1 : 0) + (_storageGranted ? 1 : 0) + (_locationGranted ? 1 : 0)}/3 permissions granted',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha:0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  /// Request storage permission (Android only)
+  static Future<PermissionResult> requestStoragePermission() async {
+    if (!Platform.isAndroid) return PermissionResult.granted(); // iOS handles automatically
+
+    try {
+      debugPrint('$_tag: Requesting storage permission...');
+
+      // For Android 13+ (API 33+), request audio permission
+      final status = await Permission.audio.request();
+      debugPrint('$_tag: Storage permission request result: $status');
+
+      switch (status) {
+        case PermissionStatus.granted:
+          return PermissionResult.granted();
+        case PermissionStatus.denied:
+          return PermissionResult.denied();
+        case PermissionStatus.permanentlyDenied:
+          return PermissionResult.permanentlyDenied();
+        case PermissionStatus.restricted:
+          return PermissionResult.restricted();
+        case PermissionStatus.limited:
+          return PermissionResult.limited();
+        case PermissionStatus.provisional:
+          return PermissionResult.provisional();
+      }
+
+    } catch (e) {
+      debugPrint('$_tag: Error requesting storage permission: $e');
+      return PermissionResult.error('Failed to request storage permission: $e');
+    }
+  }
+
+  // ==== COMBINED PERMISSIONS ====
+
+  /// Check all required permissions for recording
+  static Future<RecordingPermissionStatus> checkRecordingPermissions() async {
+    debugPrint('$_tag: Checking all recording permissions...');
+
+    try {
+      final micPermission = await hasMicrophonePermission();
+      final storagePermission = await hasStoragePermission();
+
+      debugPrint('$_tag: Mic: $micPermission, Storage: $storagePermission');
+
+      if (micPermission && storagePermission) {
+        return RecordingPermissionStatus.allGranted;
+      } else if (!micPermission && !storagePermission) {
+        return RecordingPermissionStatus.allDenied;
+      } else {
+        return RecordingPermissionStatus.partiallyGranted;
+      }
+
+    } catch (e) {
+      debugPrint('$_tag: Error checking recording permissions: $e');
+      return RecordingPermissionStatus.error;
+    }
+  }
+
+  /// Request all required permissions for recording
+  static Future<PermissionRequestResult> requestRecordingPermissions() async {
+    debugPrint('$_tag: Requesting all recording permissions...');
+
+    try {
+      final micResult = await requestMicrophonePermission();
+      final storageResult = await requestStoragePermission();
+
+      debugPrint('$_tag: Mic result: ${micResult.status}, Storage result: ${storageResult.status}');
+
+      return PermissionRequestResult(
+        microphone: micResult,
+        storage: storageResult,
+      );
+
+    } catch (e) {
+      debugPrint('$_tag: Error requesting recording permissions: $e');
+      return PermissionRequestResult.error('Failed to request permissions: $e');
+    }
+  }
+
+  // ==== UTILITY METHODS ====
+
+  /// Open app settings for permission management
+  static Future<bool> openAppSettings() async {
+    try {
+      debugPrint('$_tag: Opening app settings...');
+      final opened = await openAppSettings();
+      debugPrint('$_tag: App settings opened: $opened');
+      return opened;
+    } catch (e) {
+      debugPrint('$_tag: Error opening app settings: $e');
+      return false;
+    }
+  }
+
+  /// Check if device has microphone hardware
+  static Future<bool> hasMicrophoneHardware() async {
+    try {
+      // This is a basic check - in a real app you might use
+      // platform-specific code to check hardware capabilities
+      return true; // Most devices have microphones
+    } catch (e) {
+      debugPrint('$_tag: Error checking microphone hardware: $e');
+      return false;
+    }
+  }
+
+  /// Get detailed permission status info for debugging
+  static Future<Map<String, dynamic>> getPermissionDebugInfo() async {
+    final info = <String, dynamic>{};
+
+    try {
+      info['platform'] = Platform.operatingSystem;
+      info['microphone_status'] = (await Permission.microphone.status).toString();
+      info['microphone_granted'] = await hasMicrophonePermission();
+      info['storage_granted'] = await hasStoragePermission();
+      info['has_microphone_hardware'] = await hasMicrophoneHardware();
+      info['timestamp'] = DateTime.now().toIso8601String();
+
+      if (Platform.isAndroid) {
+        info['audio_status'] = (await Permission.audio.status).toString();
+      }
+
+    } catch (e) {
+      info['error'] = e.toString();
+    }
+
+    return info;
   }
 }
 
-class PermissionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final bool isGranted;
-  final VoidCallback onTap;
-  final bool isLoading;
-  final bool isRequired;
+// ==== RESULT CLASSES ====
 
-  const PermissionCard({
-    Key? key,
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.isGranted,
-    required this.onTap,
-    required this.isLoading,
-    this.isRequired = true,
-  }) : super(key: key);
+/// Result of a permission request
+class PermissionResult {
+  final PermissionResultStatus status;
+  final String? errorMessage;
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isGranted ? null : onTap,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 300),
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha:0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isGranted
-                ? Colors.green
-                : isRequired
-                ? Colors.yellowAccent.withValues(alpha:0.5)
-                : Colors.white.withValues(alpha:0.3),
-            width: 2,
-          ),
-          boxShadow: isGranted
-              ? [BoxShadow(
-            color: Colors.green.withValues(alpha:0.3),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          )]
-              : null,
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: Duration(milliseconds: 300),
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isGranted
-                    ? Colors.green
-                    : isRequired
-                    ? Colors.yellowAccent.withValues(alpha:0.2)
-                    : Colors.white.withValues(alpha:0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                isGranted ? Icons.check : icon,
-                color: isGranted
-                    ? Colors.white
-                    : isRequired
-                    ? Colors.yellowAccent
-                    : Colors.white70,
-                size: 24,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (isRequired) ...[
-                        SizedBox(width: 8),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha:0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'REQUIRED',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        SizedBox(width: 8),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha:0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'OPTIONAL',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha:0.7),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isLoading)
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
-                ),
-              )
-            else if (!isGranted)
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withValues(alpha:0.5),
-                size: 20,
-              )
-            else
-              Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 20,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+  const PermissionResult._({
+    required this.status,
+    this.errorMessage,
+  });
+
+  factory PermissionResult.granted() => const PermissionResult._(status: PermissionResultStatus.granted);
+  factory PermissionResult.denied() => const PermissionResult._(status: PermissionResultStatus.denied);
+  factory PermissionResult.permanentlyDenied() => const PermissionResult._(status: PermissionResultStatus.permanentlyDenied);
+  factory PermissionResult.restricted() => const PermissionResult._(status: PermissionResultStatus.restricted);
+  factory PermissionResult.limited() => const PermissionResult._(status: PermissionResultStatus.limited);
+  factory PermissionResult.provisional() => const PermissionResult._(status: PermissionResultStatus.provisional);
+  factory PermissionResult.error(String message) => PermissionResult._(
+    status: PermissionResultStatus.error,
+    errorMessage: message,
+  );
+
+  bool get isGranted => status == PermissionResultStatus.granted;
+  bool get isDenied => status == PermissionResultStatus.denied;
+  bool get isPermanentlyDenied => status == PermissionResultStatus.permanentlyDenied;
+  bool get isError => status == PermissionResultStatus.error;
+  bool get needsSettings => isPermanentlyDenied;
+}
+
+/// Combined result for all recording permissions
+class PermissionRequestResult {
+  final PermissionResult microphone;
+  final PermissionResult storage;
+  final String? errorMessage;
+
+  const PermissionRequestResult({
+    required this.microphone,
+    required this.storage,
+    this.errorMessage,
+  });
+
+  factory PermissionRequestResult.error(String message) => PermissionRequestResult(
+    microphone: PermissionResult.error(message),
+    storage: PermissionResult.error(message),
+    errorMessage: message,
+  );
+
+  bool get canRecord => microphone.isGranted && storage.isGranted;
+  bool get hasAnyPermission => microphone.isGranted || storage.isGranted;
+  bool get needsSettings => microphone.needsSettings || storage.needsSettings;
+  bool get hasError => microphone.isError || storage.isError;
+}
+
+/// Status of permission requests (renamed to avoid conflict)
+enum PermissionResultStatus {
+  granted,
+  denied,
+  permanentlyDenied,
+  restricted,
+  limited,
+  provisional,
+  error,
+}
+
+/// Overall recording permission status (renamed to avoid conflict)
+enum RecordingPermissionStatus {
+  allGranted,
+  allDenied,
+  partiallyGranted,
+  error,
 }

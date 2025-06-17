@@ -206,13 +206,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                 ),
               ),
 
-              // Bottom sheet overlay
-              if (_showBottomSheet)
-                RecordingBottomSheet(
-                  selectedFolder: widget.selectedFolder,
-                  selectedFormat: widget.selectedFormat,
-                  onComplete: _onRecordingComplete,
-                ),
+
             ],
           );
         },

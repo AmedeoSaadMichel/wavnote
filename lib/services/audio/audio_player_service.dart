@@ -1,74 +1,76 @@
 // File: services/audio/audio_player_service.dart
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
-import '../../core/utils/file_utils.dart';
 
-/// Complete audio player service implementation using just_audio
+/// Audio playback service using just_audio
 ///
-/// Provides comprehensive audio playback functionality including:
-/// - Advanced playback controls (play, pause, stop, seek)
-/// - Variable speed playback (0.25x - 3.0x)
-/// - Volume control and audio session management
-/// - Real-time position and completion tracking
-/// - Format support and device capability detection
-/// - Background playback and interruption handling
+/// Provides complete audio playback functionality for the voice memo app.
+/// Focused specifically on playback operations while implementing the full
+/// IAudioServiceRepository interface for compatibility.
 class AudioPlayerService implements IAudioServiceRepository {
-  // Audio player instance
-  AudioPlayer? _player;
+
+  // Core audio player
+  AudioPlayer? _audioPlayer;
+
+  // Service state
+  bool _isServiceInitialized = false;
+  String? _currentlyPlayingFile;
 
   // Playback state
-  bool _isInitialized = false;
-  bool _isPlaying = false;
-  bool _isPlaybackPaused = false;
-  String? _currentFilePath;
-  Duration _currentPosition = Duration.zero;
-  Duration _totalDuration = Duration.zero;
-  double _currentSpeed = 1.0;
-  double _currentVolume = 1.0;
+  bool _playbackActive = false;
+  bool _playbackPaused = false;
+  Duration _playbackPosition = Duration.zero;
+  Duration _playbackDuration = Duration.zero;
+  double _playbackSpeed = 1.0;
+  double _playbackVolume = 1.0;
 
-  // Stream controllers for real-time updates
-  StreamController<Duration>? _positionController;
-  StreamController<void>? _completionController;
-  StreamController<double>? _amplitudeController;
+  // Stream management
+  StreamController<Duration>? _positionStreamController;
+  StreamController<void>? _completionStreamController;
+  StreamController<double>? _amplitudeStreamController;
 
-  // Stream subscriptions
+  // Subscriptions
   StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<PlayerState>? _playerStateSubscription;
+  StreamSubscription<PlayerState>? _stateSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
 
-  // Timer for amplitude simulation (since just_audio doesn't provide real amplitude)
-  Timer? _amplitudeTimer;
+  // Amplitude simulation
+  Timer? _amplitudeSimulationTimer;
 
-  // ==== INITIALIZATION & CLEANUP ====
+  // ==== SERVICE LIFECYCLE ====
 
   @override
   Future<bool> initialize() async {
     try {
-      if (_isInitialized) {
+      // Clean up any existing instance
+      if (_isServiceInitialized) {
         await dispose();
       }
 
-      _player = AudioPlayer();
-      _isInitialized = true;
+      // Create new audio player instance
+      _audioPlayer = AudioPlayer();
 
       // Initialize stream controllers
-      _positionController = StreamController<Duration>.broadcast();
-      _completionController = StreamController<void>.broadcast();
-      _amplitudeController = StreamController<double>.broadcast();
+      _positionStreamController = StreamController<Duration>.broadcast();
+      _completionStreamController = StreamController<void>.broadcast();
+      _amplitudeStreamController = StreamController<double>.broadcast();
 
-      // Set up player listeners
-      await _setupPlayerListeners();
+      // Setup audio player listeners
+      await _initializePlayerListeners();
 
-      debugPrint('✅ Audio player service initialized');
+      _isServiceInitialized = true;
+      debugPrint('✅ Audio player service initialized successfully');
       return true;
+
     } catch (e) {
-      debugPrint('❌ Failed to initialize audio player: $e');
-      _isInitialized = false;
+      debugPrint('❌ Failed to initialize audio player service: $e');
+      _isServiceInitialized = false;
       return false;
     }
   }
@@ -76,106 +78,108 @@ class AudioPlayerService implements IAudioServiceRepository {
   @override
   Future<void> dispose() async {
     try {
-      // Stop any ongoing playback
-      if (_isPlaying) {
+      // Stop any active playback
+      if (_playbackActive) {
         await stopPlaying();
       }
 
-      // Cancel subscriptions
+      // Cancel all subscriptions
       await _positionSubscription?.cancel();
-      await _playerStateSubscription?.cancel();
+      await _stateSubscription?.cancel();
       await _durationSubscription?.cancel();
-      _amplitudeTimer?.cancel();
+      _amplitudeSimulationTimer?.cancel();
 
       // Close stream controllers
-      await _positionController?.close();
-      await _completionController?.close();
-      await _amplitudeController?.close();
+      await _positionStreamController?.close();
+      await _completionStreamController?.close();
+      await _amplitudeStreamController?.close();
 
-      // Dispose player
-      await _player?.dispose();
-      _player = null;
+      // Dispose audio player
+      await _audioPlayer?.dispose();
 
-      _isInitialized = false;
-      _isPlaying = false;
-      _isPlaybackPaused = false;
-      _currentFilePath = null;
+      // Reset state
+      _audioPlayer = null;
+      _isServiceInitialized = false;
+      _playbackActive = false;
+      _playbackPaused = false;
+      _currentlyPlayingFile = null;
 
       debugPrint('✅ Audio player service disposed');
+
     } catch (e) {
-      debugPrint('❌ Error disposing audio player: $e');
+      debugPrint('❌ Error disposing audio player service: $e');
     }
   }
 
-  /// Setup player event listeners
-  Future<void> _setupPlayerListeners() async {
-    if (_player == null) return;
+  /// Initialize audio player event listeners
+  Future<void> _initializePlayerListeners() async {
+    if (_audioPlayer == null) return;
 
-    // Position updates
-    _positionSubscription = _player!.positionStream.listen(
-          (position) {
-        _currentPosition = position;
-        _positionController?.add(position);
-      },
-      onError: (error) {
-        debugPrint('❌ Position stream error: $error');
-      },
-    );
+    try {
+      // Position tracking
+      _positionSubscription = _audioPlayer!.positionStream.listen(
+            (position) {
+          _playbackPosition = position;
+          _positionStreamController?.add(position);
+        },
+        onError: (error) => debugPrint('❌ Position stream error: $error'),
+      );
 
-    // Player state changes
-    _playerStateSubscription = _player!.playerStateStream.listen(
-          (state) {
-        _handlePlayerStateChange(state);
-      },
-      onError: (error) {
-        debugPrint('❌ Player state stream error: $error');
-      },
-    );
+      // State changes
+      _stateSubscription = _audioPlayer!.playerStateStream.listen(
+            (state) => _handlePlayerStateChange(state),
+        onError: (error) => debugPrint('❌ Player state error: $error'),
+      );
 
-    // Duration updates
-    _durationSubscription = _player!.durationStream.listen(
-          (duration) {
-        if (duration != null) {
-          _totalDuration = duration;
-        }
-      },
-      onError: (error) {
-        debugPrint('❌ Duration stream error: $error');
-      },
-    );
+      // Duration updates
+      _durationSubscription = _audioPlayer!.durationStream.listen(
+            (duration) {
+          if (duration != null) {
+            _playbackDuration = duration;
+          }
+        },
+        onError: (error) => debugPrint('❌ Duration stream error: $error'),
+      );
+
+    } catch (e) {
+      debugPrint('❌ Error setting up player listeners: $e');
+    }
   }
 
-  /// Handle player state changes
+  /// Handle audio player state changes
   void _handlePlayerStateChange(PlayerState state) {
     switch (state.processingState) {
       case ProcessingState.completed:
-        _isPlaying = false;
-        _isPlaybackPaused = false;
-        _completionController?.add(null);
+        _playbackActive = false;
+        _playbackPaused = false;
         _stopAmplitudeSimulation();
-        debugPrint('📻 Playback completed');
+        _completionStreamController?.add(null);
+        debugPrint('🎵 Playback completed');
         break;
+
       case ProcessingState.ready:
         if (state.playing) {
-          _isPlaying = true;
-          _isPlaybackPaused = false;
+          _playbackActive = true;
+          _playbackPaused = false;
           _startAmplitudeSimulation();
-          debugPrint('📻 Playback started/resumed');
+          debugPrint('🎵 Playback active');
         } else {
-          _isPlaying = false;
-          _isPlaybackPaused = true;
+          _playbackActive = false;
+          _playbackPaused = true;
           _stopAmplitudeSimulation();
-          debugPrint('📻 Playback paused');
+          debugPrint('🎵 Playback paused');
         }
         break;
+
       case ProcessingState.idle:
-        _isPlaying = false;
-        _isPlaybackPaused = false;
+        _playbackActive = false;
+        _playbackPaused = false;
         _stopAmplitudeSimulation();
         break;
+
       case ProcessingState.loading:
       case ProcessingState.buffering:
-      // Keep current state during loading/buffering
+      // Keep current state during loading
         break;
     }
   }
@@ -184,58 +188,49 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> startPlaying(String filePath) async {
-    if (!_isInitialized || _player == null) {
-      debugPrint('❌ Audio player not initialized');
-      return false;
-    }
+    if (!_ensureInitialized()) return false;
 
     try {
-      // Validate file exists
-      final file = File(filePath);
-      if (!await file.exists()) {
-        debugPrint('❌ Audio file not found: $filePath');
+      // Validate file
+      if (!await _validateAudioFile(filePath)) {
+        debugPrint('❌ Invalid audio file: $filePath');
         return false;
       }
 
       // Stop current playback if any
-      if (_isPlaying) {
+      if (_playbackActive) {
         await stopPlaying();
       }
 
-      // Load and play the audio file
-      await _player!.setAudioSource(AudioSource.file(filePath));
-      await _player!.setSpeed(_currentSpeed);
-      await _player!.setVolume(_currentVolume);
+      // Load and start playback
+      await _audioPlayer!.setAudioSource(AudioSource.file(filePath));
+      await _audioPlayer!.setSpeed(_playbackSpeed);
+      await _audioPlayer!.setVolume(_playbackVolume);
+      await _audioPlayer!.play();
 
-      await _player!.play();
-
-      _currentFilePath = filePath;
-      debugPrint('✅ Started playing: $filePath');
+      _currentlyPlayingFile = filePath;
+      debugPrint('🎵 Started playing: $filePath');
       return true;
 
     } catch (e) {
-      debugPrint('❌ Failed to start playing: $e');
+      debugPrint('❌ Failed to start playback: $e');
       return false;
     }
   }
 
   @override
   Future<bool> stopPlaying() async {
-    if (!_isInitialized || _player == null) {
-      debugPrint('❌ Audio player not initialized');
-      return false;
-    }
+    if (!_ensureInitialized()) return false;
 
     try {
-      await _player!.stop();
-      _currentPosition = Duration.zero;
-      _currentFilePath = null;
-      _isPlaying = false;
-      _isPlaybackPaused = false;
+      await _audioPlayer!.stop();
+      _currentlyPlayingFile = null;
+      _playbackPosition = Duration.zero;
       _stopAmplitudeSimulation();
 
-      debugPrint('✅ Playback stopped');
+      debugPrint('🎵 Playback stopped');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to stop playback: $e');
       return false;
@@ -244,15 +239,13 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> pausePlaying() async {
-    if (!_isInitialized || _player == null || !_isPlaying) {
-      debugPrint('❌ Cannot pause - not playing');
-      return false;
-    }
+    if (!_ensureInitialized() || !_playbackActive) return false;
 
     try {
-      await _player!.pause();
-      debugPrint('✅ Playback paused');
+      await _audioPlayer!.pause();
+      debugPrint('🎵 Playback paused');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to pause playback: $e');
       return false;
@@ -261,15 +254,13 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> resumePlaying() async {
-    if (!_isInitialized || _player == null || !_isPlaybackPaused) {
-      debugPrint('❌ Cannot resume - not paused');
-      return false;
-    }
+    if (!_ensureInitialized() || !_playbackPaused) return false;
 
     try {
-      await _player!.play();
-      debugPrint('✅ Playback resumed');
+      await _audioPlayer!.play();
+      debugPrint('🎵 Playback resumed');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to resume playback: $e');
       return false;
@@ -278,27 +269,21 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> seekTo(Duration position) async {
-    if (!_isInitialized || _player == null) {
-      debugPrint('❌ Audio player not initialized');
-      return false;
-    }
+    if (!_ensureInitialized()) return false;
 
     try {
       // Validate seek position
-      if (position.isNegative) {
-        debugPrint('❌ Seek position cannot be negative');
+      if (position.isNegative ||
+          (_playbackDuration > Duration.zero && position > _playbackDuration)) {
+        debugPrint('❌ Invalid seek position: $position');
         return false;
       }
 
-      if (position > _totalDuration && _totalDuration > Duration.zero) {
-        debugPrint('❌ Seek position beyond audio duration');
-        return false;
-      }
-
-      await _player!.seek(position);
-      _currentPosition = position;
-      debugPrint('✅ Seeked to: ${_formatDuration(position)}');
+      await _audioPlayer!.seek(position);
+      _playbackPosition = position;
+      debugPrint('🎵 Seeked to: $position');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to seek: $e');
       return false;
@@ -307,22 +292,20 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> setPlaybackSpeed(double speed) async {
-    if (!_isInitialized || _player == null) {
-      debugPrint('❌ Audio player not initialized');
-      return false;
-    }
+    if (!_ensureInitialized()) return false;
 
     try {
       // Validate speed range
       if (speed < 0.25 || speed > 3.0) {
-        debugPrint('❌ Playback speed must be between 0.25x and 3.0x');
+        debugPrint('❌ Invalid playback speed: $speed');
         return false;
       }
 
-      await _player!.setSpeed(speed);
-      _currentSpeed = speed;
-      debugPrint('✅ Playback speed set to: ${speed}x');
+      await _audioPlayer!.setSpeed(speed);
+      _playbackSpeed = speed;
+      debugPrint('🎵 Playback speed set: ${speed}x');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to set playback speed: $e');
       return false;
@@ -331,196 +314,51 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> setVolume(double volume) async {
-    if (!_isInitialized || _player == null) {
-      debugPrint('❌ Audio player not initialized');
-      return false;
-    }
+    if (!_ensureInitialized()) return false;
 
     try {
       // Validate volume range
       if (volume < 0.0 || volume > 1.0) {
-        debugPrint('❌ Volume must be between 0.0 and 1.0');
+        debugPrint('❌ Invalid volume: $volume');
         return false;
       }
 
-      await _player!.setVolume(volume);
-      _currentVolume = volume;
-      debugPrint('✅ Volume set to: ${(volume * 100).toInt()}%');
+      await _audioPlayer!.setVolume(volume);
+      _playbackVolume = volume;
+      debugPrint('🎵 Volume set: $volume');
       return true;
+
     } catch (e) {
       debugPrint('❌ Failed to set volume: $e');
       return false;
     }
   }
 
-  // ==== STATE GETTERS ====
+  // ==== STATE QUERIES ====
 
   @override
-  Future<bool> isPlaying() async => _isPlaying;
+  Future<bool> isPlaying() async => _playbackActive;
 
   @override
-  Future<bool> isPlaybackPaused() async => _isPlaybackPaused;
+  Future<bool> isPlaybackPaused() async => _playbackPaused;
 
   @override
-  Future<Duration> getCurrentPlaybackPosition() async => _currentPosition;
+  Future<Duration> getCurrentPlaybackPosition() async => _playbackPosition;
 
   @override
-  Future<Duration> getCurrentPlaybackDuration() async => _totalDuration;
+  Future<Duration> getCurrentPlaybackDuration() async => _playbackDuration;
 
-  /// Get current file path being played
-  String? get currentFilePath => _currentFilePath;
+  // ==== STREAM GETTERS ====
 
   @override
   Stream<Duration> getPlaybackPositionStream() =>
-      _positionController?.stream ?? const Stream.empty();
+      _positionStreamController?.stream ?? const Stream.empty();
 
   @override
   Stream<void> getPlaybackCompletionStream() =>
-      _completionController?.stream ?? const Stream.empty();
+      _completionStreamController?.stream ?? const Stream.empty();
 
-  // ==== AUDIO FILE OPERATIONS ====
-
-  @override
-  Future<AudioFileInfo?> getAudioFileInfo(String filePath) async {
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        debugPrint('❌ Audio file not found: $filePath');
-        return null;
-      }
-
-      // Get file stats
-      final fileStat = await file.stat();
-      final fileSize = fileStat.size;
-      final createdAt = fileStat.changed;
-
-      // Determine format from file extension
-      final format = FileUtils.getAudioFormatFromPath(filePath);
-      if (format == null) {
-        debugPrint('❌ Unsupported audio format: $filePath');
-        return null;
-      }
-
-      // Create temporary player to get duration and metadata
-      final tempPlayer = AudioPlayer();
-      Duration duration = Duration.zero;
-      int sampleRate = 44100; // Default
-      int bitRate = 128000; // Default
-      int channels = 2; // Default
-
-      try {
-        await tempPlayer.setAudioSource(AudioSource.file(filePath));
-        duration = tempPlayer.duration ?? Duration.zero;
-
-        // Note: just_audio doesn't provide detailed metadata
-        // In a real implementation, you might use a different library
-        // like flutter_ffmpeg or native platform channels for detailed info
-
-      } catch (e) {
-        debugPrint('❌ Failed to get audio metadata: $e');
-      } finally {
-        await tempPlayer.dispose();
-      }
-
-      return AudioFileInfo(
-        filePath: filePath,
-        format: format,
-        duration: duration,
-        fileSize: fileSize,
-        sampleRate: sampleRate,
-        bitRate: bitRate,
-        channels: channels,
-        createdAt: createdAt,
-      );
-
-    } catch (e) {
-      debugPrint('❌ Failed to get audio file info: $e');
-      return null;
-    }
-  }
-
-  @override
-  Future<List<AudioFormat>> getSupportedFormats() async {
-    // just_audio supports most common formats on both platforms
-    return const [
-      AudioFormat.m4a,
-      AudioFormat.wav,
-      AudioFormat.flac,
-    ];
-  }
-
-  @override
-  Future<List<int>> getSupportedSampleRates(AudioFormat format) async {
-    // Return commonly supported sample rates
-    switch (format) {
-      case AudioFormat.wav:
-      case AudioFormat.flac:
-        return [8000, 16000, 22050, 44100, 48000, 96000];
-      case AudioFormat.m4a:
-        return [8000, 16000, 22050, 44100, 48000];
-    }
-  }
-
-  // ==== DEVICE & PERMISSIONS ====
-
-  @override
-  Future<bool> hasMicrophonePermission() async {
-    // This method is more relevant for recording, but we implement for interface compliance
-    return true; // For playback, we don't need microphone permission
-  }
-
-  @override
-  Future<bool> requestMicrophonePermission() async {
-    // Not needed for playback
-    return true;
-  }
-
-  @override
-  Future<bool> hasMicrophone() async {
-    // For playback, we don't need microphone
-    return true;
-  }
-
-  @override
-  Future<List<AudioInputDevice>> getAudioInputDevices() async {
-    // Not relevant for playback
-    return [];
-  }
-
-  @override
-  Future<bool> setAudioInputDevice(String deviceId) async {
-    // Not relevant for playback
-    return true;
-  }
-
-  // ==== SETTINGS & CONFIGURATION ====
-
-  @override
-  Future<bool> setAudioSessionCategory(AudioSessionCategory category) async {
-    try {
-      // just_audio handles audio session automatically
-      // For advanced session management, you might need platform-specific code
-      debugPrint('✅ Audio session category set to: $category');
-      return true;
-    } catch (e) {
-      debugPrint('❌ Failed to set audio session category: $e');
-      return false;
-    }
-  }
-
-  @override
-  Future<bool> enableBackgroundRecording() async {
-    // Not relevant for playback, but implement for interface compliance
-    return true;
-  }
-
-  @override
-  Future<bool> disableBackgroundRecording() async {
-    // Not relevant for playback
-    return true;
-  }
-
-  // ==== RECORDING OPERATIONS (Not Implemented - Playback Only) ====
+  // ==== RECORDING OPERATIONS (Not Supported) ====
 
   @override
   Future<bool> startRecording({
@@ -529,27 +367,32 @@ class AudioPlayerService implements IAudioServiceRepository {
     required int sampleRate,
     required int bitRate,
   }) async {
-    throw UnsupportedError('AudioPlayerService does not support recording operations');
+    debugPrint('❌ Recording not supported in player service');
+    return false;
   }
 
   @override
   Future<RecordingEntity?> stopRecording() async {
-    throw UnsupportedError('AudioPlayerService does not support recording operations');
+    debugPrint('❌ Recording not supported in player service');
+    return null;
   }
 
   @override
   Future<bool> pauseRecording() async {
-    throw UnsupportedError('AudioPlayerService does not support recording operations');
+    debugPrint('❌ Recording not supported in player service');
+    return false;
   }
 
   @override
   Future<bool> resumeRecording() async {
-    throw UnsupportedError('AudioPlayerService does not support recording operations');
+    debugPrint('❌ Recording not supported in player service');
+    return false;
   }
 
   @override
   Future<bool> cancelRecording() async {
-    throw UnsupportedError('AudioPlayerService does not support recording operations');
+    debugPrint('❌ Recording not supported in player service');
+    return false;
   }
 
   @override
@@ -564,38 +407,36 @@ class AudioPlayerService implements IAudioServiceRepository {
   @override
   Stream<double> getRecordingAmplitudeStream() => const Stream.empty();
 
-  // ==== PRIVATE HELPER METHODS ====
+  // ==== AUDIO FILE OPERATIONS ====
 
-  /// Start amplitude simulation for visual feedback
-  void _startAmplitudeSimulation() {
-    _amplitudeTimer?.cancel();
-    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!_isPlaying) {
-        timer.cancel();
-        return;
-      }
+  @override
+  Future<AudioFileInfo?> getAudioFileInfo(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) return null;
 
-      // Simulate amplitude values for visualization
-      // In a real implementation, you'd extract actual amplitude from audio
-      final amplitude = 0.3 + (0.4 * (DateTime.now().millisecondsSinceEpoch % 1000) / 1000);
-      _amplitudeController?.add(amplitude);
-    });
+      final stats = await file.stat();
+      final format = _detectAudioFormat(filePath);
+      if (format == null) return null;
+
+      // Basic file information
+      // TODO: For production, implement proper audio metadata extraction
+      return AudioFileInfo(
+        filePath: filePath,
+        format: format,
+        duration: const Duration(seconds: 60), // Placeholder
+        fileSize: stats.size,
+        sampleRate: 44100, // Default
+        bitRate: 128000, // Default
+        channels: 2, // Default
+        createdAt: stats.modified,
+      );
+
+    } catch (e) {
+      debugPrint('❌ Error getting audio file info: $e');
+      return null;
+    }
   }
-
-  /// Stop amplitude simulation
-  void _stopAmplitudeSimulation() {
-    _amplitudeTimer?.cancel();
-    _amplitudeController?.add(0.0);
-  }
-
-  /// Format duration for logging
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds.remainder(60);
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  // ==== CONVERSION & EDITING (Stub Implementations) ====
 
   @override
   Future<String?> convertAudioFile({
@@ -605,8 +446,8 @@ class AudioPlayerService implements IAudioServiceRepository {
     int? targetSampleRate,
     int? targetBitRate,
   }) async {
-    // Audio conversion would require additional libraries like flutter_ffmpeg
-    debugPrint('❌ Audio conversion not implemented in this service');
+    // TODO: Implement audio conversion
+    debugPrint('⚠️ Audio conversion not yet implemented');
     return null;
   }
 
@@ -617,8 +458,8 @@ class AudioPlayerService implements IAudioServiceRepository {
     required Duration startTime,
     required Duration endTime,
   }) async {
-    // Audio trimming would require additional libraries
-    debugPrint('❌ Audio trimming not implemented in this service');
+    // TODO: Implement audio trimming
+    debugPrint('⚠️ Audio trimming not yet implemented');
     return null;
   }
 
@@ -628,15 +469,138 @@ class AudioPlayerService implements IAudioServiceRepository {
     required String outputPath,
     required AudioFormat outputFormat,
   }) async {
-    // Audio merging would require additional libraries
-    debugPrint('❌ Audio merging not implemented in this service');
+    // TODO: Implement audio merging
+    debugPrint('⚠️ Audio merging not yet implemented');
     return null;
   }
 
   @override
   Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100}) async {
-    // Waveform extraction would require additional libraries
-    debugPrint('❌ Waveform extraction not implemented in this service');
-    return List.generate(sampleCount, (index) => 0.5); // Return dummy data
+    // TODO: Implement waveform extraction
+    debugPrint('⚠️ Waveform extraction not yet implemented');
+    return [];
   }
+
+  // ==== DEVICE & PERMISSIONS ====
+
+  @override
+  Future<bool> hasMicrophonePermission() async => true; // Not needed for playback
+
+  @override
+  Future<bool> requestMicrophonePermission() async => true; // Not needed for playback
+
+  @override
+  Future<bool> hasMicrophone() async => true; // Not relevant for playback
+
+  @override
+  Future<List<AudioInputDevice>> getAudioInputDevices() async => []; // Not needed for playback
+
+  @override
+  Future<bool> setAudioInputDevice(String deviceId) async => true; // Not needed for playback
+
+  @override
+  Future<List<AudioFormat>> getSupportedFormats() async {
+    return [AudioFormat.wav, AudioFormat.m4a, AudioFormat.flac];
+  }
+
+  @override
+  Future<List<int>> getSupportedSampleRates(AudioFormat format) async {
+    return [22050, 44100, 48000, 96000];
+  }
+
+  // ==== SETTINGS & CONFIGURATION ====
+
+  @override
+  Future<bool> setAudioSessionCategory(AudioSessionCategory category) async {
+    // TODO: Implement platform-specific audio session management
+    debugPrint('⚠️ Audio session management not yet implemented');
+    return true;
+  }
+
+  @override
+  Future<bool> enableBackgroundRecording() async => true; // Not relevant for playback
+
+  @override
+  Future<bool> disableBackgroundRecording() async => true; // Not relevant for playback
+
+  // ==== HELPER METHODS ====
+
+  /// Ensure service is initialized
+  bool _ensureInitialized() {
+    if (!_isServiceInitialized || _audioPlayer == null) {
+      debugPrint('❌ Audio player service not initialized');
+      return false;
+    }
+    return true;
+  }
+
+  /// Validate audio file exists and is accessible
+  Future<bool> _validateAudioFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      return await file.exists() && await file.length() > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Detect audio format from file extension
+  AudioFormat? _detectAudioFormat(String filePath) {
+    final extension = filePath.toLowerCase().split('.').last;
+    switch (extension) {
+      case 'wav':
+        return AudioFormat.wav;
+      case 'm4a':
+      case 'mp4':
+        return AudioFormat.m4a;
+      case 'flac':
+        return AudioFormat.flac;
+      default:
+        return null;
+    }
+  }
+
+  /// Start amplitude simulation for visual effects
+  void _startAmplitudeSimulation() {
+    _stopAmplitudeSimulation();
+
+    _amplitudeSimulationTimer = Timer.periodic(
+      const Duration(milliseconds: 100),
+          (timer) {
+        if (!_playbackActive) {
+          timer.cancel();
+          return;
+        }
+
+        // Generate realistic amplitude simulation
+        final random = math.Random();
+        final baseAmplitude = 0.2 + (random.nextDouble() * 0.6);
+        final variation = (random.nextDouble() - 0.5) * 0.2;
+        final amplitude = (baseAmplitude + variation).clamp(0.0, 1.0);
+
+        _amplitudeStreamController?.add(amplitude);
+      },
+    );
+  }
+
+  /// Stop amplitude simulation
+  void _stopAmplitudeSimulation() {
+    _amplitudeSimulationTimer?.cancel();
+    _amplitudeSimulationTimer = null;
+    _amplitudeStreamController?.add(0.0);
+  }
+
+  // ==== PUBLIC GETTERS (No conflicts with interface) ====
+
+  /// Current playback speed
+  double get playbackSpeed => _playbackSpeed;
+
+  /// Current volume level
+  double get volumeLevel => _playbackVolume;
+
+  /// Currently playing file path
+  String? get currentFile => _currentlyPlayingFile;
+
+  /// Service initialization status
+  bool get isServiceReady => _isServiceInitialized;
 }

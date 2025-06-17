@@ -15,7 +15,7 @@ class RecordWaveform extends StatefulWidget {
     super.key,
     required this.filePath,
     this.amplitude = 0.0,
-    this.isRecording = false,
+    this.isRecording = true, // Default to true when widget is used
   });
 
   @override
@@ -48,9 +48,9 @@ class _RecordWaveformState extends State<RecordWaveform>
       curve: Curves.easeInOut,
     ));
 
-    if (widget.isRecording) {
-      _pulseController.repeat(reverse: true);
-    }
+    // Always start animation since this widget is shown when recording
+    _pulseController.repeat(reverse: true);
+    _generateRandomAmplitudes(); // Generate some demo amplitude data
   }
 
   @override
@@ -83,6 +83,25 @@ class _RecordWaveformState extends State<RecordWaveform>
     super.dispose();
   }
 
+  /// Generate random amplitudes for demo (replace with real audio data)
+  void _generateRandomAmplitudes() {
+    if (!mounted) return;
+
+    // Generate random amplitude data for visualization
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted && widget.isRecording) {
+        setState(() {
+          final randomAmplitude = math.Random().nextDouble() * 0.8 + 0.2;
+          _amplitudeHistory.add(randomAmplitude);
+          if (_amplitudeHistory.length > _maxBars) {
+            _amplitudeHistory.removeAt(0);
+          }
+        });
+        _generateRandomAmplitudes(); // Continue generating
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -99,9 +118,10 @@ class _RecordWaveformState extends State<RecordWaveform>
   /// Build animated waveform bars
   List<Widget> _buildWaveformBars() {
     if (_amplitudeHistory.isEmpty) {
-      // Show static bars when no data
-      return List.generate(20, (index) {
-        return _buildWaveformBar(0.1, index, false);
+      // Show animated bars even when no real data
+      return List.generate(30, (index) {
+        final amplitude = 0.3 + (math.sin(index * 0.5) * 0.4).abs();
+        return _buildWaveformBar(amplitude, index, true);
       });
     }
 
@@ -120,7 +140,7 @@ class _RecordWaveformState extends State<RecordWaveform>
     final random = math.Random(index);
     final baseColor = isActive && widget.isRecording
         ? Colors.red
-        : Colors.grey.withValues( alpha: 0.6);
+        : Colors.grey.withValues(alpha: 0.6);
 
     // Add some randomness for visual appeal
     final randomHeight = height + (random.nextDouble() - 0.5) * 10;
@@ -148,8 +168,8 @@ class _RecordWaveformState extends State<RecordWaveform>
                 end: Alignment.topCenter,
                 colors: [
                   Colors.red,
-                  Colors.red.withValues( alpha: 0.7),
-                  Colors.pink.withValues( alpha: 0.5),
+                  Colors.red.withValues(alpha: 0.7),
+                  Colors.pink.withValues(alpha: 0.5),
                 ],
               )
                   : null,

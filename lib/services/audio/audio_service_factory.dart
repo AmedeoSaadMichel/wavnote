@@ -1,20 +1,40 @@
 // File: services/audio/audio_service_factory.dart
 import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../core/constants/app_constants.dart';
+import 'audio_service_coordinator.dart';
 import 'audio_recorder_service.dart';
+import 'audio_player_service.dart';
 import 'real_audio_recorder_service.dart';
+
+/// Audio operation types for factory configuration
+enum AudioOperation {
+  recording,
+  playback,
+  both,
+  testing,
+}
 
 /// Factory for creating audio service instances
 ///
 /// Provides the appropriate audio service implementation based on
-/// configuration and platform capabilities.
+/// configuration and platform capabilities. Now supports the new
+/// unified coordinator approach for optimal resource management.
 class AudioServiceFactory {
 
-  /// Create audio service instance
-  static IAudioServiceRepository createAudioService({
-    bool useRealAudio = false, // Default to mock for stability
+  /// Create unified audio service instance (RECOMMENDED)
+  ///
+  /// Uses the new AudioServiceCoordinator which manages both
+  /// recording and playback efficiently with proper resource handling.
+  static IAudioServiceRepository createUnifiedService({
+    bool useRealAudio = true, // Default to real audio
   }) {
-    // For development/testing, you can toggle between real and mock
+    return AudioServiceCoordinator();
+  }
+
+  /// Create audio service instance (Legacy method)
+  static IAudioServiceRepository createAudioService({
+    bool useRealAudio = false, // Default to mock for backward compatibility
+  }) {
     if (useRealAudio && _canUseRealAudio()) {
       return RealAudioRecorderService();
     } else {
@@ -22,29 +42,59 @@ class AudioServiceFactory {
     }
   }
 
-  /// Check if real audio recording is available
-  static bool _canUseRealAudio() {
-    try {
-      // For now, return false to use mock service
-      // TODO: Add platform checks here
-      return false; // Disabled until fully implemented
-    } catch (e) {
-      return false;
-    }
+  /// Create dedicated player service only
+  static AudioPlayerService createPlayerService() {
+    return AudioPlayerService();
   }
 
-  /// Create service for recording screen
+  /// Create service for recording screen (UPDATED)
+  ///
+  /// Now returns the unified coordinator for better functionality
   static IAudioServiceRepository createForRecording() {
-    return createAudioService(useRealAudio: false); // Use mock for now
+    return createUnifiedService(useRealAudio: true);
   }
 
-  /// Create service for playback only
+  /// Create service for playback only (UPDATED)
+  ///
+  /// Now returns the unified coordinator for consistent experience
   static IAudioServiceRepository createForPlayback() {
-    return createAudioService(useRealAudio: false); // Use mock for now
+    return createUnifiedService(useRealAudio: true);
   }
 
   /// Create mock service for testing
   static IAudioServiceRepository createMockService() {
     return AudioRecorderService();
+  }
+
+  /// Check if real audio recording is available
+  static bool _canUseRealAudio() {
+    try {
+      // For now, return true to enable real audio
+      // TODO: Add platform checks here if needed
+      return true; // Enabled for production use
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Create service based on app configuration
+  static IAudioServiceRepository createFromConfig() {
+    // Use app constants to determine service type
+    final useRealAudio = AppConstants.enableRealAudioRecording;
+    return createUnifiedService(useRealAudio: useRealAudio);
+  }
+
+  /// Create service for specific audio operations
+  static IAudioServiceRepository createForOperation(AudioOperation operation) {
+    switch (operation) {
+      case AudioOperation.recording:
+        return createForRecording();
+      case AudioOperation.playback:
+        return createForPlayback();
+      case AudioOperation.both:
+        return createUnifiedService(useRealAudio: true);
+      case AudioOperation.testing:
+        return createMockService();
+    }
   }
 }

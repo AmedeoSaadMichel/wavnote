@@ -8,48 +8,77 @@ abstract class RecordingState extends Equatable {
   @override
   List<Object?> get props => [];
 
-  /// Whether recording is currently active
+  // ==== CONVENIENCE GETTERS ====
+
+  /// Whether currently recording
   bool get isRecording => this is RecordingInProgress;
 
   /// Whether recording is paused
   bool get isPaused => this is RecordingPaused;
 
-  /// Whether recording can be started
-  bool get canStartRecording => this is RecordingInitial || this is RecordingCompleted || this is RecordingCancelled;
+  /// Whether can start recording
+  bool get canStartRecording {
+    return this is RecordingInitial ||
+        this is RecordingPermissionStatus ||
+        this is RecordingCompleted ||
+        this is RecordingCancelled;
+  }
 
-  /// Whether recording can be stopped
-  bool get canStopRecording => this is RecordingInProgress || this is RecordingPaused;
+  /// Whether can stop recording
+  bool get canStopRecording {
+    return this is RecordingInProgress || this is RecordingPaused;
+  }
 
-  /// Whether recording can be paused
+  /// Whether can pause recording
   bool get canPauseRecording => this is RecordingInProgress;
 
-  /// Whether recording can be resumed
+  /// Whether can resume recording
   bool get canResumeRecording => this is RecordingPaused;
 
-  /// Whether recording can be cancelled
-  bool get canCancelRecording => this is RecordingInProgress || this is RecordingPaused;
+  /// Whether recording operations are available
+  bool get isOperational {
+    if (this is RecordingPermissionStatus) {
+      return (this as RecordingPermissionStatus).canRecord;
+    }
+    return !(this is RecordingError || this is RecordingPermissionRequesting);
+  }
+
+  /// Get current recording duration if available
+  Duration? get currentDuration {
+    if (this is RecordingInProgress) {
+      return (this as RecordingInProgress).duration;
+    }
+    if (this is RecordingPaused) {
+      return (this as RecordingPaused).duration;
+    }
+    return null;
+  }
+
+  /// Get formatted duration string
+  String get durationFormatted {
+    final duration = currentDuration;
+    if (duration == null) return '0:00';
+
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60);
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
 }
 
-/// Initial state when no recording is active
+/// Initial state when recording bloc is created
 class RecordingInitial extends RecordingState {
   const RecordingInitial();
-
-  @override
-  String toString() => 'RecordingInitial';
 }
 
-/// State when starting recording
+/// State when recording is starting
 class RecordingStarting extends RecordingState {
   const RecordingStarting();
-
-  @override
-  String toString() => 'RecordingStarting';
 }
 
 /// State when recording is in progress
 class RecordingInProgress extends RecordingState {
   final String filePath;
-  final String folderId;
+  final String? folderId;
   final AudioFormat format;
   final int sampleRate;
   final int bitRate;
@@ -59,7 +88,7 @@ class RecordingInProgress extends RecordingState {
 
   const RecordingInProgress({
     required this.filePath,
-    required this.folderId,
+    this.folderId,
     required this.format,
     required this.sampleRate,
     required this.bitRate,
@@ -69,22 +98,11 @@ class RecordingInProgress extends RecordingState {
   });
 
   @override
-  List<Object> get props => [
+  List<Object?> get props => [
     filePath, folderId, format, sampleRate, bitRate,
     duration, amplitude, startTime
   ];
 
-  /// Duration in formatted string
-  String get durationFormatted {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  /// Amplitude as percentage (0-100)
-  int get amplitudePercentage => (amplitude * 100).round();
-
-  /// Copy with updated values
   RecordingInProgress copyWith({
     String? filePath,
     String? folderId,
@@ -106,100 +124,77 @@ class RecordingInProgress extends RecordingState {
       startTime: startTime ?? this.startTime,
     );
   }
-
-  @override
-  String toString() => 'RecordingInProgress { duration: $durationFormatted, amplitude: $amplitudePercentage% }';
 }
 
 /// State when recording is paused
 class RecordingPaused extends RecordingState {
   final String filePath;
-  final String folderId;
+  final String? folderId;
   final AudioFormat format;
   final int sampleRate;
   final int bitRate;
   final Duration duration;
-  final double amplitude;
   final DateTime startTime;
-  final DateTime pausedAt;
 
   const RecordingPaused({
     required this.filePath,
-    required this.folderId,
+    this.folderId,
     required this.format,
     required this.sampleRate,
     required this.bitRate,
     required this.duration,
-    required this.amplitude,
     required this.startTime,
-    required this.pausedAt,
   });
 
   @override
-  List<Object> get props => [
-    filePath, folderId, format, sampleRate, bitRate,
-    duration, amplitude, startTime, pausedAt
+  List<Object?> get props => [
+    filePath, folderId, format, sampleRate, bitRate, duration, startTime
   ];
 
-  /// Duration in formatted string
-  String get durationFormatted {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  RecordingPaused copyWith({
+    String? filePath,
+    String? folderId,
+    AudioFormat? format,
+    int? sampleRate,
+    int? bitRate,
+    Duration? duration,
+    DateTime? startTime,
+  }) {
+    return RecordingPaused(
+      filePath: filePath ?? this.filePath,
+      folderId: folderId ?? this.folderId,
+      format: format ?? this.format,
+      sampleRate: sampleRate ?? this.sampleRate,
+      bitRate: bitRate ?? this.bitRate,
+      duration: duration ?? this.duration,
+      startTime: startTime ?? this.startTime,
+    );
   }
-
-  @override
-  String toString() => 'RecordingPaused { duration: $durationFormatted }';
 }
 
-/// State when stopping recording
-class RecordingStopping extends RecordingInProgress {
-  const RecordingStopping({
-    required super.filePath,
-    required super.folderId,
-    required super.format,
-    required super.sampleRate,
-    required super.bitRate,
-    required super.duration,
-    required super.amplitude,
-    required super.startTime,
-  });
-
-  @override
-  String toString() => 'RecordingStopping { duration: $durationFormatted }';
+/// State when recording is stopping
+class RecordingStopping extends RecordingState {
+  const RecordingStopping();
 }
 
 /// State when recording is completed
 class RecordingCompleted extends RecordingState {
   final RecordingEntity recording;
-  final bool wasSuccessful;
 
-  const RecordingCompleted({
-    required this.recording,
-    required this.wasSuccessful,
-  });
+  const RecordingCompleted({required this.recording});
 
   @override
-  List<Object> get props => [recording, wasSuccessful];
-
-  @override
-  String toString() => 'RecordingCompleted { recording: ${recording.name}, successful: $wasSuccessful }';
+  List<Object> get props => [recording];
 }
 
 /// State when recording is cancelled
 class RecordingCancelled extends RecordingState {
   const RecordingCancelled();
-
-  @override
-  String toString() => 'RecordingCancelled';
 }
 
-/// State when recording permissions are being checked/requested
+/// State when checking permissions
 class RecordingPermissionRequesting extends RecordingState {
   const RecordingPermissionRequesting();
-
-  @override
-  String toString() => 'RecordingPermissionRequesting';
 }
 
 /// State with permission status information
@@ -217,69 +212,29 @@ class RecordingPermissionStatus extends RecordingState {
 
   /// Whether recording is possible
   bool get canRecord => hasMicrophonePermission && hasMicrophone;
-
-  @override
-  String toString() => 'RecordingPermissionStatus { micPermission: $hasMicrophonePermission, hasMic: $hasMicrophone }';
 }
 
 /// State when an error occurs
 class RecordingError extends RecordingState {
   final String message;
   final RecordingErrorType errorType;
-  final String? errorCode;
-  final dynamic error;
 
   const RecordingError(
       this.message, {
         this.errorType = RecordingErrorType.unknown,
-        this.errorCode,
-        this.error,
       });
 
   @override
-  List<Object?> get props => [message, errorType, errorCode, error];
+  List<Object> get props => [message, errorType];
 
-  /// Whether this is a permission error
+  /// Whether this is a permission-related error
   bool get isPermissionError => errorType == RecordingErrorType.permission;
-
-  /// Whether this is a recording error
-  bool get isRecordingError => errorType == RecordingErrorType.recording;
-
-  /// Whether this is a state error
-  bool get isStateError => errorType == RecordingErrorType.state;
-
-  /// Whether this is a file system error
-  bool get isFileSystemError => errorType == RecordingErrorType.fileSystem;
-
-  @override
-  String toString() => 'RecordingError { message: $message, type: $errorType }';
 }
 
 /// Types of recording errors
 enum RecordingErrorType {
   permission,
   recording,
-  fileSystem,
   state,
-  network,
   unknown,
-}
-
-extension RecordingErrorTypeExtension on RecordingErrorType {
-  String get displayName {
-    switch (this) {
-      case RecordingErrorType.permission:
-        return 'Permission Error';
-      case RecordingErrorType.recording:
-        return 'Recording Error';
-      case RecordingErrorType.fileSystem:
-        return 'File System Error';
-      case RecordingErrorType.state:
-        return 'State Error';
-      case RecordingErrorType.network:
-        return 'Network Error';
-      case RecordingErrorType.unknown:
-        return 'Unknown Error';
-    }
-  }
 }
