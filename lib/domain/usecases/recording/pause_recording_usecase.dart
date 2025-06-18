@@ -84,6 +84,9 @@ class PauseRecordingUseCase {
       // 4. Calculate total paused time
       final pauseDuration = DateTime.now().difference(params.pausedSession.pausedAt);
       final totalPausedDuration = params.pausedSession.previousPausedDuration + pauseDuration;
+      
+      // Log paused duration for debugging
+      print('Recording resumed after ${pauseDuration.inSeconds}s pause. Total paused: ${totalPausedDuration.inSeconds}s');
 
       // 5. Create resumed session
       final resumedSession = RecordingSession(

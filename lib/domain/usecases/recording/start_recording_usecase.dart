@@ -1,7 +1,5 @@
 // File: domain/usecases/recording/start_recording_usecase.dart
 import 'package:dartz/dartz.dart';
-import '../../entities/recording_entity.dart';
-import '../../repositories/i_recording_repository.dart';
 import '../../repositories/i_audio_service_repository.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/utils/file_utils.dart';
@@ -17,14 +15,11 @@ import 'dart:io';
 /// - Recording start
 /// - State management
 class StartRecordingUseCase {
-  final IRecordingRepository _recordingRepository;
   final IAudioServiceRepository _audioServiceRepository;
 
   const StartRecordingUseCase({
-    required IRecordingRepository recordingRepository,
     required IAudioServiceRepository audioServiceRepository,
-  })  : _recordingRepository = recordingRepository,
-        _audioServiceRepository = audioServiceRepository;
+  })  : _audioServiceRepository = audioServiceRepository;
 
   /// Start a new recording
   Future<Either<RecordingFailure, RecordingSession>> execute(

@@ -1,10 +1,14 @@
 // File: main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'presentation/blocs/folder/folder_bloc.dart';
+import 'presentation/bloc/folder/folder_bloc.dart';
+import 'presentation/bloc/recording/recording_bloc.dart';
+import 'presentation/bloc/audio_player/audio_player_bloc.dart';
 import 'presentation/screens/main/main_screen.dart';
-import 'data/repositories/folder_repository.dart';
 import 'data/database/database_helper.dart';
+import 'data/repositories/recording_repository.dart';
+import 'services/audio/audio_service_coordinator.dart';
+import 'services/location/geolocation_service.dart';
 
 /// Main entry point for the WavNote voice recording app
 void main() async {
@@ -13,7 +17,7 @@ void main() async {
 
   // Initialize database before running app
   try {
-    final db = await DatabaseHelper.database;
+    await DatabaseHelper.database;
     print('✅ Database initialized successfully');
 
     // Print database info for debugging
@@ -27,65 +31,87 @@ void main() async {
   runApp(const WavNoteApp());
 }
 
-/// Root application widget
+/// Root application widget with BLoC providers
 class WavNoteApp extends StatelessWidget {
   const WavNoteApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'WavNote - Voice Memos',
-      debugShowCheckedModeBanner: false,
-
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent,
-        fontFamily: 'Roboto',
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.yellowAccent,
-          secondary: Colors.cyan,
-          surface: Color(0xFF5A2B8C),
-          onSurface: Colors.white,
+    // Create service instances at app level
+    final audioService = AudioServiceCoordinator();
+    final recordingRepository = RecordingRepository();
+    
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => FolderBloc()..add(const LoadFolders()),
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.yellowAccent,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+        BlocProvider(
+          create: (context) => RecordingBloc(
+            audioService: audioService,
+            recordingRepository: recordingRepository,
           ),
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.yellowAccent,
-            foregroundColor: Colors.black,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(20)),
+        BlocProvider(
+          create: (context) => AudioPlayerBloc(
+            audioRepository: audioService,
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'WavNote - Voice Memos',
+        debugShowCheckedModeBanner: false,
+
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: Colors.transparent,
+          fontFamily: 'Roboto',
+          colorScheme: const ColorScheme.dark(
+            primary: Colors.yellowAccent,
+            secondary: Colors.cyan,
+            surface: Color(0xFF5A2B8C),
+            onSurface: Colors.white,
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            titleTextStyle: TextStyle(
+              color: Colors.yellowAccent,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-            elevation: 4,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.yellowAccent,
+              foregroundColor: Colors.black,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20)),
+              ),
+              elevation: 4,
+            ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.cyan,
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            hintStyle: TextStyle(
+              color: Colors.white.withValues( alpha: 0.5),
+            ),
+            enabledBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.yellowAccent),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.yellowAccent, width: 2),
+            ),
           ),
         ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: Colors.cyan,
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          hintStyle: TextStyle(
-            color: Colors.white.withValues( alpha: 0.5),
-          ),
-          enabledBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.yellowAccent),
-          ),
-          focusedBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.yellowAccent, width: 2),
-          ),
-        ),
-      ),
 
-      home: const DatabaseInitializer(),
+        home: const DatabaseInitializer(),
+      ),
     );
   }
 }
@@ -111,7 +137,7 @@ class _DatabaseInitializerState extends State<DatabaseInitializer> {
   Future<void> _initializeDatabase() async {
     try {
       // Ensure database is ready
-      final db = await DatabaseHelper.database;
+      await DatabaseHelper.database;
 
       // Get database info for debugging
       final dbInfo = await DatabaseHelper.getDatabaseInfo();
@@ -210,10 +236,7 @@ class _DatabaseInitializerState extends State<DatabaseInitializer> {
       );
     }
 
-    // Database is ready, show main app with BLoC
-    return BlocProvider(
-      create: (context) => FolderBloc()..add(const LoadFolders()),
-      child: const MainScreen(),
-    );
+    // Database is ready, show main screen
+    return const MainScreen();
   }
 }

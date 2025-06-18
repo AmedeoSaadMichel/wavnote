@@ -1,10 +1,8 @@
 // File: domain/usecases/recording/stop_recording_usecase.dart
 import 'package:dartz/dartz.dart';
 import '../../entities/recording_entity.dart';
-import '../../repositories/i_recording_repository.dart';
 import '../../repositories/i_folder_repository.dart';
 import '../../repositories/i_audio_service_repository.dart';
-import '../../../core/utils/file_utils.dart';
 import 'start_recording_usecase.dart';
 import 'pause_recording_usecase.dart';
 import 'create_recording_usecase.dart';
@@ -20,18 +18,15 @@ import 'dart:io';
 /// - Cleanup operations
 /// - Error recovery
 class StopRecordingUseCase {
-  final IRecordingRepository _recordingRepository;
   final IFolderRepository _folderRepository;
   final IAudioServiceRepository _audioServiceRepository;
   final CreateRecordingUseCase _createRecordingUseCase;
 
   const StopRecordingUseCase({
-    required IRecordingRepository recordingRepository,
     required IFolderRepository folderRepository,
     required IAudioServiceRepository audioServiceRepository,
     required CreateRecordingUseCase createRecordingUseCase,
-  })  : _recordingRepository = recordingRepository,
-        _folderRepository = folderRepository,
+  })  : _folderRepository = folderRepository,
         _audioServiceRepository = audioServiceRepository,
         _createRecordingUseCase = createRecordingUseCase;
 

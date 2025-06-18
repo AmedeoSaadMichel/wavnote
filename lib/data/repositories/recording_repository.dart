@@ -1,10 +1,7 @@
 // File: data/repositories/recording_repository.dart
-import 'package:sqflite/sqflite.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/repositories/i_recording_repository.dart';
 import '../../core/enums/audio_format.dart';
-import '../database/database_helper.dart';
-import '../models/recording_model.dart';
 import 'recording_repository_crud.dart';
 import 'recording_repository_search.dart';
 import 'recording_repository_bulk.dart';

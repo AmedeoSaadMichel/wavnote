@@ -1,6 +1,5 @@
 // File: domain/usecases/recording/create_recording_usecase.dart
 import '../../entities/recording_entity.dart';
-import '../../entities/folder_entity.dart';
 import '../../repositories/i_recording_repository.dart';
 import '../../repositories/i_folder_repository.dart';
 import '../../../core/enums/audio_format.dart';

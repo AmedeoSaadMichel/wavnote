@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_sound/flutter_sound.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/utils/file_utils.dart';
@@ -135,7 +134,7 @@ class AudioRecorderImpl {
       _startPositionTracking();
 
       debugPrint('✅ Recording started: $absolutePath');
-      debugPrint('📊 Format: $format, Sample Rate: $sampleRate, Bit Rate: $bitRate');
+      debugPrint('📊 Format: $format, Sample Rate: $sampleRate, Bit Rate: $_currentBitRate');
       return true;
 
     } catch (e) {
@@ -186,6 +185,9 @@ class AudioRecorderImpl {
         folderId: 'default', // Default folder
       );
 
+      debugPrint('✅ Recording completed: ${recording.name}');
+      debugPrint('📊 Duration: ${recording.duration}, Size: ${recording.fileSize} bytes, Bit Rate: $_currentBitRate');
+
       // Clear current state
       _currentFilePath = null;
       _recordingStartTime = null;
@@ -194,9 +196,6 @@ class AudioRecorderImpl {
       _currentBitRate = null;
 
       _completionController?.add(null);
-
-      debugPrint('✅ Recording completed: ${recording.name}');
-      debugPrint('📊 Duration: ${recording.duration}, Size: ${recording.fileSize} bytes');
       return recording;
 
     } catch (e) {
@@ -323,8 +322,6 @@ class AudioRecorderImpl {
         return Codec.aacMP4;
       case AudioFormat.flac:
         return Codec.flac;
-      default:
-        return null;
     }
   }
 
@@ -391,8 +388,6 @@ class AudioRecorderImpl {
       case AudioFormat.m4a:
       case AudioFormat.flac:
         return true;
-      default:
-        return false;
     }
   }
 }

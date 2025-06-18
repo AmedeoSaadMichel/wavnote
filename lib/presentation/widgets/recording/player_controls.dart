@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:math' as math;
 import '../../../domain/entities/recording_entity.dart';
-import '../../blocs/audio_player/audio_player_bloc.dart';
+import '../../bloc/audio_player/audio_player_bloc.dart';
+import '../../bloc/audio_player/audio_player_event.dart';
+import '../../bloc/audio_player/audio_player_state.dart';
 
 /// Cosmic player controls widget with Midnight Gospel aesthetic
 ///
@@ -307,7 +309,7 @@ class _PlayerControlsState extends State<PlayerControls>
           final position = Duration(
             milliseconds: (value * duration.inMilliseconds).round(),
           );
-          context.read<AudioPlayerBloc>().add(SeekTo(position));
+          context.read<AudioPlayerBloc>().add(SeekToPositionEvent(position: position));
         },
       ),
     );
@@ -445,7 +447,7 @@ class _PlayerControlsState extends State<PlayerControls>
         _buildControlButton(
           icon: Icons.stop,
           onPressed: state.isPlaying || state.isPaused
-              ? () => context.read<AudioPlayerBloc>().add(const StopPlayback())
+              ? () => context.read<AudioPlayerBloc>().add(const StopPlaybackEvent())
               : null,
           size: 36,
         ),
@@ -458,7 +460,7 @@ class _PlayerControlsState extends State<PlayerControls>
 
   /// Build speed control with cosmic menu
   Widget _buildSpeedControl(AudioPlayerState state) {
-    final currentSpeed = state is AudioPlayerWithRecording ? state.speed : 1.0;
+    final currentSpeed = state is AudioPlayerPlaying ? state.playbackSpeed : 1.0;
 
     return PopupMenuButton<double>(
       child: Container(
@@ -485,7 +487,7 @@ class _PlayerControlsState extends State<PlayerControls>
         ),
       ),
       onSelected: (speed) {
-        context.read<AudioPlayerBloc>().add(SetPlaybackSpeed(speed));
+        context.read<AudioPlayerBloc>().add(SetPlaybackSpeedEvent(speed: speed));
       },
       itemBuilder: (context) => _playbackSpeeds.map((speed) {
         final isSelected = speed.value == currentSpeed;
@@ -542,13 +544,13 @@ class _PlayerControlsState extends State<PlayerControls>
 
   /// Build volume control
   Widget _buildVolumeControl(AudioPlayerState state) {
-    final currentVolume = state is AudioPlayerWithRecording ? state.volume : 1.0;
+    final currentVolume = state is AudioPlayerPlaying ? state.volume : 1.0;
 
     return GestureDetector(
       onTap: () {
         // Toggle volume between 0 and 1
         final newVolume = currentVolume > 0 ? 0.0 : 1.0;
-        context.read<AudioPlayerBloc>().add(SetVolume(newVolume));
+        context.read<AudioPlayerBloc>().add(SetVolumeEvent(volume: newVolume));
       },
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -620,11 +622,11 @@ class _PlayerControlsState extends State<PlayerControls>
 
   void _togglePlayPause(AudioPlayerState state) {
     if (state.isPlaying) {
-      context.read<AudioPlayerBloc>().add(const PausePlayback());
+      context.read<AudioPlayerBloc>().add(const PausePlaybackEvent());
     } else if (state.isPaused) {
-      context.read<AudioPlayerBloc>().add(const ResumePlayback());
+      context.read<AudioPlayerBloc>().add(const StartPlaybackEvent());
     } else {
-      context.read<AudioPlayerBloc>().add(PlayRecording(widget.recording));
+      context.read<AudioPlayerBloc>().add(LoadAudioEvent(filePath: widget.recording.filePath));
     }
   }
 
@@ -633,7 +635,7 @@ class _PlayerControlsState extends State<PlayerControls>
     final newPosition = Duration(
       milliseconds: math.max(0, currentPosition.inMilliseconds - 10000),
     );
-    context.read<AudioPlayerBloc>().add(SeekTo(newPosition));
+    context.read<AudioPlayerBloc>().add(SeekToPositionEvent(position: newPosition));
   }
 
   void _skipForward(AudioPlayerState state) {
@@ -645,7 +647,7 @@ class _PlayerControlsState extends State<PlayerControls>
         currentPosition.inMilliseconds + 30000,
       ),
     );
-    context.read<AudioPlayerBloc>().add(SeekTo(newPosition));
+    context.read<AudioPlayerBloc>().add(SeekToPositionEvent(position: newPosition));
   }
 
   double _getPlaybackProgress(AudioPlayerState state) {
@@ -656,17 +658,12 @@ class _PlayerControlsState extends State<PlayerControls>
   }
 
   Duration _getPlaybackPosition(AudioPlayerState state) {
-    if (state is AudioPlayerWithRecording) {
-      return state.position;
-    }
-    return Duration.zero;
+    return state.currentPosition;
   }
 
   Duration _getPlaybackDuration(AudioPlayerState state) {
-    if (state is AudioPlayerWithRecording) {
-      return state.duration;
-    }
-    return widget.recording.duration;
+    final duration = state.totalDuration;
+    return duration.inMilliseconds > 0 ? duration : widget.recording.duration;
   }
 
   double _getAmplitude(AudioPlayerState state) {

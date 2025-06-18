@@ -28,11 +28,11 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs the mic for recording the audio</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app needs location access to name recordings with your current address</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>This app needs location access to name recordings with your current address</string>
+	<string>This app needs location access to name recordings with your current address</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to name recordings with your current address</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>

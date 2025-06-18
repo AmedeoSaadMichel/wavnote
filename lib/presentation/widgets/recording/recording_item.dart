@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../blocs/audio_player/audio_player_bloc.dart';
+import '../../bloc/audio_player/audio_player_bloc.dart';
+import '../../bloc/audio_player/audio_player_event.dart';
+import '../../bloc/audio_player/audio_player_state.dart';
 
 /// Widget to display a single recording item in lists
 ///
@@ -37,7 +39,7 @@ class RecordingItem extends StatelessWidget {
     return BlocBuilder<AudioPlayerBloc, AudioPlayerState>(
       builder: (context, playerState) {
         final isCurrentlyPlaying = playerState is AudioPlayerPlaying &&
-            playerState.currentRecording.id == recording.id;
+            playerState.currentFilePath == recording.filePath;
 
         return GestureDetector(
           onTap: onTap,
@@ -136,7 +138,7 @@ class RecordingItem extends StatelessWidget {
   /// Build header row with recording name and metadata
   Widget _buildHeaderRow(AudioPlayerState playerState) {
     final isPlaying = playerState is AudioPlayerPlaying &&
-        playerState.currentRecording.id == recording.id;
+        playerState.currentFilePath == recording.filePath;
 
     return Row(
       children: [
@@ -251,8 +253,8 @@ class RecordingItem extends StatelessWidget {
 
   /// Build waveform visualization area
   Widget _buildWaveformArea(AudioPlayerState playerState) {
-    if (playerState is AudioPlayerWithRecording &&
-        playerState.currentRecording.id == recording.id) {
+    if (playerState is AudioPlayerPlaying &&
+        playerState.currentFilePath == recording.filePath) {
       return _buildPlaybackProgress(playerState);
     }
 
@@ -260,7 +262,7 @@ class RecordingItem extends StatelessWidget {
   }
 
   /// Build playback progress indicator
-  Widget _buildPlaybackProgress(AudioPlayerWithRecording playerState) {
+  Widget _buildPlaybackProgress(AudioPlayerPlaying playerState) {
     return Column(
       children: [
         // Progress bar
@@ -294,7 +296,7 @@ class RecordingItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              playerState.positionFormatted,
+              playerState.formattedPosition,
               style: TextStyle(
                 color: AppConstants.accentCyan,
                 fontSize: 12,
@@ -302,7 +304,7 @@ class RecordingItem extends StatelessWidget {
               ),
             ),
             Text(
-              playerState.durationFormatted,
+              _formatDuration(playerState.totalDuration),
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 12,
@@ -337,8 +339,8 @@ class RecordingItem extends StatelessWidget {
 
   /// Build controls row with play/pause and action buttons
   Widget _buildControlsRow(BuildContext context, AudioPlayerState playerState) {
-    final isCurrentRecording = playerState is AudioPlayerWithRecording &&
-        playerState.currentRecording.id == recording.id;
+    final isCurrentRecording = playerState is AudioPlayerPlaying &&
+        playerState.currentFilePath == recording.filePath;
     final isPlaying = playerState is AudioPlayerPlaying && isCurrentRecording;
     final isPaused = playerState is AudioPlayerPaused && isCurrentRecording;
 
@@ -351,7 +353,7 @@ class RecordingItem extends StatelessWidget {
         const SizedBox(width: 12),
 
         // Speed control (when playing)
-        if (isCurrentRecording && playerState is AudioPlayerWithRecording)
+        if (isCurrentRecording)
           _buildSpeedButton(context, playerState),
 
         const Spacer(),
@@ -369,11 +371,11 @@ class RecordingItem extends StatelessWidget {
         final audioBloc = context.read<AudioPlayerBloc>();
 
         if (isPlaying) {
-          audioBloc.add(const PausePlayback());
+          audioBloc.add(const PausePlaybackEvent());
         } else if (isPaused) {
-          audioBloc.add(const ResumePlayback());
+          audioBloc.add(const StartPlaybackEvent());
         } else {
-          audioBloc.add(PlayRecording(recording));
+          audioBloc.add(LoadAudioEvent(filePath: recording.filePath));
         }
       },
       child: Container(
@@ -405,7 +407,7 @@ class RecordingItem extends StatelessWidget {
   }
 
   /// Build speed control button
-  Widget _buildSpeedButton(BuildContext context, AudioPlayerWithRecording playerState) {
+  Widget _buildSpeedButton(BuildContext context, AudioPlayerPlaying playerState) {
     return GestureDetector(
       onTap: () => _showSpeedDialog(context),
       child: Container(
@@ -419,7 +421,7 @@ class RecordingItem extends StatelessWidget {
           ),
         ),
         child: Text(
-          playerState.speedFormatted,
+          '${playerState.playbackSpeed}x',
           style: TextStyle(
             color: AppConstants.accentCyan,
             fontSize: 12,
@@ -514,7 +516,7 @@ class RecordingItem extends StatelessWidget {
                 style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
-                context.read<AudioPlayerBloc>().add(SetPlaybackSpeed(speed));
+                context.read<AudioPlayerBloc>().add(SetPlaybackSpeedEvent(speed: speed));
                 Navigator.of(dialogContext).pop();
               },
             );
@@ -522,6 +524,13 @@ class RecordingItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Helper method to format duration
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds.remainder(60);
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 }
 

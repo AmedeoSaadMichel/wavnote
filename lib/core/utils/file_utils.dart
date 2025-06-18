@@ -371,8 +371,7 @@ class FileUtils {
   /// Get available storage space
   static Future<int> getAvailableStorage() async {
     try {
-      final appDir = await getAppDocumentsDirectory();
-      final stat = await appDir.stat();
+      await getAppDocumentsDirectory();
 
       // This is a simplified approach - in real implementation,
       // you'd need platform-specific code to get actual free space

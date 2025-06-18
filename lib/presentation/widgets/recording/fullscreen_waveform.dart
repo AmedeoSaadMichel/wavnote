@@ -285,7 +285,6 @@ class MainWaveformPainter extends CustomPainter {
 
         // Create wave effect
         final y1 = centerY - scaledAmplitude;
-        final y2 = centerY + scaledAmplitude;
 
         if (i == 0) {
           path.moveTo(x, y1);

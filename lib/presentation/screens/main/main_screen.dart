@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fluttericon/font_awesome5_icons.dart';
-import '../../blocs/folder/folder_bloc.dart';
+import '../../bloc/folder/folder_bloc.dart';
 import '../../widgets/folder/folder_item.dart';
 import '../../widgets/dialogs/create_folder_dialog.dart';
 import '../../widgets/dialogs/audio_format_dialog.dart';

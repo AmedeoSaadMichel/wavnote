@@ -3,19 +3,23 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../core/enums/audio_format.dart';
 import '../permission/permission_service.dart';
 
-/// Enhanced audio recording service with robust permission handling
+/// Real audio recording service using flutter_sound
 ///
-/// Combines mock recording functionality with comprehensive permission management
-/// and error handling. Ready for real audio recording integration.
+/// Provides actual audio recording and playback functionality with
+/// comprehensive permission management and error handling.
 class AudioRecorderService implements IAudioServiceRepository {
   static const String _tag = 'AudioRecorderService';
+
+  // Flutter Sound instances
+  FlutterSoundRecorder? _recorder;
+  FlutterSoundPlayer? _player;
 
   // Stream controllers for real-time updates
   StreamController<double>? _amplitudeController;
@@ -23,8 +27,6 @@ class AudioRecorderService implements IAudioServiceRepository {
   StreamController<void>? _completionController;
 
   // Recording state
-  Timer? _amplitudeTimer;
-  Timer? _durationTimer;
   String? _currentRecordingPath;
   DateTime? _recordingStartTime;
   Duration _pausedDuration = Duration.zero;
@@ -52,7 +54,15 @@ class AudioRecorderService implements IAudioServiceRepository {
     if (_isInitialized) return true;
 
     try {
-      debugPrint('$_tag: Initializing audio service...');
+      debugPrint('$_tag: Initializing real audio service...');
+
+      // Initialize Flutter Sound instances
+      _recorder = FlutterSoundRecorder();
+      _player = FlutterSoundPlayer();
+
+      // Open recorder session
+      await _recorder!.openRecorder();
+      await _player!.openPlayer();
 
       // Initialize stream controllers
       _amplitudeController = StreamController<double>.broadcast();
@@ -63,7 +73,7 @@ class AudioRecorderService implements IAudioServiceRepository {
       await _logPermissionStatus();
 
       _isInitialized = true;
-      debugPrint('$_tag: ✅ Audio service initialized successfully');
+      debugPrint('$_tag: ✅ Real audio service initialized successfully');
       return true;
 
     } catch (e, stackTrace) {
@@ -77,7 +87,7 @@ class AudioRecorderService implements IAudioServiceRepository {
   @override
   Future<void> dispose() async {
     try {
-      debugPrint('$_tag: Disposing audio service...');
+      debugPrint('$_tag: Disposing real audio service...');
 
       // Stop any ongoing operations
       if (_isRecording) {
@@ -87,9 +97,9 @@ class AudioRecorderService implements IAudioServiceRepository {
         await stopPlaying();
       }
 
-      // Stop timers
-      _amplitudeTimer?.cancel();
-      _durationTimer?.cancel();
+      // Close Flutter Sound instances
+      await _recorder?.closeRecorder();
+      await _player?.closePlayer();
 
       // Close stream controllers
       await _amplitudeController?.close();
@@ -97,6 +107,8 @@ class AudioRecorderService implements IAudioServiceRepository {
       await _completionController?.close();
 
       // Reset state
+      _recorder = null;
+      _player = null;
       _amplitudeController = null;
       _positionController = null;
       _completionController = null;
@@ -105,7 +117,7 @@ class AudioRecorderService implements IAudioServiceRepository {
       _isPlaying = false;
       _currentRecordingPath = null;
 
-      debugPrint('$_tag: ✅ Audio service disposed');
+      debugPrint('$_tag: ✅ Real audio service disposed');
 
     } catch (e) {
       debugPrint('$_tag: ❌ Error during disposal: $e');
@@ -184,7 +196,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     required int sampleRate,
     required int bitRate,
   }) async {
-    if (!_isInitialized) {
+    if (!_isInitialized || _recorder == null) {
       _lastError = 'Audio service not initialized';
       debugPrint('$_tag: ❌ Service not initialized');
       return false;
@@ -197,9 +209,9 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
 
     try {
-      debugPrint('$_tag: Starting recording...');
+      debugPrint('$_tag: Starting real recording...');
 
-      // 1. Check permissions first with enhanced validation
+      // 1. Check permissions first
       final hasPermission = await hasMicrophonePermission();
       if (!hasPermission) {
         debugPrint('$_tag: ❌ No microphone permission - attempting to request...');
@@ -212,20 +224,12 @@ class AudioRecorderService implements IAudioServiceRepository {
         }
       }
 
-      // 2. Verify microphone hardware
-      final hasMic = await hasMicrophone();
-      if (!hasMic) {
-        _lastError = 'No microphone detected on this device';
-        debugPrint('$_tag: ❌ No microphone hardware');
-        return false;
-      }
-
-      // 3. Store settings
+      // 2. Store settings
       _currentFormat = format;
       _currentSampleRate = sampleRate;
       _currentBitRate = bitRate;
 
-      // 4. Generate file path and create directories
+      // 3. Generate file path and create directories
       final fullPath = await _getFullPath(filePath);
       final file = File(fullPath);
       await file.parent.create(recursive: true);
@@ -233,8 +237,16 @@ class AudioRecorderService implements IAudioServiceRepository {
       debugPrint('$_tag: Recording to: $fullPath');
       debugPrint('$_tag: Format: ${format.name}, Sample Rate: $sampleRate, Bit Rate: $bitRate');
 
-      // 5. Create mock audio file with metadata
-      await _createMockAudioFile(file, format);
+      // 4. Convert format to flutter_sound codec
+      final codec = _getFlutterSoundCodec(format);
+      
+      // 5. Start real recording with flutter_sound
+      await _recorder!.startRecorder(
+        toFile: fullPath,
+        codec: codec,
+        sampleRate: sampleRate,
+        bitRate: bitRate,
+      );
 
       // 6. Update state
       _currentRecordingPath = fullPath;
@@ -245,10 +257,10 @@ class AudioRecorderService implements IAudioServiceRepository {
       _lastError = null;
 
       // 7. Start monitoring
-      _startAmplitudeMonitoring();
+      _startRealAmplitudeMonitoring();
       _startDurationMonitoring();
 
-      debugPrint('$_tag: ✅ Recording started successfully');
+      debugPrint('$_tag: ✅ Real recording started successfully');
       return true;
 
     } catch (e, stackTrace) {
@@ -262,18 +274,21 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<RecordingEntity?> stopRecording() async {
-    if (!_isRecording || _currentRecordingPath == null) {
+    if (!_isRecording || _currentRecordingPath == null || _recorder == null) {
       _lastError = 'No active recording to stop';
       debugPrint('$_tag: ❌ No active recording to stop');
       return null;
     }
 
     try {
-      debugPrint('$_tag: Stopping recording...');
+      debugPrint('$_tag: Stopping real recording...');
 
-      // Stop monitoring
+      // Stop monitoring first
       _stopAmplitudeMonitoring();
       _stopDurationMonitoring();
+
+      // Stop real recording with flutter_sound
+      await _recorder!.stopRecorder();
 
       // Calculate total duration
       final totalDuration = _calculateTotalRecordingDuration();
@@ -291,20 +306,31 @@ class AudioRecorderService implements IAudioServiceRepository {
         return null;
       }
 
-      // Update file with duration info
-      await _updateMockAudioFile(file, totalDuration);
       final fileSize = await file.length();
 
-      // Create recording entity
+      // Create recording entity with correct folder ID extracted from file path
+      final folderId = _extractFolderIdFromPath(_currentRecordingPath!);
       final recording = RecordingEntity.create(
         name: _generateDefaultName(),
         filePath: _currentRecordingPath!,
-        folderId: 'all_recordings',
+        folderId: folderId,
         format: _currentFormat,
         duration: totalDuration,
         fileSize: fileSize,
         sampleRate: _currentSampleRate,
+        // Note: locationName will be set by RecordingBloc using geolocation
       );
+      
+      debugPrint('$_tag: 🔍 Created recording entity:');
+      debugPrint('$_tag: - ID: ${recording.id}');
+      debugPrint('$_tag: - Name: ${recording.name}');
+      debugPrint('$_tag: - FilePath: ${recording.filePath}');
+      debugPrint('$_tag: - FolderId: ${recording.folderId}');
+      debugPrint('$_tag: - Format: ${recording.format}');
+      debugPrint('$_tag: - Duration: ${recording.duration}');
+      debugPrint('$_tag: - FileSize: ${recording.fileSize}');
+      debugPrint('$_tag: - SampleRate: ${recording.sampleRate}');
+      debugPrint('$_tag: - CreatedAt: ${recording.createdAt}');
 
       // Clean up state
       final recordingPath = _currentRecordingPath;
@@ -313,7 +339,7 @@ class AudioRecorderService implements IAudioServiceRepository {
       _pausedDuration = Duration.zero;
       _lastError = null;
 
-      debugPrint('$_tag: ✅ Recording stopped successfully: ${recording.name}');
+      debugPrint('$_tag: ✅ Real recording stopped successfully: ${recording.name}');
       debugPrint('$_tag: File path: $recordingPath');
       debugPrint('$_tag: File size: ${fileSize} bytes');
 
@@ -330,14 +356,15 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> pauseRecording() async {
-    if (!_isRecording || _isRecordingPaused) return false;
+    if (!_isRecording || _isRecordingPaused || _recorder == null) return false;
 
     try {
+      await _recorder!.pauseRecorder();
       _isRecordingPaused = true;
       _pauseStartTime = DateTime.now();
       _stopAmplitudeMonitoring();
 
-      debugPrint('$_tag: ⏸️ Recording paused');
+      debugPrint('$_tag: ⏸️ Real recording paused');
       return true;
 
     } catch (e) {
@@ -348,9 +375,11 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> resumeRecording() async {
-    if (!_isRecording || !_isRecordingPaused) return false;
+    if (!_isRecording || !_isRecordingPaused || _recorder == null) return false;
 
     try {
+      await _recorder!.resumeRecorder();
+      
       // Add paused time to total paused duration
       if (_pauseStartTime != null) {
         _pausedDuration += DateTime.now().difference(_pauseStartTime!);
@@ -358,9 +387,9 @@ class AudioRecorderService implements IAudioServiceRepository {
       }
 
       _isRecordingPaused = false;
-      _startAmplitudeMonitoring();
+      _startRealAmplitudeMonitoring();
 
-      debugPrint('$_tag: ▶️ Recording resumed');
+      debugPrint('$_tag: ▶️ Real recording resumed');
       return true;
 
     } catch (e) {
@@ -371,11 +400,14 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> cancelRecording() async {
-    if (!_isRecording) return false;
+    if (!_isRecording || _recorder == null) return false;
 
     try {
       _stopAmplitudeMonitoring();
       _stopDurationMonitoring();
+
+      // Stop real recording
+      await _recorder!.stopRecorder();
 
       _isRecording = false;
       _isRecordingPaused = false;
@@ -393,7 +425,7 @@ class AudioRecorderService implements IAudioServiceRepository {
       _pausedDuration = Duration.zero;
       _pauseStartTime = null;
 
-      debugPrint('$_tag: 🚫 Recording cancelled');
+      debugPrint('$_tag: 🚫 Real recording cancelled');
       return true;
 
     } catch (e) {
@@ -422,40 +454,109 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<bool> startPlaying(String filePath) async {
-    _isPlaying = true;
-    debugPrint('$_tag: ▶️ Mock playback started');
-    return true;
+    if (_player == null) return false;
+
+    try {
+      final fullPath = await _getFullPath(filePath);
+      await _player!.startPlayer(
+        fromURI: fullPath,
+        whenFinished: () {
+          _isPlaying = false;
+          _isPlaybackPaused = false;
+          _completionController?.add(null);
+        },
+      );
+      _isPlaying = true;
+      _isPlaybackPaused = false;
+      debugPrint('$_tag: ▶️ Real playback started: $fullPath');
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to start playback: $e');
+      return false;
+    }
   }
 
   @override
   Future<bool> stopPlaying() async {
-    _isPlaying = false;
-    debugPrint('$_tag: ⏹️ Mock playback stopped');
-    return true;
+    if (_player == null) return false;
+
+    try {
+      await _player!.stopPlayer();
+      _isPlaying = false;
+      _isPlaybackPaused = false;
+      debugPrint('$_tag: ⏹️ Real playback stopped');
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to stop playback: $e');
+      return false;
+    }
   }
 
   @override
   Future<bool> pausePlaying() async {
-    _isPlaybackPaused = true;
-    debugPrint('$_tag: ⏸️ Mock playback paused');
-    return true;
+    if (_player == null) return false;
+
+    try {
+      await _player!.pausePlayer();
+      _isPlaybackPaused = true;
+      debugPrint('$_tag: ⏸️ Real playback paused');
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to pause playback: $e');
+      return false;
+    }
   }
 
   @override
   Future<bool> resumePlaying() async {
-    _isPlaybackPaused = false;
-    debugPrint('$_tag: ▶️ Mock playback resumed');
-    return true;
+    if (_player == null) return false;
+
+    try {
+      await _player!.resumePlayer();
+      _isPlaybackPaused = false;
+      debugPrint('$_tag: ▶️ Real playback resumed');
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to resume playback: $e');
+      return false;
+    }
   }
 
   @override
-  Future<bool> seekTo(Duration position) async => true;
+  Future<bool> seekTo(Duration position) async {
+    if (_player == null) return false;
+    try {
+      await _player!.seekToPlayer(position);
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to seek: $e');
+      return false;
+    }
+  }
 
   @override
-  Future<bool> setPlaybackSpeed(double speed) async => true;
+  Future<bool> setPlaybackSpeed(double speed) async {
+    if (_player == null) return false;
+    try {
+      await _player!.setSpeed(speed);
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to set speed: $e');
+      return false;
+    }
+  }
 
   @override
-  Future<bool> setVolume(double volume) async => true;
+  Future<bool> setVolume(double volume) async {
+    if (_player == null) return false;
+    try {
+      await _player!.setVolume(volume);
+      return true;
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to set volume: $e');
+      return false;
+    }
+  }
 
   @override
   Future<bool> isPlaying() async => _isPlaying && !_isPlaybackPaused;
@@ -464,10 +565,18 @@ class AudioRecorderService implements IAudioServiceRepository {
   Future<bool> isPlaybackPaused() async => _isPlaybackPaused;
 
   @override
-  Future<Duration> getCurrentPlaybackPosition() async => Duration.zero;
+  Future<Duration> getCurrentPlaybackPosition() async {
+    // Note: getProgress is deprecated in newer flutter_sound versions
+    // For now, return Duration.zero as placeholder
+    return Duration.zero;
+  }
 
   @override
-  Future<Duration> getCurrentPlaybackDuration() async => const Duration(minutes: 1);
+  Future<Duration> getCurrentPlaybackDuration() async {
+    // Note: getProgress is deprecated in newer flutter_sound versions
+    // For now, return Duration.zero as placeholder
+    return Duration.zero;
+  }
 
   @override
   Stream<Duration> getPlaybackPositionStream() {
@@ -612,77 +721,83 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  /// Create a mock audio file with metadata
-  Future<void> _createMockAudioFile(File file, AudioFormat format) async {
-    final content = '''Mock Audio File - Enhanced Version
-Format: ${format.name}
-Sample Rate: $_currentSampleRate
-Bit Rate: $_currentBitRate
-Created: ${DateTime.now().toIso8601String()}
-Duration: 0
-Status: Recording...
-Permission Check: ✅ Granted
-Hardware Check: ✅ Available
-Service Version: Enhanced with PermissionService
-''';
-    await file.writeAsString(content);
-    debugPrint('$_tag: Mock audio file created: ${file.path}');
+  /// Convert AudioFormat to FlutterSound Codec
+  Codec _getFlutterSoundCodec(AudioFormat format) {
+    switch (format) {
+      case AudioFormat.wav:
+        return Codec.pcm16WAV;
+      case AudioFormat.m4a:
+        return Codec.aacMP4;
+      case AudioFormat.flac:
+        return Codec.flac;
+      default:
+        return Codec.aacMP4;
+    }
   }
 
-  /// Update mock audio file with final duration
-  Future<void> _updateMockAudioFile(File file, Duration duration) async {
-    final content = '''Mock Audio File - Enhanced Version
-Format: ${_currentFormat.name}
-Sample Rate: $_currentSampleRate
-Bit Rate: $_currentBitRate
-Created: ${DateTime.now().toIso8601String()}
-Duration: ${duration.inSeconds}
-Status: Completed ✅
-Permission Check: ✅ Granted
-Hardware Check: ✅ Available
-Service Version: Enhanced with PermissionService
-Final File Size: ${await file.length()} bytes
-''';
-    await file.writeAsString(content);
-    debugPrint('$_tag: Mock audio file updated with duration: ${duration.inSeconds}s');
+  /// Start real amplitude monitoring using flutter_sound
+  void _startRealAmplitudeMonitoring() {
+    if (_recorder == null) return;
+    
+    try {
+      // Subscribe to recorder's amplitude stream
+      _recorder!.onProgress!.listen((e) {
+        if (_isRecording && !_isRecordingPaused) {
+          // Convert decibels to normalized amplitude (0.0 to 1.0)
+          final dbfs = e.decibels ?? -80.0;
+          final amplitude = _dbToAmplitude(dbfs);
+          _amplitudeController?.add(amplitude);
+        } else {
+          _amplitudeController?.add(0.0);
+        }
+      });
+      debugPrint('$_tag: Real amplitude monitoring started');
+    } catch (e) {
+      debugPrint('$_tag: ❌ Failed to start amplitude monitoring: $e');
+      // Fallback to mock monitoring
+      _startMockAmplitudeMonitoring();
+    }
   }
 
-  /// Start amplitude monitoring for visualization
-  void _startAmplitudeMonitoring() {
-    _amplitudeTimer?.cancel();
-    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+  /// Convert decibels to amplitude (0.0 to 1.0)
+  double _dbToAmplitude(double dbfs) {
+    // Convert dBFS to linear amplitude
+    // -80 dBFS = 0.0, -20 dBFS = 1.0 (approximate speech range)
+    final normalizedDb = (dbfs + 80.0) / 60.0; // Normalize -80 to -20 dBFS to 0-1
+    return normalizedDb.clamp(0.0, 1.0);
+  }
+
+  /// Fallback mock amplitude monitoring
+  void _startMockAmplitudeMonitoring() {
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (_isRecording && !_isRecordingPaused) {
-        // Generate more realistic amplitude data with speech patterns
         final time = DateTime.now().millisecondsSinceEpoch;
-        final speechPattern = math.sin(time / 300) * 0.3; // Slower speech-like pattern
-        final breathPattern = math.sin(time / 1000) * 0.1; // Breathing pattern
-        final noise = (math.Random().nextDouble() - 0.5) * 0.2; // Random noise
-
+        final speechPattern = math.sin(time / 300) * 0.3;
+        final breathPattern = math.sin(time / 1000) * 0.1;
+        final noise = (math.Random().nextDouble() - 0.5) * 0.2;
         final baseAmplitude = 0.25 + speechPattern + breathPattern;
         final amplitude = (baseAmplitude + noise).clamp(0.0, 1.0);
-
         _amplitudeController?.add(amplitude);
       } else {
         _amplitudeController?.add(0.0);
       }
     });
-    debugPrint('$_tag: Amplitude monitoring started');
   }
 
   /// Stop amplitude monitoring
   void _stopAmplitudeMonitoring() {
-    _amplitudeTimer?.cancel();
     _amplitudeController?.add(0.0);
     debugPrint('$_tag: Amplitude monitoring stopped');
   }
 
   /// Start duration monitoring
   void _startDurationMonitoring() {
-    _durationTimer?.cancel();
-    _durationTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+    Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_isRecording) {
         final duration = _calculateTotalRecordingDuration();
         _positionController?.add(duration);
+      } else {
+        timer.cancel();
       }
     });
     debugPrint('$_tag: Duration monitoring started');
@@ -690,7 +805,6 @@ Final File Size: ${await file.length()} bytes
 
   /// Stop duration monitoring
   void _stopDurationMonitoring() {
-    _durationTimer?.cancel();
     debugPrint('$_tag: Duration monitoring stopped');
   }
 
@@ -741,5 +855,38 @@ Final File Size: ${await file.length()} bytes
     final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final timeStr = '${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}-${now.second.toString().padLeft(2, '0')}';
     return 'Recording $dateStr $timeStr';
+  }
+
+  /// Extract folder ID from file path
+  /// File path format: ".../Documents/folderId/recording_timestamp.extension"
+  String _extractFolderIdFromPath(String filePath) {
+    try {
+      final parts = filePath.split('/');
+      debugPrint('$_tag: 🔍 Splitting path: $filePath');
+      debugPrint('$_tag: 🔍 Path parts: $parts');
+      
+      // Look for the folder ID - it should be the directory name before the filename
+      // The structure is: .../Documents/folderId/filename.extension
+      if (parts.length >= 2) {
+        // Find the last directory before the filename
+        final filename = parts.last;
+        final folderName = parts[parts.length - 2];
+        
+        debugPrint('$_tag: 📁 Filename: $filename');
+        debugPrint('$_tag: 📁 Folder name: $folderName');
+        
+        // Check if this looks like a folder ID (numeric string)
+        if (folderName.isNotEmpty && RegExp(r'^\d+$').hasMatch(folderName)) {
+          debugPrint('$_tag: 📁 Extracted folder ID: $folderName from path: $filePath');
+          return folderName;
+        }
+      }
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Failed to extract folder ID from path: $filePath, error: $e');
+    }
+    
+    // Fallback to default
+    debugPrint('$_tag: ⚠️ Using fallback folder ID: all_recordings');
+    return 'all_recordings';
   }
 }

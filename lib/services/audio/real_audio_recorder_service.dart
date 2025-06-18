@@ -1,13 +1,7 @@
 // File: services/audio/real_audio_recorder_service.dart
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/recording_entity.dart';
-import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../core/enums/audio_format.dart';
-import '../../core/utils/file_utils.dart';
-import '../../core/utils/date_formatter.dart';
-import '../../data/repositories/recording_repository.dart';
 import 'audio_recorder_service.dart'; // Use the working mock service as base
 
 /// Real audio recording service - simplified version

@@ -377,10 +377,6 @@ class WaveformLoadingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
     final barCount = 8;
     final barWidth = size.width / (barCount * 2);
     final spacing = barWidth;
