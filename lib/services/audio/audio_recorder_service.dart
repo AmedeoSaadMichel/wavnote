@@ -730,8 +730,6 @@ class AudioRecorderService implements IAudioServiceRepository {
         return Codec.aacMP4;
       case AudioFormat.flac:
         return Codec.flac;
-      default:
-        return Codec.aacMP4;
     }
   }
 

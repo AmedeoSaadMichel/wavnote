@@ -1,30 +1,36 @@
 // File: presentation/screens/recording/recording_list_screen.dart
+
+// Dart packages
+import 'dart:async';
+
+// Flutter packages
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../domain/entities/recording_entity.dart';
+
+// Domain
 import '../../../domain/entities/folder_entity.dart';
+import '../../../domain/entities/recording_entity.dart';
+
+// Presentation
 import '../../bloc/recording/recording_bloc.dart';
-import '../../bloc/audio_player/audio_player_bloc.dart';
-import '../../bloc/audio_player/audio_player_event.dart';
-import '../../bloc/audio_player/audio_player_state.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../core/extensions/duration_extensions.dart';
-import '../../../core/extensions/datetime_extensions.dart';
-import '../../../core/enums/audio_format.dart';
+import '../../bloc/folder/folder_bloc.dart';
+import '../../bloc/settings/settings_bloc.dart';
 import '../../widgets/recording/recording_bottom_sheet.dart';
 import '../../widgets/recording/recording_card.dart';
+import 'audio_player_manager.dart';
 
-/// iPhone Voice Memos Style Recording List Screen with Cosmic Theme
+// Core
+import '../../../core/constants/app_constants.dart';
+import '../../../core/enums/audio_format.dart';
+
+/// Recording List Screen with Single AudioPlayer Architecture
 ///
-/// Recreates the exact iPhone Voice Memos interface with:
-/// - "All Recordings" header with Edit button
-/// - Clean recording list with titles, dates, and durations
-/// - Transcript icon for transcribed recordings
-/// - Three-dot menu for actions
-/// - Inline audio player with waveform and controls
-/// - Cosmic theme overlay while maintaining iOS design language
-/// - Fixed BLoC provider errors
-class RecordingListScreen extends StatelessWidget {
+/// Features:
+/// - Single AudioPlayer instance at screen level
+/// - Pure UI RecordingCards with callbacks
+/// - One expanded card at a time
+/// - Instant audio playback (like old project)
+class RecordingListScreen extends StatefulWidget {
   final FolderEntity folder;
 
   const RecordingListScreen({
@@ -32,114 +38,253 @@ class RecordingListScreen extends StatelessWidget {
     required this.folder,
   }) : super(key: key);
 
+  @override
+  State<RecordingListScreen> createState() => _RecordingListScreenState();
+}
+
+class _RecordingListScreenState extends State<RecordingListScreen> {
+  // ============================================================================
+  // PROPERTIES
+  // ============================================================================
+  
+  // Audio player manager - handles all audio playback logic
+  final AudioPlayerManager _audioPlayerManager = AudioPlayerManager();
+  
+  // Track recording count for folder refresh detection
+  int? _previousRecordingCount;
+  
+  // Folder names for tag display
+  Map<String, String> _folderNames = {};
+
+  // ============================================================================
+  // LIFECYCLE METHODS
+  // ============================================================================
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayerManager.initialize(() => setState(() {}));
+    _loadFolderNames();
+    
+    // Load recordings and check permissions on init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('🚀 Loading recordings for folder: ${widget.folder.id}');
+      context.read<RecordingBloc>().add(LoadRecordings(folderId: widget.folder.id));
+      
+      // Check recording permissions
+      print('🔍 Checking recording permissions');
+      context.read<RecordingBloc>().add(const CheckRecordingPermissions());
+    });
+  }
+
+  /// Load folder names for tag display
+  void _loadFolderNames() {
+    final folderBloc = context.read<FolderBloc>();
+    final folderState = folderBloc.state;
+    
+    if (folderState is FolderLoaded) {
+      final Map<String, String> names = {};
+      
+      // Add default folders
+      for (final folder in folderState.defaultFolders) {
+        names[folder.id] = folder.name;
+      }
+      
+      // Add custom folders
+      for (final folder in folderState.customFolders) {
+        names[folder.id] = folder.name;
+      }
+      
+      setState(() {
+        _folderNames = names;
+      });
+      
+      print('📋 Loaded ${names.length} folder names for tags');
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayerManager.dispose();
+    super.dispose();
+  }
+
+  // ============================================================================
+  // AUDIO PLAYER MANAGEMENT (Delegated to AudioPlayerManager)
+  // ============================================================================
+
+  /// Expand/collapse recording - delegated to AudioPlayerManager
+  Future<void> _expandRecording(RecordingEntity recording) async {
+    try {
+      await _audioPlayerManager.expandRecording(recording);
+    } catch (e) {
+      // Show user-friendly error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not play recording: ${recording.name}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Toggle playback - delegated to AudioPlayerManager
+  Future<void> _togglePlayback() async {
+    await _audioPlayerManager.togglePlayback();
+  }
+
+  /// Seek to position - delegated to AudioPlayerManager
+  void _seekToPosition(double percent) {
+    _audioPlayerManager.seekToPosition(percent);
+  }
+
+  /// Get the currently expanded recording - delegated to AudioPlayerManager
+  RecordingEntity? _getExpandedRecording() {
+    final recordingBloc = context.read<RecordingBloc>();
+    final state = recordingBloc.state;
+    if (state is RecordingLoaded) {
+      return _audioPlayerManager.getCurrentlyExpandedRecording(state.recordings);
+    }
+    return null;
+  }
+
+  /// Skip backward - delegated to AudioPlayerManager
+  void _skipBackward() {
+    _audioPlayerManager.skipBackward();
+  }
+
+  /// Skip forward - delegated to AudioPlayerManager
+  void _skipForward() {
+    _audioPlayerManager.skipForward();
+  }
+
+  /// Delete recording (soft delete or permanent delete based on folder)
+  Future<void> _deleteRecording(RecordingEntity recording) async {
+    // Stop playback if deleting current recording
+    if (_audioPlayerManager.expandedRecordingId == recording.id) {
+      await _audioPlayerManager.audioPlayer.stop();
+      setState(() {});
+    }
+
+    // Use different delete logic based on current folder
+    if (widget.folder.id == 'recently_deleted') {
+      // Permanent delete from Recently Deleted folder
+      context.read<RecordingBloc>().add(PermanentDeleteRecording(recording.id));
+    } else {
+      // Soft delete from any other folder (moves to Recently Deleted)
+      context.read<RecordingBloc>().add(SoftDeleteRecording(recording.id));
+    }
+  }
+
+  // ============================================================================
+  // BUILD METHODS
+  // ============================================================================
 
   @override
   Widget build(BuildContext context) {
-    // Load recordings on first build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('🚀 Loading recordings for folder: ${folder.id}');
-      context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
-    });
-
-    return BlocListener<RecordingBloc, RecordingState>(
-      listener: (context, state) {
-        // Refresh recordings list when recording is completed
-        if (state is RecordingCompleted) {
-          print('🔄 Recording completed, refreshing list for folder: ${folder.id}');
-          context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
-        }
-      },
-      child: Scaffold(
-      backgroundColor: Colors.black,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0a0a0a), // Darker for iPhone style
-              Color(0xFF1a1a1a),
-              Color(0xFF000000),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  _buildHeader(context),
-                  Expanded(
-                    child: _buildRecordingsList(context),
-                  ),
-                  // Add bottom padding to prevent overlap with bottom sheet
-                  const SizedBox(height: 200),
-                ],
-              ),
-
-              // Position the bottom sheet absolutely
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: BlocBuilder<RecordingBloc, RecordingState>(
-                  builder: (context, recordingState) {
-                    final isRecording = recordingState.isRecording;
-                    final currentTitle = recordingState is RecordingInProgress
-                        ? recordingState.title ?? 'New Recording'
-                        : 'New Recording';
-                    final elapsed = recordingState.currentDuration ?? Duration.zero;
-                    
-                    return RecordingBottomSheet(
-                      title: currentTitle,
-                      filePath: isRecording ? '/temp/current_recording.m4a' : null,
-                      isRecording: isRecording,
-                      onToggle: () => _toggleRecording(context),
-                      elapsed: elapsed,
-                      width: MediaQuery.of(context).size.width,
-                      onTitleChanged: (newTitle) {
-                        context.read<RecordingBloc>().add(
-                          UpdateRecordingTitle(title: newTitle),
-                        );
-                      },
-                      onPause: () => _pauseRecording(context),
-                      onDone: () => _finishRecording(context),
-                      onChat: () => _showTranscriptOptions(context),
-                    );
-                  },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<RecordingBloc, RecordingState>(
+          listener: (context, state) {
+            if (state is RecordingCompleted) {
+              print('🎉 RecordingCompleted event received! Recording: ${state.recording.name}');
+              print('🔄 Refreshing recordings list for folder: ${widget.folder.id}');
+              // Refresh recordings list
+              context.read<RecordingBloc>().add(LoadRecordings(folderId: widget.folder.id));
+            } else if (state is RecordingLoaded) {
+              // Check if recording count decreased (recording deleted)
+              final currentCount = state.recordings.length;
+              if (_previousRecordingCount != null && currentCount < _previousRecordingCount!) {
+                print('🔄 Recording count decreased, will refresh folders when navigating back');
+                // We'll refresh folders when we navigate back to main screen
+              }
+              _previousRecordingCount = currentCount;
+            } else if (state is RecordingPermissionStatus) {
+              print('🔐 Permission status: canRecord=${state.canRecord}');
+              if (!state.canRecord) {
+                print('🔐 Requesting microphone permission...');
+                context.read<RecordingBloc>().add(const RequestRecordingPermissions());
+              }
+            } else if (state is RecordingError) {
+              print('❌ Recording error: ${state.message}');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Recording error: ${state.message}'),
+                  backgroundColor: Colors.red,
                 ),
-              ),
-            ],
+              );
+            }
+          },
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF0a0a0a),
+                Color(0xFF1a1a1a),
+                Color(0xFF000000),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    _buildHeader(context),
+                    _buildEditModeToolbar(context),
+                    Expanded(
+                      child: _buildRecordingsList(context),
+                    ),
+                    const SizedBox(height: 200),
+                  ],
+                ),
+                // Only show recording bottom sheet if NOT in Recently Deleted folder
+                if (widget.folder.id != 'recently_deleted') _buildRecordingBottomSheet(context),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
-  /// Build iPhone-style header with "All Recordings" title and Edit button
+  /// Build header
   Widget _buildHeader(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
       builder: (context, recordingState) {
         final isEditMode = recordingState is RecordingLoaded ? recordingState.isEditMode : false;
-        
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              // Back button
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(
                   Icons.arrow_back_ios,
                   color: AppConstants.accentCyan,
-                  size: 20,
+                  size: 24,
                 ),
               ),
-
-              const Spacer(),
-
-              // Edit button
+              Expanded(
+                child: Text(
+                  widget.folder.name,
+                  style: const TextStyle(
+                    color: AppConstants.accentYellow,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
               TextButton(
                 onPressed: () {
                   context.read<RecordingBloc>().add(const ToggleEditMode());
@@ -148,8 +293,8 @@ class RecordingListScreen extends StatelessWidget {
                   isEditMode ? 'Done' : 'Edit',
                   style: const TextStyle(
                     color: AppConstants.accentCyan,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w400,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -160,88 +305,63 @@ class RecordingListScreen extends StatelessWidget {
     );
   }
 
-  /// Build recordings list with proper error handling
-  Widget _buildRecordingsList(BuildContext context) {
+  /// Build edit mode toolbar
+  Widget _buildEditModeToolbar(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
-      builder: (context, recordingState) {
-        if (recordingState is RecordingLoading) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: AppConstants.accentCyan,
+      builder: (context, state) {
+        if (state is! RecordingLoaded || !state.isEditMode) {
+          return const SizedBox.shrink();
+        }
+
+        final selectedCount = state.selectedRecordings.length;
+        final totalCount = state.recordings.length;
+        final allSelected = selectedCount == totalCount && totalCount > 0;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            border: Border(
+              bottom: BorderSide(color: Colors.grey[700]!, width: 1),
             ),
-          );
-        }
-
-        if (recordingState is RecordingError) {
-          return _buildErrorState(context, recordingState.message);
-        }
-
-        if (recordingState is RecordingLoaded) {
-          print('📋 All recordings loaded: ${recordingState.recordings.length}');
-          for (var rec in recordingState.recordings) {
-            print('  - ${rec.name} (folder: ${rec.folderId})');
-          }
-          
-          final recordings = recordingState.recordings
-              .where((r) => r.folderId == folder.id)
-              .toList();
-          
-          print('🎯 Filtered recordings for folder ${folder.id}: ${recordings.length}');
-
-          if (recordings.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          child: Row(
             children: [
-              // Folder title
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              // Select All / Deselect All button
+              TextButton(
+                onPressed: () {
+                  if (allSelected) {
+                    context.read<RecordingBloc>().add(const DeselectAllRecordings());
+                  } else {
+                    context.read<RecordingBloc>().add(const SelectAllRecordings());
+                  }
+                },
                 child: Text(
-                  folder.name,
+                  allSelected ? 'Deselect All' : 'Select All',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
+                    color: AppConstants.accentCyan,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-
-              // Recordings list
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 0),
-                  itemCount: recordings.length,
-                  itemBuilder: (context, index) {
-                    final recording = recordings[index];
-                    final isExpanded = recordingState.expandedRecordingId == recording.id;
-
-                    return _buildRecordingItem(context, recording, isExpanded, recordingState);
-                  },
+              const Spacer(),
+              // Selection count
+              Text(
+                '$selectedCount selected',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
                 ),
               ),
-            ],
-          );
-        }
-
-        // Default state
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.mic_none,
-                color: Colors.white54,
-                size: 64,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Loading recordings...',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 18,
+              const SizedBox(width: 16),
+              // Delete selected button
+              IconButton(
+                onPressed: selectedCount > 0 ? () => _deleteSelectedRecordings(context) : null,
+                icon: Icon(
+                  Icons.delete,
+                  color: selectedCount > 0 ? Colors.red : Colors.grey[600],
+                  size: 24,
                 ),
               ),
             ],
@@ -251,248 +371,44 @@ class RecordingListScreen extends StatelessWidget {
     );
   }
 
-  /// Build individual recording item in iPhone style
-  Widget _buildRecordingItem(BuildContext context, RecordingEntity recording, bool isExpanded, RecordingLoaded recordingState) {
-    final hasTranscript = recording.name.contains('transcript') ||
-        recording.name.toLowerCase().contains('gelat'); // Mock transcript detection
+  /// Delete selected recordings with confirmation
+  void _deleteSelectedRecordings(BuildContext context) {
+    final recordingBloc = context.read<RecordingBloc>();
+    final state = recordingBloc.state;
+    
+    if (state is! RecordingLoaded) return;
+    
+    final selectedCount = state.selectedRecordings.length;
+    if (selectedCount == 0) return;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.grey[900]?.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(0), // iPhone style has sharp corners
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey[800]!.withOpacity(0.3),
-            width: 0.5,
-          ),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A2A),
+        title: const Text(
+          'Delete Recordings',
+          style: TextStyle(color: Colors.white),
         ),
-      ),
-      child: Column(
-        children: [
-          // Main recording row
-          InkWell(
-            onTap: () => context.read<RecordingBloc>().add(
-              ExpandRecording(recordingId: recording.id),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Selection circle (edit mode)
-                  if (recordingState.isEditMode) ...[
-                    GestureDetector(
-                      onTap: () => context.read<RecordingBloc>().add(
-                        ToggleRecordingSelection(recordingId: recording.id),
-                      ),
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: recordingState.selectedRecordings.contains(recording.id)
-                                ? AppConstants.accentCyan
-                                : Colors.grey[600]!,
-                            width: 2,
-                          ),
-                          color: recordingState.selectedRecordings.contains(recording.id)
-                              ? AppConstants.accentCyan
-                              : Colors.transparent,
-                        ),
-                        child: recordingState.selectedRecordings.contains(recording.id)
-                            ? const Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 14,
-                        )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-
-                  // Recording info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            // Recording title
-                            Expanded(
-                              child: Text(
-                                recording.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-
-                            // Transcript icon
-                            if (hasTranscript) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[700],
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Icon(
-                                  Icons.text_snippet_outlined,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        // Date and duration
-                        Row(
-                          children: [
-                            Text(
-                              recording.createdAt.userFriendlyFormat,
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 15,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Duration
-                  Text(
-                    recording.duration.recordingFormat,
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Three-dot menu or expand indicator
-                  if (!recordingState.isEditMode)
-                    IconButton(
-                      onPressed: () => _showRecordingMenu(context, recording),
-                      icon: const Icon(
-                        Icons.more_horiz,
-                        color: AppConstants.accentCyan,
-                        size: 24,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // Expanded audio player
-          if (isExpanded)
-            _buildExpandedPlayer(context, recording),
-        ],
-      ),
-    );
-  }
-
-  /// Build expanded audio player section with safe BLoC access
-  Widget _buildExpandedPlayer(BuildContext context, RecordingEntity recording) {
-    // Try to get the AudioPlayerBloc, fallback to manual state if not available
-    try {
-      return BlocBuilder<AudioPlayerBloc, AudioPlayerState>(
-        builder: (context, playerState) {
-          return RecordingCard(
-            recording: recording,
-            playerState: playerState,
-            onTogglePlayback: () => _togglePlayback(context, recording),
-            onSkipBackward: () => _skipBackward(context, recording),
-            onSkipForward: () => _skipForward(context, recording),
-            onShowWaveform: () => _showWaveform(context, recording),
-            onDelete: () => _deleteRecording(context, recording),
-            onSeekToPosition: (position) => _seekToPosition(context, position),
-          );
-        },
-      );
-    } catch (e) {
-      // Fallback to manual player controls if BLoC is not available
-      debugPrint('AudioPlayerBloc not available: $e');
-      return RecordingCard(
-        recording: recording,
-        playerState: null,
-        onTogglePlayback: () => _togglePlayback(context, recording),
-        onSkipBackward: () => _skipBackward(context, recording),
-        onSkipForward: () => _skipForward(context, recording),
-        onShowWaveform: () => _showWaveform(context, recording),
-        onDelete: () => _deleteRecording(context, recording),
-        onSeekToPosition: (position) => _seekToPosition(context, position),
-      );
-    }
-  }
-
-
-  /// Build error state
-  Widget _buildErrorState(BuildContext context, String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline,
-            color: Colors.red,
-            size: 64,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
+        content: Text(
+          'Are you sure you want to delete $selectedCount recording${selectedCount > 1 ? 's' : ''}?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
           TextButton(
-            onPressed: () => context.read<RecordingBloc>().add(
-              LoadRecordings(folderId: folder.id),
-            ),
+            onPressed: () => Navigator.of(context).pop(),
             child: const Text(
-              'Retry',
+              'Cancel',
               style: TextStyle(color: AppConstants.accentCyan),
             ),
           ),
-          const SizedBox(height: 16),
           TextButton(
             onPressed: () {
-              // Debug: Load ALL recordings to see what's in database
-              print('🔍 DEBUG: Requesting all recordings...');
-              context.read<RecordingBloc>().add(const DebugLoadAllRecordings());
+              Navigator.of(context).pop();
+              recordingBloc.add(DeleteSelectedRecordings(folderId: widget.folder.id));
             },
             child: const Text(
-              'Debug: Show ALL',
-              style: TextStyle(color: Colors.orange),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () {
-              // Debug: Create a test recording
-              print('🧪 DEBUG: Requesting test recording creation...');
-              context.read<RecordingBloc>().add(DebugCreateTestRecording(folderId: folder.id));
-            },
-            child: const Text(
-              'Debug: Add Test',
-              style: TextStyle(color: Colors.green),
+              'Delete',
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -500,102 +416,190 @@ class RecordingListScreen extends StatelessWidget {
     );
   }
 
-  /// Build empty state
-  Widget _buildEmptyState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.mic_none,
-            color: Colors.white54,
-            size: 64,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No recordings yet',
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 18,
+  /// Build recordings list
+  Widget _buildRecordingsList(BuildContext context) {
+    return BlocBuilder<RecordingBloc, RecordingState>(
+      builder: (context, state) {
+        if (state is RecordingLoading) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: AppConstants.accentYellow,
             ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Tap the record button to create your first cosmic transmission',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 14,
+          );
+        }
+
+        if (state is RecordingLoaded) {
+          if (state.recordings.isEmpty) {
+            // Don't show "No recordings yet" when recording is active
+            final recordingBloc = context.read<RecordingBloc>();
+            final currentState = recordingBloc.state;
+            if (currentState.isRecording) {
+              return const SizedBox.shrink(); // Hide the message when recording
+            }
+            
+            return const Center(
+              child: Text(
+                'No recordings yet',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 18,
+                ),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: state.recordings.length,
+            itemBuilder: (context, index) {
+              final recording = state.recordings[index];
+              final isExpanded = _audioPlayerManager.expandedRecordingId == recording.id;
+              print('📦 Building card for: ${recording.name}');
+              print('⏱ Duration: ${recording.duration.inMilliseconds}ms');
+              print('▶️ Current position: ${_audioPlayerManager.position.inMilliseconds}ms');
+              return RecordingCard(
+                recording: recording,
+                isExpanded: isExpanded,
+                onTap: () => _expandRecording(recording),
+                onShowWaveform: () {}, // TODO: Implement if needed
+                onDelete: () => _deleteRecording(recording),
+                onMoveToFolder: () => _moveRecordingToFolder(recording),
+                onMoreActions: () => _showMoreActions(recording),
+                onRestore: () => _restoreRecording(recording),
+                onToggleFavorite: () => _toggleFavoriteRecording(recording),
+                // Audio state passed from screen
+                isPlaying: isExpanded ? _audioPlayerManager.isPlaying : false,
+                isLoading: isExpanded ? _audioPlayerManager.isLoading : false,
+                currentPosition: isExpanded ? _audioPlayerManager.position : Duration.zero,
+                // Audio control callbacks
+                onPlayPause: _togglePlayback,
+                onSeek: _seekToPosition,
+                onSkipBackward: _skipBackward,
+                onSkipForward: _skipForward,
+                // Tag display context
+                currentFolderId: widget.folder.id,
+                folderNames: _folderNames,
+                // Selection state
+                isEditMode: state.isEditMode,
+                isSelected: state.selectedRecordings.contains(recording.id),
+                onSelectionToggle: () => context.read<RecordingBloc>().add(
+                  ToggleRecordingSelection(recordingId: recording.id),
+                ),
+              );
+            },
+          );
+        }
+
+        // Handle other states (RecordingInProgress, RecordingError, etc.)
+        // Hide content while recording is in progress instead of showing "No recordings yet"
+        if (state is RecordingInProgress || state is RecordingStarting) {
+          return const SizedBox.shrink(); // Hide content when recording
+        }
+        
+        if (state is RecordingError) {
+          return Center(
+            child: Text(
+              'Error: ${state.message}',
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
+          );
+        }
+        
+        // Default fallback for any other states
+        return const Center(
+          child: CircularProgressIndicator(
+            color: AppConstants.accentYellow,
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  /// Build recording bottom sheet
+  Widget _buildRecordingBottomSheet(BuildContext context) {
+    return BlocBuilder<RecordingBloc, RecordingState>(
+      builder: (context, recordingState) {
+        final isRecording = recordingState.isRecording;
+        final currentTitle = recordingState is RecordingInProgress
+            ? recordingState.title ?? 'New Recording'
+            : 'New Recording';
+        final elapsed = recordingState.currentDuration ?? Duration.zero;
 
-  /// Show recording menu
-  void _showRecordingMenu(BuildContext context, RecordingEntity recording) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.white),
-              title: const Text('Rename', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _renameRecording(context, recording);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text('Share', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _shareRecording(context, recording);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteRecording(context, recording);
-              },
-            ),
-          ],
-        ),
-      ),
+        return RecordingBottomSheet(
+          title: currentTitle,
+          filePath: isRecording ? '/temp/current_recording.m4a' : null,
+          isRecording: isRecording,
+          onToggle: () {
+            print('🔘 Bottom sheet toggle button pressed');
+            _toggleRecording(context);
+          },
+          elapsed: elapsed,
+          width: MediaQuery.of(context).size.width,
+          onTitleChanged: (newTitle) {
+            context.read<RecordingBloc>().add(
+              UpdateRecordingTitle(title: newTitle),
+            );
+          },
+          onPause: () => _pauseRecording(context),
+          onDone: () => _finishRecording(context),
+          onChat: () => _showTranscriptOptions(context),
+        );
+      },
     );
   }
 
-  /// Recording controls for bottom sheet
+  // ============================================================================
+  // RECORDING CONTROL METHODS
+  // ============================================================================
+
   void _toggleRecording(BuildContext context) {
+    print('🎤 Toggle recording called');
     final recordingBloc = context.read<RecordingBloc>();
-    if (recordingBloc.state.isRecording) {
+    final currentState = recordingBloc.state;
+    
+    print('📍 Current recording state: ${currentState.runtimeType}');
+    print('📍 Can start recording: ${currentState.canStartRecording}');
+    print('📍 Can stop recording: ${currentState.canStopRecording}');
+
+    if (currentState.canStartRecording) {
+      print('🚀 Starting recording...');
+      
+      // Get format from settings
+      AudioFormat selectedFormat = AudioFormat.m4a; // Default fallback
+      final settingsBloc = context.read<SettingsBloc>();
+      final settingsState = settingsBloc.state;
+      
+      if (settingsState is SettingsLoaded) {
+        selectedFormat = settingsState.settings.audioFormat;
+        print('🎵 Using format from settings: ${selectedFormat.name}');
+      } else {
+        print('⚠️ Settings not loaded, using default format: ${selectedFormat.name}');
+      }
+      
+      recordingBloc.add(StartRecording(
+        folderId: widget.folder.id,
+        folderName: widget.folder.name,
+        format: selectedFormat,
+      ));
+    } else if (currentState.canStopRecording) {
       print('🛑 Stopping recording...');
       recordingBloc.add(const StopRecording());
     } else {
-      print('🎤 Starting recording for folder: ${folder.id}');
-      recordingBloc.add(StartRecording(
-        folderId: folder.id,
-        format: AudioFormat.m4a,
-        sampleRate: 44100,
-        bitRate: 128000,
-      ));
+      print('❌ Cannot start or stop recording in current state: ${currentState.runtimeType}');
     }
   }
 
   void _pauseRecording(BuildContext context) {
-    context.read<RecordingBloc>().add(const PauseRecording());
+    final recordingBloc = context.read<RecordingBloc>();
+    if (recordingBloc.state.canPauseRecording) {
+      recordingBloc.add(const PauseRecording());
+    } else if (recordingBloc.state.canResumeRecording) {
+      recordingBloc.add(const ResumeRecording());
+    }
   }
 
   void _finishRecording(BuildContext context) {
@@ -603,87 +607,88 @@ class RecordingListScreen extends StatelessWidget {
   }
 
   void _showTranscriptOptions(BuildContext context) {
+    // TODO: Implement transcript options
+    print('🎤 Transcript options tapped');
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  /// Move recording to another folder
+  void _moveRecordingToFolder(RecordingEntity recording) {
+    print('📁 Move to folder tapped for: ${recording.name}');
+    // TODO: Show folder selection dialog
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Transcript options coming soon'),
+      SnackBar(
+        content: Text('Move to folder - ${recording.name}'),
         backgroundColor: Colors.blue,
       ),
     );
   }
 
-
-  /// Audio control methods with safe BLoC access
-  void _togglePlayback(BuildContext context, RecordingEntity recording) {
-    try {
-      final audioBloc = context.read<AudioPlayerBloc>();
-      audioBloc.add(LoadAudioEvent(filePath: recording.filePath));
-      audioBloc.add(const StartPlaybackEvent());
-    } catch (e) {
-      debugPrint('AudioPlayerBloc not available: $e');
-      _showMessage(context, 'Audio playback not available');
-    }
-  }
-
-  void _skipBackward(BuildContext context, RecordingEntity recording) {
-    try {
-      context.read<AudioPlayerBloc>().add(
-        const SkipBackwardEvent(),
-      );
-    } catch (e) {
-      debugPrint('AudioPlayerBloc not available: $e');
-    }
-  }
-
-  void _skipForward(BuildContext context, RecordingEntity recording) {
-    try {
-      context.read<AudioPlayerBloc>().add(
-        const SkipForwardEvent(),
-      );
-    } catch (e) {
-      debugPrint('AudioPlayerBloc not available: $e');
-    }
-  }
-
-  void _seekToPosition(BuildContext context, Duration position) {
-    try {
-      context.read<AudioPlayerBloc>().add(
-        SeekToPositionEvent(position: position),
-      );
-    } catch (e) {
-      debugPrint('AudioPlayerBloc not available: $e');
-    }
-  }
-
-  /// Action methods
-  void _showWaveform(BuildContext context, RecordingEntity recording) {
-    debugPrint('Show waveform for: ${recording.name}');
-  }
-
-  void _renameRecording(BuildContext context, RecordingEntity recording) {
-    debugPrint('Rename recording: ${recording.name}');
-  }
-
-  void _shareRecording(BuildContext context, RecordingEntity recording) {
-    debugPrint('Share recording: ${recording.name}');
-  }
-
-  void _deleteRecording(BuildContext context, RecordingEntity recording) {
-    try {
-      context.read<RecordingBloc>().add(
-        LoadRecordings(folderId: folder.id), // Refresh after delete
-      );
-    } catch (e) {
-      debugPrint('RecordingBloc not available: $e');
-      _showMessage(context, 'Delete functionality not available');
-    }
-  }
-
-  void _showMessage(BuildContext context, String message) {
+  /// Show more actions for recording
+  void _showMoreActions(RecordingEntity recording) {
+    print('⚙️ More actions tapped for: ${recording.name}');
+    // TODO: Show more actions dialog
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
+        content: Text('More actions - ${recording.name}'),
+        backgroundColor: Colors.grey[600],
       ),
     );
   }
+
+  /// Restore recording from Recently Deleted folder
+  void _restoreRecording(RecordingEntity recording) {
+    print('♻️ Restore tapped for: ${recording.name}');
+    
+    // Stop playback if restoring current recording
+    if (_audioPlayerManager.expandedRecordingId == recording.id) {
+      _audioPlayerManager.audioPlayer.stop();
+      setState(() {});
+    }
+
+    // Restore the recording
+    context.read<RecordingBloc>().add(RestoreRecording(recording.id));
+    
+    // Show feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Restored "${recording.name}"'),
+        backgroundColor: Colors.green,
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: Colors.white,
+          onPressed: () {
+            // Re-soft delete the recording
+            context.read<RecordingBloc>().add(SoftDeleteRecording(recording.id));
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Toggle favorite status of recording
+  void _toggleFavoriteRecording(RecordingEntity recording) {
+    print('❤️ Toggle favorite for: ${recording.name}');
+    
+    // Toggle favorite status
+    context.read<RecordingBloc>().add(ToggleFavoriteRecording(recordingId: recording.id));
+    
+    // Show feedback
+    final isFavorite = recording.isFavorite;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isFavorite 
+              ? 'Removed "${recording.name}" from favorites'
+              : 'Added "${recording.name}" to favorites',
+        ),
+        backgroundColor: isFavorite ? Colors.grey[600] : Colors.orange,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
 }

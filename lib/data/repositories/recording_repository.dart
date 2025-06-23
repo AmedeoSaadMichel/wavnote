@@ -59,6 +59,33 @@ class RecordingRepository implements IRecordingRepository {
     return _crudOps.deleteRecording(id);
   }
 
+  // ==== SOFT DELETE OPERATIONS ====
+
+  @override
+  Future<bool> softDeleteRecording(String id) async {
+    return _crudOps.softDeleteRecording(id);
+  }
+
+  @override
+  Future<bool> restoreRecording(String id) async {
+    return _crudOps.restoreRecording(id);
+  }
+
+  @override
+  Future<bool> permanentlyDeleteRecording(String id) async {
+    return _crudOps.permanentlyDeleteRecording(id);
+  }
+
+  @override
+  Future<List<RecordingEntity>> getExpiredDeletedRecordings() async {
+    return _crudOps.getExpiredDeletedRecordings();
+  }
+
+  @override
+  Future<int> cleanupExpiredRecordings() async {
+    return _crudOps.cleanupExpiredRecordings();
+  }
+
   // ==== SEARCH & FILTER OPERATIONS ====
 
   @override
@@ -120,6 +147,11 @@ class RecordingRepository implements IRecordingRepository {
       bool isFavorite,
       ) async {
     return _bulkOps.updateRecordingsFavoriteStatus(recordingIds, isFavorite);
+  }
+
+  @override
+  Future<bool> toggleFavorite(String recordingId) async {
+    return _bulkOps.toggleFavorite(recordingId);
   }
 
   @override

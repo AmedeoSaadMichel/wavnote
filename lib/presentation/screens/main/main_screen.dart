@@ -1,8 +1,10 @@
 // File: presentation/screens/main/main_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:fluttericon/font_awesome5_icons.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../bloc/folder/folder_bloc.dart';
+import '../../bloc/recording/recording_bloc.dart';
+import '../../bloc/settings/settings_bloc.dart';
 import '../../widgets/folder/folder_item.dart';
 import '../../widgets/dialogs/create_folder_dialog.dart';
 import '../../widgets/dialogs/audio_format_dialog.dart';
@@ -22,25 +24,38 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  String _selectedAudioFormat = 'M4A'; // Default to M4A for iOS
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   FolderEntity? _selectedFolder;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Load folders when screen initializes
     BlocProvider.of<FolderBloc>(context).add(const LoadFolders());
-    _loadAudioFormat();
+    
+    // Clean up expired recordings (15+ days old) on app start
+    _scheduleExpiredRecordingsCleanup();
   }
 
-  /// Load current audio format from settings
-  void _loadAudioFormat() {
-    setState(() {
-      _selectedAudioFormat = 'M4A'; // Default for iOS
-    });
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Refresh folder counts when app resumes
+    if (state == AppLifecycleState.resumed && mounted) {
+      print('📱 App resumed - refreshing folder counts');
+      BlocProvider.of<FolderBloc>(context).add(const RefreshFolders());
+    }
+  }
+
 
   /// Show dialog to create a new custom folder
   void _showCreateFolderDialog() {
@@ -62,47 +77,117 @@ class _MainScreenState extends State<MainScreen> {
 
   /// Show dialog to select audio recording format
   void _showAudioFormatDialog() {
+    // Get current format from settings
+    AudioFormat currentFormat = AudioFormat.m4a; // Default fallback
+    final settingsBloc = context.read<SettingsBloc>();
+    final settingsState = settingsBloc.state;
+    
+    if (settingsState is SettingsLoaded) {
+      currentFormat = settingsState.settings.audioFormat;
+    }
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AudioFormatDialog(
-          currentFormat: _getAudioFormatFromString(_selectedAudioFormat),
+          currentFormat: currentFormat,
           onFormatSelected: (AudioFormat format) {
-            setState(() {
-              _selectedAudioFormat = format.name;
-            });
-            // TODO: Save to settings service when implemented
+            // Update settings with selected format
+            context.read<SettingsBloc>().add(UpdateAudioFormat(format));
           },
         );
       },
     );
   }
 
-  /// Convert string to AudioFormat enum
-  AudioFormat _getAudioFormatFromString(String formatString) {
-    switch (formatString.toLowerCase()) {
-      case 'wav':
-        return AudioFormat.wav;
-      case 'm4a':
-        return AudioFormat.m4a;
-      case 'flac':
-        return AudioFormat.flac;
-      default:
-        return AudioFormat.m4a; // Default to M4A for iOS
-    }
+  /// Schedule cleanup of expired recordings (15+ days old)
+  void _scheduleExpiredRecordingsCleanup() {
+    // Clean up expired recordings in Recently Deleted folder
+    // This runs once when the app starts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('🧹 Scheduling expired recordings cleanup...');
+      context.read<RecordingBloc>().add(const CleanupExpiredRecordings());
+    });
   }
 
+
   /// Handle folder tap navigation
-  void _onFolderTap(FolderEntity folder) {
+  void _onFolderTap(FolderEntity folder) async {
     setState(() {
       _selectedFolder = folder;
     });
 
-    Navigator.push(
+    // Navigate to recording list and refresh folders when returning
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RecordingListScreen(folder: folder),
       ),
+    );
+    
+    // Refresh folder counts when returning from recording list
+    print('🔄 Refreshing folder counts after returning to main screen');
+    if (mounted) {
+      BlocProvider.of<FolderBloc>(context).add(const RefreshFolders());
+    }
+  }
+
+  /// Toggle edit mode for multi-selection
+  void _toggleEditMode() {
+    context.read<FolderBloc>().add(const ToggleFolderEditMode());
+  }
+
+  /// Delete selected folders with confirmation
+  void _deleteSelectedFolders() {
+    final folderBloc = context.read<FolderBloc>();
+    final folderState = folderBloc.state;
+    
+    if (folderState is! FolderLoaded || !folderState.hasSelectedFolders) {
+      return;
+    }
+
+    final selectedFolders = folderState.selectedFolders;
+    final selectedFolderIds = folderState.selectedFolderIds.toList();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2D1B69),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Delete Folders',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Are you sure you want to delete ${selectedFolders.length} folder${selectedFolders.length == 1 ? '' : 's'}? This action cannot be undone.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                folderBloc.add(DeleteSelectedFolders(folderIds: selectedFolderIds));
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.red.withValues(alpha: 0.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -194,91 +279,165 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Build the header with title, format selector, and quick record button
+  /// Build the header with title, format selector, and edit button
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(
-        children: [
-          // Main header row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return BlocBuilder<FolderBloc, FolderState>(
+      builder: (context, folderState) {
+        final isEditMode = folderState is FolderLoaded ? folderState.isEditMode : false;
+        final hasSelectedFolders = folderState is FolderLoaded ? folderState.hasSelectedFolders : false;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
             children: [
+              // Main header row
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Voice Memos',
-                    style: TextStyle(
-                      color: Colors.yellowAccent,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Audio Format Selector
-                  GestureDetector(
-                    onTap: _showAudioFormatDialog,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          width: 1,
+                  Row(
+                    children: [
+                      const Text(
+                        'Voice Memos',
+                        style: TextStyle(
+                          color: Colors.yellowAccent,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getAudioFormatFromString(_selectedAudioFormat).icon,
-                            color: _getAudioFormatFromString(_selectedAudioFormat).color,
-                            size: 16,
+                      const SizedBox(width: 8),
+                      // Audio Format Selector (hidden in edit mode)
+                      if (!isEditMode) BlocBuilder<SettingsBloc, SettingsState>(
+                        builder: (context, settingsState) {
+                          AudioFormat currentFormat = AudioFormat.m4a; // Default
+                          if (settingsState is SettingsLoaded) {
+                            currentFormat = settingsState.settings.audioFormat;
+                          }
+                          
+                          return GestureDetector(
+                            onTap: _showAudioFormatDialog,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    currentFormat.icon,
+                                    color: currentFormat.color,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    currentFormat.name,
+                                    style: TextStyle(
+                                      color: currentFormat.color,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  // Edit Button or action buttons
+                  Row(
+                    children: [
+                      if (isEditMode && hasSelectedFolders) ...[
+                        // Delete selected folders button
+                        GestureDetector(
+                          onTap: _deleteSelectedFolders,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.red.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.white, size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _selectedAudioFormat,
-                            style: TextStyle(
-                              color: _getAudioFormatFromString(_selectedAudioFormat).color,
-                              fontSize: 12,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      // Edit/Done toggle button
+                      GestureDetector(
+                        onTap: _toggleEditMode,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            isEditMode ? 'Done' : 'Edit',
+                            style: const TextStyle(
+                              color: Colors.cyan,
+                              fontSize: 16,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-              // Edit Button
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        width: 1,
-                      ),
-                    ),
-                    child: const Text(
-                      'Edit',
-                      style: TextStyle(
-                        color: Colors.cyan,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
 
-          // Selected folder indicator (if any)
-          if (_selectedFolder != null) ...[
+              // Selection status indicator in edit mode
+              if (isEditMode) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    '${folderState.selectedFoldersCount} folder${folderState.selectedFoldersCount == 1 ? '' : 's'} selected',
+                    style: const TextStyle(
+                      color: Colors.blue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+
+              // Selected folder indicator (if any and not in edit mode)
+              if (_selectedFolder != null && !isEditMode) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -319,9 +478,11 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-          ],
-        ],
-      ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -349,6 +510,14 @@ class _MainScreenState extends State<MainScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Deleted folder: ${state.deletedFolderName}'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else if (state is FoldersDeleted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Deleted ${state.deletedCount} folder${state.deletedCount == 1 ? '' : 's'}'),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
             ),
@@ -491,42 +660,18 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Custom Folders List - SCROLLABLE
+                  // Custom Folders List - SCROLLABLE with edit mode support
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                           (context, index) {
                         final folder = state.customFolders[index];
+                        final isSelected = state.isFolderSelected(folder.id);
+                        
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: Dismissible(
-                            key: Key(folder.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Icon(
-                                FontAwesome5.skull,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            confirmDismiss: (direction) async {
-                              _onFolderDelete(folder);
-                              return false; // Don't auto-dismiss, let the Bloc handle it
-                            },
-                            child: GestureDetector(
-                              onTap: () => _onFolderTap(folder),
-                              onLongPress: () => setState(() => _selectedFolder = folder),
-                              child: FolderItem(
-                                folder: folder,
-                                onTap: () => _onFolderTap(folder),
-                              ),
-                            ),
-                          ),
+                          child: state.isEditMode
+                              ? _buildEditableFolderItem(folder, isSelected, state)
+                              : _buildNormalFolderItem(folder),
                         );
                       },
                       childCount: state.customFolders.length,
@@ -543,8 +688,8 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
 
-        // FIXED ADD FOLDER BUTTON AT BOTTOM
-        Padding(
+        // FIXED ADD FOLDER BUTTON AT BOTTOM (hidden in edit mode)
+        if (!state.isEditMode) Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: _buildAddFolderButton(),
         ),
@@ -561,6 +706,90 @@ class _MainScreenState extends State<MainScreen> {
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.7),
           fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  /// Build folder item in normal mode (with dismissible delete)
+  Widget _buildNormalFolderItem(FolderEntity folder) {
+    return Dismissible(
+      key: Key(folder.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const FaIcon(
+          FontAwesomeIcons.skull,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        _onFolderDelete(folder);
+        return false; // Don't auto-dismiss, let the Bloc handle it
+      },
+      child: GestureDetector(
+        onTap: () => _onFolderTap(folder),
+        onLongPress: () => setState(() => _selectedFolder = folder),
+        child: FolderItem(
+          folder: folder,
+          onTap: () => _onFolderTap(folder),
+        ),
+      ),
+    );
+  }
+
+  /// Build folder item in edit mode (with selection checkbox)
+  Widget _buildEditableFolderItem(FolderEntity folder, bool isSelected, FolderLoaded state) {
+    return GestureDetector(
+      onTap: () {
+        // Toggle selection when tapped in edit mode
+        context.read<FolderBloc>().add(ToggleFolderSelection(folderId: folder.id));
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected 
+              ? Border.all(color: Colors.blue, width: 2)
+              : null,
+        ),
+        child: Stack(
+          children: [
+            // Folder item
+            FolderItem(
+              folder: folder,
+              onTap: () => context.read<FolderBloc>().add(ToggleFolderSelection(folderId: folder.id)),
+            ),
+            // Selection checkbox
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? Colors.blue : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected ? Colors.blue : Colors.white.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 16,
+                      )
+                    : null,
+              ),
+            ),
+          ],
         ),
       ),
     );

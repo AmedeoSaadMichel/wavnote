@@ -22,6 +22,10 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
     on<DeleteFolder>(_onDeleteFolder);
     on<UpdateFolderCount>(_onUpdateFolderCount);
     on<RenameFolderEvent>(_onRenameFolder);
+    on<ToggleFolderEditMode>(_onToggleFolderEditMode);
+    on<ToggleFolderSelection>(_onToggleFolderSelection);
+    on<ClearFolderSelection>(_onClearFolderSelection);
+    on<DeleteSelectedFolders>(_onDeleteSelectedFolders);
   }
 
   /// Load all folders (default + custom)
@@ -322,6 +326,130 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
     } catch (e) {
       print('❌ Error renaming folder: $e');
       emit(FolderError('Failed to rename folder: ${e.toString()}'));
+    }
+  }
+
+  /// Toggle edit mode for multi-selection
+  void _onToggleFolderEditMode(
+      ToggleFolderEditMode event,
+      Emitter<FolderState> emit,
+      ) {
+    if (state is FolderLoaded) {
+      final currentState = state as FolderLoaded;
+      emit(currentState.copyWith(
+        isEditMode: !currentState.isEditMode,
+        selectedFolderIds: currentState.isEditMode ? <String>{} : currentState.selectedFolderIds,
+      ));
+      print('📝 Toggled edit mode: ${!currentState.isEditMode}');
+    }
+  }
+
+  /// Toggle selection of a custom folder
+  void _onToggleFolderSelection(
+      ToggleFolderSelection event,
+      Emitter<FolderState> emit,
+      ) {
+    if (state is FolderLoaded) {
+      final currentState = state as FolderLoaded;
+      final selectedFolderIds = Set<String>.from(currentState.selectedFolderIds);
+      
+      if (selectedFolderIds.contains(event.folderId)) {
+        selectedFolderIds.remove(event.folderId);
+        print('➖ Deselected folder: ${event.folderId}');
+      } else {
+        selectedFolderIds.add(event.folderId);
+        print('➕ Selected folder: ${event.folderId}');
+      }
+      
+      emit(currentState.copyWith(selectedFolderIds: selectedFolderIds));
+      print('📋 Selected folders count: ${selectedFolderIds.length}');
+    }
+  }
+
+  /// Clear all folder selections
+  void _onClearFolderSelection(
+      ClearFolderSelection event,
+      Emitter<FolderState> emit,
+      ) {
+    if (state is FolderLoaded) {
+      final currentState = state as FolderLoaded;
+      emit(currentState.copyWith(selectedFolderIds: <String>{}));
+      print('🗑️ Cleared all folder selections');
+    }
+  }
+
+  /// Delete multiple selected folders
+  Future<void> _onDeleteSelectedFolders(
+      DeleteSelectedFolders event,
+      Emitter<FolderState> emit,
+      ) async {
+    if (state is! FolderLoaded) {
+      emit(const FolderError('Cannot delete folders: folders not loaded'));
+      return;
+    }
+
+    final currentState = state as FolderLoaded;
+    
+    if (event.folderIds.isEmpty) {
+      emit(const FolderError('No folders selected for deletion'));
+      return;
+    }
+
+    print('🗑️ [DEBUG] Bulk delete requested for ${event.folderIds.length} folders');
+
+    try {
+      // Verify all folders can be deleted
+      final foldersToDelete = currentState.customFolders
+          .where((folder) => event.folderIds.contains(folder.id))
+          .toList();
+
+      final nonDeletableFolders = foldersToDelete
+          .where((folder) => !folder.canBeDeleted)
+          .toList();
+
+      if (nonDeletableFolders.isNotEmpty) {
+        emit(const FolderError('Some selected folders cannot be deleted'));
+        return;
+      }
+
+      print('✅ [DEBUG] All selected folders can be deleted');
+
+      // Delete folders from repository one by one
+      int deletedCount = 0;
+      for (final folderId in event.folderIds) {
+        try {
+          final success = await _folderRepository.deleteFolder(folderId);
+          if (success) {
+            deletedCount++;
+            print('✅ [DEBUG] Deleted folder: $folderId');
+          } else {
+            print('❌ [DEBUG] Failed to delete folder: $folderId');
+          }
+        } catch (e) {
+          print('❌ [DEBUG] Error deleting folder $folderId: $e');
+        }
+      }
+
+      // Create updated custom folders list
+      final updatedCustomFolders = currentState.customFolders
+          .where((folder) => !event.folderIds.contains(folder.id))
+          .toList();
+
+      print('✅ [DEBUG] Bulk delete complete. Deleted: $deletedCount/${event.folderIds.length}');
+
+      // Emit the updated state with edit mode turned off and selections cleared
+      emit(FoldersDeleted(
+        defaultFolders: currentState.defaultFolders,
+        customFolders: updatedCustomFolders,
+        deletedFolderIds: event.folderIds,
+        deletedCount: deletedCount,
+        isEditMode: false,
+        selectedFolderIds: <String>{},
+      ));
+
+    } catch (e) {
+      print('❌ [DEBUG] Error during bulk folder deletion: $e');
+      emit(FolderError('Failed to delete selected folders: ${e.toString()}'));
     }
   }
 }

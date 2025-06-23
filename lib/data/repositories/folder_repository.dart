@@ -1,14 +1,16 @@
 // File: data/repositories/folder_repository.dart
 import 'package:flutter/material.dart';
-import 'package:fluttericon/font_awesome5_icons.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/repositories/i_folder_repository.dart';
 import '../../core/enums/folder_type.dart';
 import '../database/database_helper.dart';
+import 'recording_repository_stats.dart';
 
 /// SQLite implementation of folder repository with debugging
 class FolderRepository implements IFolderRepository {
+  final RecordingRepositoryStats _recordingStats = RecordingRepositoryStats();
 
   // ==== DEFAULT FOLDERS CONFIGURATION ====
 
@@ -30,7 +32,7 @@ class FolderRepository implements IFolderRepository {
       FolderEntity.defaultFolder(
         id: 'recently_deleted',
         name: 'Recently Deleted',
-        icon: FontAwesome5.skull,
+        icon: FontAwesomeIcons.skull,
         color: Colors.yellow,
       ),
     ];
@@ -47,15 +49,30 @@ class FolderRepository implements IFolderRepository {
       final customFolders = await getCustomFolders();
       print('📁 Found ${customFolders.length} custom folders in database');
 
-      // Combine with default folders
-      final allFolders = [..._getDefaultFolders(), ...customFolders];
-
-      print('📂 Total folders: ${allFolders.length} (${_getDefaultFolders().length} default, ${customFolders.length} custom)');
-
-      // Print folder names for debugging
-      for (final folder in allFolders) {
-        print('  - ${folder.name} (${folder.type.name}) [${folder.id}]');
+      // Get default folders and update their recording counts
+      final defaultFolders = _getDefaultFolders();
+      final updatedDefaultFolders = <FolderEntity>[];
+      
+      for (final folder in defaultFolders) {
+        final recordingCount = await _recordingStats.getRecordingCountByFolder(folder.id);
+        final updatedFolder = folder.copyWith(recordingCount: recordingCount);
+        updatedDefaultFolders.add(updatedFolder);
+        print('📊 ${folder.name}: $recordingCount recordings');
       }
+
+      // Update custom folder recording counts as well
+      final updatedCustomFolders = <FolderEntity>[];
+      for (final folder in customFolders) {
+        final recordingCount = await _recordingStats.getRecordingCountByFolder(folder.id);
+        final updatedFolder = folder.copyWith(recordingCount: recordingCount);
+        updatedCustomFolders.add(updatedFolder);
+        print('📊 ${folder.name}: $recordingCount recordings');
+      }
+
+      // Combine updated folders
+      final allFolders = [...updatedDefaultFolders, ...updatedCustomFolders];
+
+      print('📂 Total folders: ${allFolders.length} (${updatedDefaultFolders.length} default, ${updatedCustomFolders.length} custom)');
 
       return allFolders;
     } catch (e) {

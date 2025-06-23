@@ -116,6 +116,48 @@ class FilterFolders extends FolderEvent {
   String toString() => 'FilterFolders { searchQuery: $searchQuery }';
 }
 
+/// Event to toggle edit mode for multi-selection
+class ToggleFolderEditMode extends FolderEvent {
+  const ToggleFolderEditMode();
+
+  @override
+  String toString() => 'ToggleFolderEditMode';
+}
+
+/// Event to toggle selection of a custom folder
+class ToggleFolderSelection extends FolderEvent {
+  final String folderId;
+
+  const ToggleFolderSelection({required this.folderId});
+
+  @override
+  List<Object> get props => [folderId];
+
+  @override
+  String toString() => 'ToggleFolderSelection { folderId: $folderId }';
+}
+
+/// Event to clear all folder selections
+class ClearFolderSelection extends FolderEvent {
+  const ClearFolderSelection();
+
+  @override
+  String toString() => 'ClearFolderSelection';
+}
+
+/// Event to delete multiple selected folders
+class DeleteSelectedFolders extends FolderEvent {
+  final List<String> folderIds;
+
+  const DeleteSelectedFolders({required this.folderIds});
+
+  @override
+  List<Object> get props => [folderIds];
+
+  @override
+  String toString() => 'DeleteSelectedFolders { folderIds: $folderIds }';
+}
+
 /// Enum for folder sorting options
 enum FolderSortType {
   name,

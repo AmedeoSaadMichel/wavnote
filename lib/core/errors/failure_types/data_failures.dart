@@ -1,5 +1,4 @@
 // File: core/errors/failure_types/data_failures.dart
-import 'package:equatable/equatable.dart';
 import '../failures.dart';
 import '../exceptions.dart';
 

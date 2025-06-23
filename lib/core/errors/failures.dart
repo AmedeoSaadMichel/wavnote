@@ -1,9 +1,5 @@
 // File: core/errors/failures.dart
 import 'package:equatable/equatable.dart';
-import 'failure_types/audio_failures.dart';
-import 'failure_types/data_failures.dart';
-import 'failure_types/system_failures.dart';
-import 'failure_utils.dart';
 
 // Export specific failure types for public API
 export 'failure_types/audio_failures.dart';

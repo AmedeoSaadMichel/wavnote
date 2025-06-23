@@ -53,11 +53,6 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
     super.dispose();
   }
 
-  /// Select format and close dialog
-  void _selectFormat() {
-    widget.onFormatSelected(_selectedFormat);
-    Navigator.of(context).pop();
-  }
 
   /// Get all available format options
   List<AudioFormatOption> get _formatOptions {
@@ -77,11 +72,11 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                   colors: [
-                    Color(0xFF8E2DE2),
-                    Color(0xFFDA22FF),
+                    Color(0xFF6B46C1),
+                    Color(0xFF9333EA),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -118,38 +113,13 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
 
   /// Build dialog header with title and info
   Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Select Recording Format',
-          style: TextStyle(
-            color: Colors.pinkAccent,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
-          ),
-          child: const Text(
-            'Available formats for iOS',
-            style: TextStyle(
-              color: Colors.cyan,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
+    return const Text(
+      'Select Recording Format',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -173,28 +143,16 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
         setState(() {
           _selectedFormat = option.format;
         });
+        // Auto-select and close dialog
+        widget.onFormatSelected(option.format);
+        Navigator.of(context).pop();
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? Colors.cyan
-                : Colors.white.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-            BoxShadow(
-              color: Colors.cyan.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ]
-              : null,
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
@@ -207,10 +165,6 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
               child: _buildFormatDetails(option),
             ),
 
-            // Quality Indicators
-            _buildQualityIndicators(option),
-            const SizedBox(width: 12),
-
             // Selection Indicator
             _buildSelectionIndicator(isSelected),
           ],
@@ -221,25 +175,16 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
 
   /// Build format icon with background
   Widget _buildFormatIcon(AudioFormatOption option, bool isSelected) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(12),
+    return Container(
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: isSelected
-            ? option.color.withValues(alpha: 0.3)
-            : option.color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected
-              ? option.color
-              : option.color.withValues(alpha: 0.3),
-          width: isSelected ? 2 : 1,
-        ),
+        color: option.color,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         option.icon,
-        color: option.color,
-        size: 24,
+        color: Colors.white,
+        size: 20,
       ),
     );
   }
@@ -270,62 +215,6 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
     );
   }
 
-  /// Build quality indicators (stars for quality and file size)
-  Widget _buildQualityIndicators(AudioFormatOption option) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        // Quality Rating
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Quality',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 10,
-              ),
-            ),
-            const SizedBox(width: 4),
-            ...List.generate(5, (index) {
-              return Icon(
-                index < option.format.qualityRating
-                    ? Icons.star
-                    : Icons.star_border,
-                color: Colors.amber,
-                size: 12,
-              );
-            }),
-          ],
-        ),
-        const SizedBox(height: 4),
-
-        // File Size Indicator
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Size',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 10,
-              ),
-            ),
-            const SizedBox(width: 4),
-            ...List.generate(5, (index) {
-              return Icon(
-                index < option.format.fileSizeRating
-                    ? Icons.circle
-                    : Icons.circle_outlined,
-                color: Colors.orange,
-                size: 8,
-              );
-            }),
-          ],
-        ),
-      ],
-    );
-  }
 
   /// Build selection indicator (radio button style)
   Widget _buildSelectionIndicator(bool isSelected) {
@@ -353,40 +242,19 @@ class _AudioFormatDialogState extends State<AudioFormatDialog>
 
   /// Build action buttons
   Widget _buildActionButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: TextStyle(
-              color: Colors.cyanAccent.withValues(alpha: 0.7),
-              fontSize: 16,
-            ),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text(
+          'Cancel',
+          style: TextStyle(
+            color: Colors.tealAccent,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        ElevatedButton.icon(
-          onPressed: _selectFormat,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.cyan,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 4,
-          ),
-          icon: const Icon(Icons.check, size: 18),
-          label: const Text(
-            'Select',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

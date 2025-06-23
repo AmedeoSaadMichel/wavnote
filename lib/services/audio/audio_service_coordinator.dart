@@ -201,27 +201,56 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
 
   // ==== PLAYBACK OPERATIONS ====
 
+// FIXED: AudioServiceCoordinator startPlaying method
+
   @override
   Future<bool> startPlaying(String filePath) async {
-    if (!_isInitialized) {
-      debugPrint('❌ Audio service coordinator not initialized');
+    try {
+      debugPrint('🎵 AudioServiceCoordinator: Starting playback for $filePath');
+
+      // Ensure initialization
+      if (!_isInitialized) {
+        debugPrint('🔄 AudioServiceCoordinator: Auto-initializing...');
+        final initSuccess = await initialize();
+        if (!initSuccess) {
+          debugPrint('❌ AudioServiceCoordinator: Auto-initialization failed');
+          return false;
+        }
+      }
+
+      // Ensure playback service is ready
+      if (!_playbackService.isServiceReady) {
+        debugPrint('🔄 AudioServiceCoordinator: Initializing playback service...');
+        final playbackInit = await _playbackService.initialize();
+        if (!playbackInit) {
+          debugPrint('❌ AudioServiceCoordinator: Failed to initialize playback service');
+          return false;
+        }
+      }
+
+      // Stop any active recording
+      if (await _recordingService.isRecording()) {
+        debugPrint('🛑 AudioServiceCoordinator: Stopping active recording');
+        await _recordingService.stopRecording();
+      }
+
+      // Start playback through the specialized service
+      final success = await _playbackService.startPlaying(filePath);
+
+      if (success) {
+        _activePlayer = _playbackService;
+        _setupPlaybackStreams();
+        debugPrint('✅ AudioServiceCoordinator: Playback started successfully');
+      } else {
+        debugPrint('❌ AudioServiceCoordinator: Playback failed');
+      }
+
+      return success;
+
+    } catch (e) {
+      debugPrint('❌ AudioServiceCoordinator: Error starting playback: $e');
       return false;
     }
-
-    // Stop any active recording
-    if (await _recordingService.isRecording()) {
-      await _recordingService.stopRecording();
-    }
-
-    // Start playback
-    final success = await _playbackService.startPlaying(filePath);
-
-    if (success) {
-      _activePlayer = _playbackService;
-      _setupPlaybackStreams();
-    }
-
-    return success;
   }
 
   @override
@@ -259,6 +288,50 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       return false;
     }
     return await _activePlayer!.seekTo(position);
+  }
+
+  /// Seek to position with recording duration validation
+  Future<bool> seekToWithRecordingDuration(Duration position, Duration recordingDuration) async {
+    if (_activePlayer == null) {
+      return false;
+    }
+    
+    // Validate against recording duration instead of player duration
+    if (position.isNegative || position > recordingDuration) {
+      debugPrint('❌ Invalid seek position: $position (max: $recordingDuration)');
+      return false;
+    }
+    
+    return await (_activePlayer as AudioPlayerService).seekToWithRecordingDuration(position, recordingDuration);
+  }
+
+  /// Preload an audio source for faster playback
+  Future<bool> preloadAudioSource(String filePath) async {
+    if (!_isInitialized) {
+      debugPrint('❌ Audio service coordinator not initialized');
+      return false;
+    }
+
+    // Ensure playback service is ready
+    if (!_playbackService.isServiceReady) {
+      final playbackInit = await _playbackService.initialize();
+      if (!playbackInit) {
+        debugPrint('❌ Failed to initialize playback service for preload');
+        return false;
+      }
+    }
+
+    return await _playbackService.preloadAudioSource(filePath);
+  }
+
+  /// Clear the audio source cache
+  void clearAudioCache() {
+    _playbackService.clearCache();
+  }
+
+  /// Get cache statistics
+  Map<String, dynamic> getAudioCacheStats() {
+    return _playbackService.getCacheStats();
   }
 
   @override

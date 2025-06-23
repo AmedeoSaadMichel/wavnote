@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluttericon/font_awesome5_icons.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 
 import '../../data/models/folder_model.dart';
@@ -26,7 +26,7 @@ class DatabaseService {
       VoiceMemoFolder(
         id: 'recently_deleted',
         title: 'Recently Deleted',
-        icon: FontAwesome5.skull,
+        icon: FontAwesomeIcons.skull,
         color: Colors.yellow,
         type: FolderType.defaultFolder,
         isDeletable: false,

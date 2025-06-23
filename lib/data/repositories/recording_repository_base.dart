@@ -27,7 +27,11 @@ abstract class RecordingRepositoryBase {
           created_at TEXT NOT NULL,
           updated_at TEXT,
           is_favorite INTEGER DEFAULT 0,
-          tags TEXT
+          tags TEXT,
+          is_deleted INTEGER DEFAULT 0,
+          deleted_at TEXT,
+          original_folder_id TEXT,
+          waveform_data TEXT
         )
       ''');
 

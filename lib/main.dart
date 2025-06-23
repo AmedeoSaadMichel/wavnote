@@ -3,20 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'presentation/bloc/folder/folder_bloc.dart';
 import 'presentation/bloc/recording/recording_bloc.dart';
-import 'presentation/bloc/audio_player/audio_player_bloc.dart';
+import 'presentation/bloc/settings/settings_bloc.dart';
+// Removed AudioPlayerBloc - using single AudioPlayer at screen level
 import 'presentation/screens/main/main_screen.dart';
 import 'data/database/database_helper.dart';
 import 'data/repositories/recording_repository.dart';
 import 'services/audio/audio_service_coordinator.dart';
-import 'services/location/geolocation_service.dart';
+
+/// Global singleton instances for the app
+late final AudioServiceCoordinator globalAudioService;
+late final RecordingRepository globalRecordingRepository;
 
 /// Main entry point for the WavNote voice recording app
 void main() async {
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize database before running app
   try {
+    // Initialize database
     await DatabaseHelper.database;
     print('✅ Database initialized successfully');
 
@@ -24,8 +28,20 @@ void main() async {
     final dbInfo = await DatabaseHelper.getDatabaseInfo();
     print('📊 Database Info: $dbInfo');
 
+    // Create and initialize global services
+    globalAudioService = AudioServiceCoordinator();
+    globalRecordingRepository = RecordingRepository();
+
+    // Initialize audio service
+    final audioInitialized = await globalAudioService.initialize();
+    if (!audioInitialized) {
+      print('❌ Failed to initialize audio service');
+    } else {
+      print('✅ Audio service initialized successfully');
+    }
+
   } catch (e) {
-    print('❌ Database initialization error: $e');
+    print('❌ Initialization error: $e');
   }
 
   runApp(const WavNoteApp());
@@ -37,10 +53,6 @@ class WavNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Create service instances at app level
-    final audioService = AudioServiceCoordinator();
-    final recordingRepository = RecordingRepository();
-    
     return MultiBlocProvider(
       providers: [
         BlocProvider(
@@ -48,15 +60,14 @@ class WavNoteApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (context) => RecordingBloc(
-            audioService: audioService,
-            recordingRepository: recordingRepository,
+            audioService: globalAudioService,
+            recordingRepository: globalRecordingRepository,
           ),
         ),
         BlocProvider(
-          create: (context) => AudioPlayerBloc(
-            audioRepository: audioService,
-          ),
+          create: (context) => SettingsBloc()..add(const LoadSettings()),
         ),
+        // Removed AudioPlayerBloc - using single AudioPlayer at screen level
       ],
       child: MaterialApp(
         title: 'WavNote - Voice Memos',
@@ -99,7 +110,7 @@ class WavNoteApp extends StatelessWidget {
           ),
           inputDecorationTheme: InputDecorationTheme(
             hintStyle: TextStyle(
-              color: Colors.white.withValues( alpha: 0.5),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
             enabledBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: Colors.yellowAccent),

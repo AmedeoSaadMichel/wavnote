@@ -93,6 +93,52 @@ class RecordingRepositoryBulk extends RecordingRepositoryBase {
     }
   }
 
+  /// Toggle favorite status of a single recording
+  Future<bool> toggleFavorite(String recordingId) async {
+    try {
+      print('❤️ Toggling favorite status for recording: $recordingId');
+      final db = await getDatabaseWithTable();
+
+      // Get current favorite status
+      final result = await db.query(
+        DatabaseHelper.recordingsTable,
+        columns: ['is_favorite'],
+        where: 'id = ?',
+        whereArgs: [recordingId],
+      );
+
+      if (result.isEmpty) {
+        print('❌ Recording not found: $recordingId');
+        return false;
+      }
+
+      final currentFavoriteStatus = (result.first['is_favorite'] as int? ?? 0) == 1;
+      final newFavoriteStatus = !currentFavoriteStatus;
+
+      // Update favorite status
+      final rowsAffected = await db.update(
+        DatabaseHelper.recordingsTable,
+        {
+          'is_favorite': newFavoriteStatus ? 1 : 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [recordingId],
+      );
+
+      if (rowsAffected > 0) {
+        print('✅ Toggled favorite status for recording: $recordingId -> $newFavoriteStatus');
+        return true;
+      } else {
+        print('❌ Failed to toggle favorite status for recording: $recordingId');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error toggling favorite status: $e');
+      return false;
+    }
+  }
+
   /// Add tags to multiple recordings
   Future<bool> addTagsToRecordings(
       List<String> recordingIds,

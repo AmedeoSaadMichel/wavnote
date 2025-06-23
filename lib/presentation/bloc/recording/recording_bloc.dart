@@ -8,6 +8,7 @@ import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../services/location/geolocation_service.dart';
+import '../../../services/audio/waveform_processing_service.dart';
 
 part 'recording_event.dart';
 part 'recording_state.dart';
@@ -20,6 +21,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
   final GeolocationService _geolocationService;
+  final WaveformProcessingService _waveformProcessingService;
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
@@ -29,9 +31,11 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
     GeolocationService? geolocationService,
+    WaveformProcessingService? waveformProcessingService,
   }) : _audioService = audioService,
         _recordingRepository = recordingRepository,
         _geolocationService = geolocationService ?? GeolocationService(),
+        _waveformProcessingService = waveformProcessingService ?? WaveformProcessingService(),
         super(const RecordingInitial()) {
 
     on<StartRecording>(_onStartRecording);
@@ -47,8 +51,17 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<ToggleEditMode>(_onToggleEditMode);
     on<ToggleRecordingSelection>(_onToggleRecordingSelection);
     on<ClearRecordingSelection>(_onClearRecordingSelection);
-    on<ExpandRecording>(_onExpandRecording);
+    // Removed ExpandRecording handler - expansion managed at screen level
     on<UpdateRecordingTitle>(_onUpdateRecordingTitle);
+    on<DeleteRecording>(_onDeleteRecording);
+    on<SoftDeleteRecording>(_onSoftDeleteRecording);
+    on<PermanentDeleteRecording>(_onPermanentDeleteRecording);
+    on<RestoreRecording>(_onRestoreRecording);
+    on<CleanupExpiredRecordings>(_onCleanupExpiredRecordings);
+    on<SelectAllRecordings>(_onSelectAllRecordings);
+    on<DeselectAllRecordings>(_onDeselectAllRecordings);
+    on<DeleteSelectedRecordings>(_onDeleteSelectedRecordings);
+    on<ToggleFavoriteRecording>(_onToggleFavoriteRecording);
     on<DebugLoadAllRecordings>(_onDebugLoadAllRecordings);
     on<DebugCreateTestRecording>(_onDebugCreateTestRecording);
 
@@ -184,12 +197,21 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       if (recording != null) {
         // Save recording to repository with proper location-based naming
         try {
-          // Generate location-based name and update the recording
-          final finalRecording = await _generateLocationBasedRecording(recording);
+          print('🔄 Starting recording save process...');
           
+          // Generate location-based name and update the recording
+          print('🔄 Generating location-based name...');
+          final finalRecording = await _generateLocationBasedRecording(recording);
+          print('✅ Location-based name generated: ${finalRecording.name}');
+          
+          print('🔄 Saving recording to repository...');
           final savedRecording = await _recordingRepository.createRecording(finalRecording);
+          print('✅ Recording saved to repository with ID: ${savedRecording.id}');
+          
+          print('🔄 Emitting RecordingCompleted event...');
           emit(RecordingCompleted(recording: savedRecording));
           print('✅ Recording completed and saved: ${savedRecording.name} in folder: ${savedRecording.folderId}');
+          
         } catch (e) {
           print('❌ Error saving recording to repository: $e');
           emit(RecordingCompleted(recording: recording));
@@ -380,13 +402,23 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       Emitter<RecordingState> emit,
       ) async {
     try {
+      print('🔄 Loading recordings for folder: ${event.folderId}');
       emit(const RecordingLoading());
 
       // Get recordings from recording repository
       final recordings = await _recordingRepository.getRecordingsByFolder(event.folderId);
+      
+      print('✅ Loaded ${recordings.length} recordings for folder ${event.folderId}');
+      if (recordings.isNotEmpty) {
+        print('📋 Recordings found:');
+        for (final recording in recordings) {
+          print('  📝 ${recording.name} (ID: ${recording.id}, Folder: ${recording.folderId})');
+        }
+      } else {
+        print('📭 No recordings found for folder ${event.folderId}');
+      }
 
       emit(RecordingLoaded(recordings));
-      print('✅ Loaded ${recordings.length} recordings for folder ${event.folderId}');
 
     } catch (e) {
       print('❌ Error loading recordings: $e');
@@ -477,19 +509,261 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     }
   }
 
-  void _onExpandRecording(ExpandRecording event, Emitter<RecordingState> emit) {
+  void _onSelectAllRecordings(SelectAllRecordings event, Emitter<RecordingState> emit) {
     if (state is RecordingLoaded) {
       final currentState = state as RecordingLoaded;
-      emit(currentState.copyWith(
-        expandedRecordingId: currentState.expandedRecordingId == event.recordingId ? null : event.recordingId,
-      ));
+      final allRecordingIds = currentState.recordings.map((r) => r.id).toSet();
+      emit(currentState.copyWith(selectedRecordings: allRecordingIds));
     }
   }
+
+  void _onDeselectAllRecordings(DeselectAllRecordings event, Emitter<RecordingState> emit) {
+    if (state is RecordingLoaded) {
+      final currentState = state as RecordingLoaded;
+      emit(currentState.copyWith(selectedRecordings: <String>{}));
+    }
+  }
+
+  Future<void> _onDeleteSelectedRecordings(DeleteSelectedRecordings event, Emitter<RecordingState> emit) async {
+    if (state is RecordingLoaded) {
+      final currentState = state as RecordingLoaded;
+      final selectedIds = currentState.selectedRecordings;
+      
+      if (selectedIds.isEmpty) return;
+      
+      try {
+        print('🗑️ Deleting ${selectedIds.length} selected recordings');
+        
+        // Delete all selected recordings based on folder context
+        for (final recordingId in selectedIds) {
+          if (event.folderId == 'recently_deleted') {
+            // Permanent delete from Recently Deleted folder
+            await _recordingRepository.deleteRecording(recordingId);
+          } else {
+            // Soft delete from any other folder (moves to Recently Deleted)
+            await _recordingRepository.softDeleteRecording(recordingId);
+          }
+        }
+        
+        // Update the recordings list by removing deleted recordings
+        final updatedRecordings = currentState.recordings
+            .where((recording) => !selectedIds.contains(recording.id))
+            .toList();
+        
+        // Clear selection and update list
+        emit(currentState.copyWith(
+          recordings: updatedRecordings,
+          selectedRecordings: <String>{},
+        ));
+        
+        print('✅ Successfully deleted ${selectedIds.length} recordings');
+        
+      } catch (e) {
+        print('❌ Error deleting selected recordings: $e');
+        emit(RecordingError(
+          'Failed to delete selected recordings: ${e.toString()}',
+          errorType: RecordingErrorType.unknown,
+        ));
+      }
+    }
+  }
+
+  /// Toggle favorite status of a recording
+  Future<void> _onToggleFavoriteRecording(ToggleFavoriteRecording event, Emitter<RecordingState> emit) async {
+    if (state is RecordingLoaded) {
+      final currentState = state as RecordingLoaded;
+      
+      try {
+        print('❤️ Toggling favorite for recording: ${event.recordingId}');
+        
+        // Find the recording
+        final recording = currentState.recordings.firstWhere(
+          (r) => r.id == event.recordingId,
+        );
+        
+        // Toggle favorite status
+        final success = await _recordingRepository.toggleFavorite(event.recordingId);
+        
+        if (success) {
+          // Update the recording in the list
+          final updatedRecordings = currentState.recordings.map((r) {
+            if (r.id == event.recordingId) {
+              return r.toggleFavorite();
+            }
+            return r;
+          }).toList();
+          
+          emit(currentState.copyWith(recordings: updatedRecordings));
+          print('✅ Successfully toggled favorite status');
+        } else {
+          throw Exception('Failed to toggle favorite status');
+        }
+        
+      } catch (e) {
+        print('❌ Error toggling favorite: $e');
+        emit(RecordingError(
+          'Failed to toggle favorite: ${e.toString()}',
+          errorType: RecordingErrorType.unknown,
+        ));
+      }
+    }
+  }
+
+  // Removed _onExpandRecording - expansion managed at screen level
 
   void _onUpdateRecordingTitle(UpdateRecordingTitle event, Emitter<RecordingState> emit) {
     if (state is RecordingInProgress) {
       final currentState = state as RecordingInProgress;
       emit(currentState.copyWith(title: event.title));
+    }
+  }
+
+  /// Delete a recording
+  Future<void> _onDeleteRecording(DeleteRecording event, Emitter<RecordingState> emit) async {
+    try {
+      print('🗑️ Deleting recording: ${event.recordingId}');
+      
+      // Delete from repository
+      await _recordingRepository.deleteRecording(event.recordingId);
+      
+      // If currently in RecordingLoaded state, update the list
+      if (state is RecordingLoaded) {
+        final currentState = state as RecordingLoaded;
+        final updatedRecordings = currentState.recordings
+            .where((recording) => recording.id != event.recordingId)
+            .toList();
+        
+        emit(currentState.copyWith(recordings: updatedRecordings));
+        print('✅ Recording deleted successfully and list updated');
+      }
+      
+    } catch (e) {
+      print('❌ Error deleting recording: $e');
+      emit(RecordingError(
+        'Failed to delete recording: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+  /// Soft delete a recording (move to Recently Deleted)
+  Future<void> _onSoftDeleteRecording(SoftDeleteRecording event, Emitter<RecordingState> emit) async {
+    try {
+      print('🗑️ Soft deleting recording: ${event.recordingId}');
+      
+      // Soft delete from repository
+      final success = await _recordingRepository.softDeleteRecording(event.recordingId);
+      
+      if (success) {
+        // If currently in RecordingLoaded state, update the list
+        if (state is RecordingLoaded) {
+          final currentState = state as RecordingLoaded;
+          final updatedRecordings = currentState.recordings
+              .where((recording) => recording.id != event.recordingId)
+              .toList();
+          
+          emit(currentState.copyWith(recordings: updatedRecordings));
+          print('✅ Recording soft deleted successfully and list updated');
+        }
+      } else {
+        throw Exception('Failed to soft delete recording');
+      }
+      
+    } catch (e) {
+      print('❌ Error soft deleting recording: $e');
+      emit(RecordingError(
+        'Failed to delete recording: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+  /// Permanently delete a recording
+  Future<void> _onPermanentDeleteRecording(PermanentDeleteRecording event, Emitter<RecordingState> emit) async {
+    try {
+      print('💀 Permanently deleting recording: ${event.recordingId}');
+      
+      // Permanently delete from repository
+      final success = await _recordingRepository.permanentlyDeleteRecording(event.recordingId);
+      
+      if (success) {
+        // If currently in RecordingLoaded state, update the list
+        if (state is RecordingLoaded) {
+          final currentState = state as RecordingLoaded;
+          final updatedRecordings = currentState.recordings
+              .where((recording) => recording.id != event.recordingId)
+              .toList();
+          
+          emit(currentState.copyWith(recordings: updatedRecordings));
+          print('✅ Recording permanently deleted successfully and list updated');
+        }
+      } else {
+        throw Exception('Failed to permanently delete recording');
+      }
+      
+    } catch (e) {
+      print('❌ Error permanently deleting recording: $e');
+      emit(RecordingError(
+        'Failed to permanently delete recording: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+  /// Restore a recording from Recently Deleted
+  Future<void> _onRestoreRecording(RestoreRecording event, Emitter<RecordingState> emit) async {
+    try {
+      print('🔄 Restoring recording: ${event.recordingId}');
+      
+      // Restore from repository
+      final success = await _recordingRepository.restoreRecording(event.recordingId);
+      
+      if (success) {
+        // If currently in RecordingLoaded state, update the list (remove from Recently Deleted)
+        if (state is RecordingLoaded) {
+          final currentState = state as RecordingLoaded;
+          final updatedRecordings = currentState.recordings
+              .where((recording) => recording.id != event.recordingId)
+              .toList();
+          
+          emit(currentState.copyWith(recordings: updatedRecordings));
+          print('✅ Recording restored successfully and removed from Recently Deleted list');
+        }
+      } else {
+        throw Exception('Failed to restore recording');
+      }
+      
+    } catch (e) {
+      print('❌ Error restoring recording: $e');
+      emit(RecordingError(
+        'Failed to restore recording: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+  /// Clean up expired recordings (auto-delete after 15 days)
+  Future<void> _onCleanupExpiredRecordings(CleanupExpiredRecordings event, Emitter<RecordingState> emit) async {
+    try {
+      print('🧹 Cleaning up expired recordings...');
+      
+      // Clean up from repository
+      final deletedCount = await _recordingRepository.cleanupExpiredRecordings();
+      
+      print('✅ Cleaned up $deletedCount expired recordings');
+      
+      // If currently viewing Recently Deleted folder, refresh the list
+      if (state is RecordingLoaded) {
+        final currentState = state as RecordingLoaded;
+        // Could trigger a refresh here if needed
+      }
+      
+    } catch (e) {
+      print('❌ Error cleaning up expired recordings: $e');
+      emit(RecordingError(
+        'Failed to clean up expired recordings: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
     }
   }
 
@@ -552,10 +826,21 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   /// Generate location-based recording with incremental naming
   Future<RecordingEntity> _generateLocationBasedRecording(RecordingEntity recording) async {
     try {
-      // Get the current address from geolocation
-      String locationName = await _geolocationService.getRecordingLocationName();
+      // Get the current address from geolocation with timeout
+      String locationName;
       
-      print('📍 Using geolocation address for recording: "$locationName"');
+      try {
+        // Add a shorter timeout to prevent blocking
+        locationName = await _geolocationService.getRecordingLocationName()
+            .timeout(const Duration(seconds: 3));
+        print('📍 Using geolocation address for recording: "$locationName"');
+      } catch (e) {
+        print('⚠️ Geolocation timeout/error, using fallback naming: $e');
+        // Use timestamp-based fallback if geolocation fails
+        final now = DateTime.now();
+        locationName = 'Recording ${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+        print('📍 Using fallback name: "$locationName"');
+      }
 
       // Get existing recordings in this folder to determine the next number
       final existingRecordings = await _recordingRepository.getRecordingsByFolder(recording.folderId);
@@ -606,6 +891,27 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       print('❌ Error generating location-based recording name: $e');
       // Return original recording if naming fails
       return recording;
+    }
+  }
+
+  /// Process waveform data in background after recording completion
+  void _processWaveformInBackground(RecordingEntity recording) async {
+    try {
+      print('🎵 Starting background waveform processing for: ${recording.name}');
+      
+      // Process waveform in background (don't await to avoid blocking)
+      _waveformProcessingService.processRecordingWaveform(recording).then((processedRecording) {
+        if (processedRecording != null && processedRecording.waveformData != null) {
+          print('✅ Background waveform processing completed for: ${recording.name}');
+          // Optionally emit an event to refresh the UI with updated waveform data
+          // add(RefreshRecordingWaveform(recording: processedRecording));
+        }
+      }).catchError((error) {
+        print('❌ Background waveform processing failed for ${recording.name}: $error');
+      });
+      
+    } catch (e) {
+      print('❌ Error starting background waveform processing: $e');
     }
   }
 }

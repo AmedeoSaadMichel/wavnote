@@ -1,24 +1,23 @@
 // File: presentation/widgets/recording/recording_bottom_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:async';
 import 'dart:math' as math;
-import '../../../core/constants/app_constants.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import '../../../core/extensions/duration_extensions.dart';
 import '../../bloc/recording/recording_bloc.dart';
 
 import 'fullscreen_waveform.dart';
-import 'record_waveform.dart';
 
-/// Cosmic Recording Bottom Sheet with Midnight Gospel Aesthetics
+/// Recording Bottom Sheet
 ///
-/// This widget displays a draggable bottom sheet for recording audio with
-/// cosmic theme integration. Features include:
+/// This widget displays a draggable bottom sheet for recording audio.
+/// Features include:
 /// - Compact and fullscreen modes with smooth animated transitions
 /// - Real-time waveform visualization during recording
-/// - Cosmic gradient backgrounds and ethereal effects
-/// - Mystical UI elements and philosophical interactions
+/// - Clean UI with modern design
 /// - Integration with BLoC pattern for state management
-/// - Cosmic error handling and user feedback
+/// - Proper error handling and user feedback
 class RecordingBottomSheet extends StatefulWidget {
   final String? title; // Recording title to display
   final String? filePath; // Path to the file being recorded
@@ -51,14 +50,14 @@ class RecordingBottomSheet extends StatefulWidget {
 
 class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     with TickerProviderStateMixin {
-  // Animation controllers for cosmic effects
+  // Animation controllers
   late AnimationController _pulseController;
-  late AnimationController _cosmicFlowController;
   late AnimationController _sheetAnimationController;
+  
+  // Audio waveforms controller (for visualization only)
+  late RecorderController _recorderController;
 
   late Animation<double> _pulseAnimation;
-  late Animation<double> _cosmicFlowAnimation;
-  late Animation<double> _sheetAnimation;
 
   // Bottom sheet drag state
   late double maxHeight; // Max expanded height (set in build)
@@ -71,18 +70,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _initializeWaveformController();
   }
 
   void _initializeAnimations() {
-    // Pulse animation for record button and cosmic effects
+    // Pulse animation for record button
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    // Cosmic flow animation for background effects
-    _cosmicFlowController = AnimationController(
-      duration: const Duration(seconds: 4),
       vsync: this,
     );
 
@@ -92,24 +86,22 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       vsync: this,
     );
 
-    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _cosmicFlowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _cosmicFlowController, curve: Curves.linear),
-    );
-
-    _sheetAnimation = CurvedAnimation(
-      parent: _sheetAnimationController,
-      curve: Curves.easeInOutCubic,
-    );
-
-    // Start cosmic animations
-    _cosmicFlowController.repeat();
+    // Start pulse animation when recording
     if (widget.isRecording) {
       _pulseController.repeat(reverse: true);
     }
+  }
+
+  void _initializeWaveformController() {
+    _recorderController = RecorderController()
+      ..androidEncoder = AndroidEncoder.aac
+      ..androidOutputFormat = AndroidOutputFormat.mpeg4
+      ..iosEncoder = IosEncoder.kAudioFormatMPEG4AAC
+      ..sampleRate = 44100;
   }
 
   @override
@@ -120,37 +112,60 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     if (widget.isRecording != oldWidget.isRecording) {
       if (widget.isRecording) {
         _pulseController.repeat(reverse: true);
+        _startWaveformRecording();
       } else {
         _pulseController.stop();
         _pulseController.reset();
+        _stopWaveformRecording();
       }
+    }
+  }
+
+  /// Start waveform recording for visualization
+  void _startWaveformRecording() async {
+    try {
+      if (await _recorderController.checkPermission()) {
+        // Start recording for waveform visualization only
+        await _recorderController.record();
+      }
+    } catch (e) {
+      print('Error starting waveform recording: $e');
+    }
+  }
+
+  /// Stop waveform recording
+  void _stopWaveformRecording() async {
+    try {
+      await _recorderController.stop();
+    } catch (e) {
+      print('Error stopping waveform recording: $e');
     }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _cosmicFlowController.dispose();
     _sheetAnimationController.dispose();
+    _recorderController.dispose();
     super.dispose();
   }
 
-  /// Converts the elapsed recording time into cosmic time format
+  /// Converts the elapsed recording time into formatted string
   String get _formattedTime {
     return widget.elapsed.formatted;
   }
 
-  /// Get mystical recording description
-  String get _mysticalDescription {
-    if (!widget.isRecording) return 'Cosmic energy awaits your transmission';
+  /// Get recording description
+  String get _recordingDescription {
+    if (!widget.isRecording) return 'Ready to start recording';
 
     final minutes = widget.elapsed.inMinutes;
     if (minutes < 1) {
-      return 'Capturing ethereal vibrations...';
+      return 'Recording in progress...';
     } else if (minutes < 5) {
-      return 'Weaving your cosmic narrative...';
+      return 'Recording your audio...';
     } else {
-      return 'Transcending temporal boundaries...';
+      return 'Long recording in progress...';
     }
   }
 
@@ -199,92 +214,43 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         onVerticalDragStart: widget.isRecording ? _onVerticalDragStart : null,
         onVerticalDragUpdate: widget.isRecording ? _onVerticalDragUpdate : null,
         onVerticalDragEnd: widget.isRecording ? _onVerticalDragEnd : null,
-        child: _buildCosmicContainer(),
+        child: _buildContainer(),
       ),
     );
   }
 
-  /// Build cosmic-themed container with ethereal effects
-  Widget _buildCosmicContainer() {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulseAnimation, _cosmicFlowAnimation]),
-      builder: (context, child) {
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppConstants.backgroundSpace.withValues(alpha: 0.95),
-                AppConstants.surfaceCard.withValues(alpha: 0.9),
-                AppConstants.backgroundDark.withValues(alpha: 0.95),
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppConstants.primaryPink.withValues(
-                  alpha: 0.1 * _pulseAnimation.value,
-                ),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-              BoxShadow(
-                color: AppConstants.primaryBlue.withValues(alpha: 0.08),
-                blurRadius: 40,
-                spreadRadius: 5,
-              ),
-            ],
-            border: Border.all(
-              color: AppConstants.accentCyan.withValues(alpha: 0.2),
-              width: 1,
-            ),
+  /// Build container with clean design
+  Widget _buildContainer() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: Colors.grey[900]?.withValues(alpha: 0.95),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 20,
+            spreadRadius: 2,
           ),
-          child: Stack(
-            children: [
-              // Cosmic background effects
-              _buildCosmicBackground(),
-
-              // Main content
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 600),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SizeTransition(
-                    sizeFactor: animation,
-                    axisAlignment: -1,
-                    child: child,
-                  ),
-                ),
-                child: _sheetOffset > 0.7
-                    ? _buildFullScreenView()
-                    : _buildCompactView(),
-              ),
-            ],
+        ],
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 600),
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: -1,
+            child: child,
           ),
-        );
-      },
-    );
-  }
-
-  /// Build cosmic background with flowing particles and gradients
-  Widget _buildCosmicBackground() {
-    return Positioned.fill(
-      child: AnimatedBuilder(
-        animation: _cosmicFlowAnimation,
-        builder: (context, child) {
-          return CustomPaint(
-            painter: CosmicBackgroundPainter(
-              flowValue: _cosmicFlowAnimation.value,
-              pulseValue: _pulseAnimation.value,
-              isRecording: widget.isRecording,
-            ),
-          );
-        },
+        ),
+        child: _sheetOffset > 0.7
+            ? _buildFullScreenView()
+            : _buildCompactView(),
       ),
     );
   }
+
 
   /// Build fullscreen view for expanded sheet
   Widget _buildFullScreenView() {
@@ -293,19 +259,19 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       mainAxisSize: MainAxisSize.min,
       children: [
         // Top spacer - flexible
-        Spacer(),
+        const Flexible(flex: 1, child: SizedBox(height: 10)),
 
-        // Cosmic handle - flexible
-        Flexible(flex: 1, child: _buildCosmicHandle()),
+        // Handle - flexible
+        Flexible(flex: 1, child: _buildHandle()),
 
         // Spacing after handle - flexible
-        Spacer(),
+        const Flexible(flex: 1, child: SizedBox(height: 10)),
 
         // Recording info section - flexible
         Flexible(flex: 4, child: _buildRecordingInfo(isFullscreen: true)),
 
         // Spacing after info - flexible
-        Spacer(),
+        const Flexible(flex: 1, child: SizedBox(height: 10)),
 
         // Fullscreen waveform - conditional flexible
         if (widget.isRecording)
@@ -316,7 +282,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
               child: FullScreenWaveform(
                 filePath: widget.filePath,
                 isRecording: widget.isRecording,
-                amplitude: _getCurrentAmplitude(),
+                amplitude: 0.5, // Default amplitude for fullscreen waveform
               ),
             ),
           ),
@@ -345,69 +311,135 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       key: const ValueKey('compact'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Top spacing - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 12)),
+        // Top spacer
+        const Flexible(flex: 1, child: SizedBox(height: 10)),
 
-        // Cosmic handle - flexible
-        Flexible(flex: 1, child: _buildCosmicHandle()),
-
-        // Spacing after handle - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 16)),
-
-        // Compact recording info - conditional flexible
-        if (widget.isRecording)
-          Flexible(flex: 3, child: _buildRecordingInfo(isFullscreen: false)),
-
-        // Spacing between info and waveform - flexible
-        if (widget.isRecording)
-          const Flexible(flex: 1, child: SizedBox(height: 12)),
-
-        // Compact waveform - conditional flexible
-        if (widget.isRecording && widget.filePath != null)
-          Flexible(
-            flex: 3,
-            child: RecordWaveform(
-              filePath: widget.filePath!,
-              isRecording: widget.isRecording,
-              amplitude: _getCurrentAmplitude(),
+        // Handle at top
+        Flexible(
+          flex: 1,
+          child: Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
+        ),
 
-        // Spacing before button - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 16)),
+        // Compact animated content
+        Flexible(
+          flex: 8,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 100),
+            transitionBuilder: (child, animation) => SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1.0,
+              child: FadeTransition(opacity: animation, child: child),
+            ),
+            child: widget.isRecording
+                ? Column(
+              key: const ValueKey(true),
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (widget.title != null)
+                  Flexible(
+                    flex: 2,
+                    child: Text(
+                      widget.title!, 
+                      style: const TextStyle(
+                        color: Colors.white, 
+                        fontSize: 22, 
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                const Flexible(flex: 1, child: SizedBox(height: 6)),
+                Flexible(
+                  flex: 2,
+                  child: Text(
+                    _formattedTime, 
+                    style: const TextStyle(
+                      color: Colors.grey, 
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                const Flexible(flex: 1, child: SizedBox(height: 12)),
+                if (widget.filePath != null) 
+                  Flexible(
+                    flex: 4,
+                    child: Container(
+                      height: 50,
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildAudioWaveform(),
+                    ),
+                  ),
+                const Flexible(flex: 1, child: SizedBox(height: 12)),
+              ],
+            )
+                : const SizedBox(key: ValueKey(false)),
+          ),
+        ),
 
-        // Main cosmic record button - centered and flexible
-        Flexible(flex: 4, child: Center(child: _buildCosmicRecordButton())),
+        // Main record toggle button - centered
+        Flexible(
+          flex: 6,
+          child: Center(
+            child: GestureDetector(
+              onTap: widget.onToggle,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.isRecording ? Colors.white : Colors.red,
+                      border: Border.all(color: Colors.white, width: 4),
+                    ),
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 1000),
+                        child: widget.isRecording
+                            ? const Icon(
+                                Icons.stop_rounded, 
+                                key: ValueKey('stop'), 
+                                color: Colors.red, 
+                                size: 32,
+                              )
+                            : const Icon(
+                                Icons.fiber_manual_record, 
+                                key: ValueKey('rec'), 
+                                color: Colors.red,
+                                size: 35,
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
 
-        // Bottom spacing - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 20)),
+        // Bottom spacer
+        const Flexible(flex: 2, child: SizedBox(height: 20)),
       ],
     );
   }
 
-  /// Build cosmic handle with ethereal glow
-  Widget _buildCosmicHandle() {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Container(
-          width: 50,
-          height: 5,
-          decoration: BoxDecoration(
-            color: AppConstants.accentCyan.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(3),
-            boxShadow: [
-              BoxShadow(
-                color: AppConstants.accentCyan.withValues(
-                  alpha: 0.3 * _pulseAnimation.value,
-                ),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-        );
-      },
+  /// Build simple handle
+  Widget _buildHandle() {
+    return Container(
+      width: 50,
+      height: 5,
+      decoration: BoxDecoration(
+        color: Colors.grey,
+        borderRadius: BorderRadius.circular(3),
+      ),
     );
   }
 
@@ -422,10 +454,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
             child: Text(
               widget.title!,
               style: TextStyle(
-                color: AppConstants.textPrimary,
+                color: Colors.white,
                 fontSize: isFullscreen ? 28 : 22,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
               ),
               textAlign: TextAlign.center,
             ),
@@ -445,10 +476,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
             child: Text(
               _formattedTime,
               style: TextStyle(
-                color: AppConstants.primaryPink,
+                color: Colors.grey,
                 fontSize: isFullscreen ? 24 : 18,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1.0,
               ),
             ),
           ),
@@ -463,9 +493,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           Flexible(
             flex: 2,
             child: Text(
-              _mysticalDescription,
+              _recordingDescription,
               style: TextStyle(
-                color: AppConstants.textSecondary,
+                color: Colors.grey[400],
                 fontSize: isFullscreen ? 16 : 14,
                 fontStyle: FontStyle.italic,
               ),
@@ -477,9 +507,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           Flexible(
             flex: 3,
             child: Text(
-              'Ready to capture cosmic vibrations',
+              'Ready to start recording',
               style: TextStyle(
-                color: AppConstants.textSecondary,
+                color: Colors.grey[400],
                 fontSize: isFullscreen ? 18 : 16,
                 fontStyle: FontStyle.italic,
               ),
@@ -518,8 +548,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
             icon: Icon(
               Icons.play_arrow,
               color: widget.isRecording
-                  ? AppConstants.textMuted
-                  : AppConstants.textPrimary,
+                  ? Colors.grey
+                  : Colors.white,
               size: 40,
             ),
             onPressed: widget.isRecording ? null : () {},
@@ -555,7 +585,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           flex: 2,
           child: _buildActionButton(
             icon: Icons.chat_bubble_outline,
-            color: AppConstants.accentCyan,
+            color: Colors.blue,
             onPressed: widget.onChat ?? () {},
           ),
         ),
@@ -571,10 +601,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           flex: 4,
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 10),
-            child: _buildCosmicActionButton(
+            child: _buildActionButton(
               icon: Icons.pause,
               label: 'Pause',
-              color: AppConstants.primaryOrange,
+              color: Colors.orange,
               onPressed: widget.onPause ?? () {},
             ),
           ),
@@ -591,7 +621,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           flex: 2,
           child: _buildActionButton(
             icon: Icons.check,
-            color: AppConstants.accentCyan,
+            color: Colors.green,
             onPressed: widget.onDone ?? () {},
             label: 'Done',
           ),
@@ -600,71 +630,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     );
   }
 
-  /// Build main cosmic record button
-  Widget _buildCosmicRecordButton() {
-    return BlocBuilder<RecordingBloc, RecordingState>(
-      builder: (context, state) {
-        return AnimatedBuilder(
-          animation: _pulseAnimation,
-          builder: (context, child) {
-            return GestureDetector(
-              onTap: widget.onToggle,
-              child: Container(
-                width: 100 * _pulseAnimation.value,
-                height: 100 * _pulseAnimation.value,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: widget.isRecording
-                      ? LinearGradient(
-                          colors: [
-                            AppConstants.primaryOrange,
-                            AppConstants.primaryPink,
-                          ],
-                        )
-                      : LinearGradient(
-                          colors: [
-                            AppConstants.primaryPink,
-                            AppConstants.primaryPurple,
-                          ],
-                        ),
-                  border: Border.all(color: AppConstants.textPrimary, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.isRecording
-                          ? AppConstants.primaryOrange.withValues(alpha: 0.4)
-                          : AppConstants.primaryPink.withValues(alpha: 0.3),
-                      blurRadius: 20 * _pulseAnimation.value,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 600),
-                    child: widget.isRecording
-                        ? const Icon(
-                            Icons.stop_rounded,
-                            key: ValueKey('stop'),
-                            color: AppConstants.textPrimary,
-                            size: 40,
-                          )
-                        : const Icon(
-                            Icons.fiber_manual_record,
-                            key: ValueKey('record'),
-                            color: AppConstants.textPrimary,
-                            size: 35,
-                          ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
-  /// Build control button with cosmic styling
+  /// Build control button
   Widget _buildControlButton({
     required Widget icon,
     required VoidCallback? onPressed,
@@ -676,12 +643,12 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: enabled
-            ? AppConstants.surfaceCard.withValues(alpha: 0.6)
-            : AppConstants.surfaceCard.withValues(alpha: 0.3),
+            ? Colors.grey[800]?.withValues(alpha: 0.6)
+            : Colors.grey[800]?.withValues(alpha: 0.3),
         border: Border.all(
           color: enabled
-              ? AppConstants.accentCyan.withValues(alpha: 0.5)
-              : AppConstants.textMuted.withValues(alpha: 0.3),
+              ? Colors.grey[400]?.withValues(alpha: 0.5) ?? Colors.grey
+              : Colors.grey[600]?.withValues(alpha: 0.3) ?? Colors.grey,
           width: 1,
         ),
       ),
@@ -716,49 +683,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     );
   }
 
-  /// Build cosmic action button with gradient
-  Widget _buildCosmicActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.1)],
-        ),
-        border: Border.all(color: color, width: 2),
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: TextButton(
-        onPressed: onPressed,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Build circular icon with text overlay
   Widget _buildCircularIcon(String text, IconData icon) {
     final bool isEnabled = !widget.isRecording;
     final Color color = isEnabled
-        ? AppConstants.textPrimary
-        : AppConstants.textMuted;
+        ? Colors.white
+        : Colors.grey;
 
     return Stack(
       alignment: Alignment.center,
@@ -776,80 +707,37 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     );
   }
 
-  /// Get current amplitude for waveform (mock implementation)
-  double _getCurrentAmplitude() {
-    if (!widget.isRecording) return 0.0;
-
-    // In a real implementation, this would come from the audio recorder
-    return 0.3 +
-        (math.sin(DateTime.now().millisecondsSinceEpoch / 100) * 0.4).abs();
-  }
-}
-
-/// Custom painter for cosmic background effects
-class CosmicBackgroundPainter extends CustomPainter {
-  final double flowValue;
-  final double pulseValue;
-  final bool isRecording;
-
-  CosmicBackgroundPainter({
-    required this.flowValue,
-    required this.pulseValue,
-    required this.isRecording,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw flowing cosmic particles
-    _drawCosmicParticles(canvas, size);
-
-    // Draw ethereal glow effects
-    if (isRecording) {
-      _drawRecordingAura(canvas, size);
-    }
-  }
-
-  void _drawCosmicParticles(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Draw floating particles
-    for (int i = 0; i < 20; i++) {
-      final x = (size.width * flowValue + i * size.width / 10) % size.width;
-      final y =
-          size.height * 0.2 +
-          math.sin(flowValue * 2 * math.pi + i * 0.5) * size.height * 0.3;
-
-      final opacity = (0.1 + math.sin(flowValue * math.pi + i) * 0.1).abs();
-      paint.color = AppConstants.accentCyan.withValues(alpha: opacity);
-
-      canvas.drawCircle(
-        Offset(x, y),
-        1 + math.sin(flowValue * 2 * math.pi + i) * 1.5,
-        paint,
-      );
-    }
-  }
-
-  void _drawRecordingAura(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.7);
-    final maxRadius = size.width * 0.3 * pulseValue;
-
-    final gradient = RadialGradient(
-      colors: [
-        AppConstants.primaryPink.withValues(alpha: 0.1),
-        AppConstants.primaryOrange.withValues(alpha: 0.05),
-        Colors.transparent,
-      ],
+  /// Build audio waveform using audio_waveforms library
+  Widget _buildAudioWaveform() {
+    return AudioWaveforms(
+      enableGesture: false,
+      size: const Size(double.infinity, 50),
+      recorderController: _recorderController,
+      waveStyle: WaveStyle(
+        waveColor: Colors.yellow,
+        showDurationLabel: false,
+        spacing: 4.0,
+        showBottom: true, // Show bottom half of waveform
+        extendWaveform: true,
+        showMiddleLine: false,
+        scaleFactor: 100, // Increased scale factor
+        waveThickness: 2.0,
+        gradient: LinearGradient(
+          colors: [
+            Colors.yellow,
+            Colors.yellow.withOpacity(0.8),
+            Colors.green.withOpacity(0.8),
+            Colors.green,
+          ],
+          stops: const [0.0, 0.3, 0.7, 1.0],
+        ).createShader(const Rect.fromLTWH(0, 0, 200, 50)),
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8.0),
+        color: Colors.transparent,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
     );
-
-    final paint = Paint()
-      ..shader = gradient.createShader(
-        Rect.fromCircle(center: center, radius: maxRadius),
-      );
-
-    canvas.drawCircle(center, maxRadius, paint);
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
+

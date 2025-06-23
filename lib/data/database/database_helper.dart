@@ -11,7 +11,7 @@ import 'dart:io';
 class DatabaseHelper {
   static Database? _database;
   static const String _databaseName = 'voice_memo.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 3;
 
   // Table names
   static const String foldersTable = 'folders';
@@ -119,16 +119,50 @@ class DatabaseHelper {
   static Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
     print('🔄 Upgrading database from version $oldVersion to $newVersion');
 
-    // Future database migrations will go here
-    // Example:
-    // if (oldVersion < 2) {
-    //   await db.execute('ALTER TABLE $foldersTable ADD COLUMN new_column TEXT');
-    // }
+    try {
+      // Version 2: Add soft delete columns to recordings table
+      if (oldVersion < 2) {
+        print('🔄 Migrating to version 2: Adding soft delete columns...');
+        
+        // Add soft delete columns to recordings table
+        await db.execute('ALTER TABLE $recordingsTable ADD COLUMN is_deleted INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE $recordingsTable ADD COLUMN deleted_at TEXT');
+        await db.execute('ALTER TABLE $recordingsTable ADD COLUMN original_folder_id TEXT');
+        
+        // Create indices for new columns
+        await db.execute('CREATE INDEX idx_recordings_is_deleted ON $recordingsTable(is_deleted)');
+        await db.execute('CREATE INDEX idx_recordings_deleted_at ON $recordingsTable(deleted_at)');
+        
+        print('✅ Successfully migrated to version 2');
+      }
+
+      // Version 3: Add waveform_data column to recordings table
+      if (oldVersion < 3) {
+        print('🔄 Migrating to version 3: Adding waveform_data column...');
+        
+        // Add waveform_data column to recordings table
+        await db.execute('ALTER TABLE $recordingsTable ADD COLUMN waveform_data TEXT');
+        
+        print('✅ Successfully migrated to version 3');
+      }
+    } catch (e) {
+      print('❌ Error during database migration: $e');
+      rethrow;
+    }
   }
 
   /// Called when database is opened
   static Future<void> _onOpen(Database db) async {
     print('📖 Database opened successfully');
+  }
+
+  /// Reset database instance (forces reconnection and migration check)
+  static Future<void> resetDatabase() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    print('🔄 Database instance reset - will reconnect on next access');
   }
 
   /// Insert default app settings

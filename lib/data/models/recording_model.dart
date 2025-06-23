@@ -1,4 +1,5 @@
 // File: data/models/recording_model.dart
+import 'dart:convert';
 import '../../domain/entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
 
@@ -22,6 +23,10 @@ class RecordingModel {
   final String? updatedAt;
   final bool isFavorite;
   final String? tags;
+  final bool isDeleted;
+  final String? deletedAt;
+  final String? originalFolderId;
+  final String? waveformDataJson; // JSON string of List<double>
 
   const RecordingModel({
     required this.id,
@@ -39,6 +44,10 @@ class RecordingModel {
     this.updatedAt,
     required this.isFavorite,
     this.tags,
+    required this.isDeleted,
+    this.deletedAt,
+    this.originalFolderId,
+    this.waveformDataJson,
   });
 
   /// Create from entity
@@ -59,6 +68,12 @@ class RecordingModel {
       updatedAt: entity.updatedAt?.toIso8601String(),
       isFavorite: entity.isFavorite,
       tags: entity.tags.isNotEmpty ? entity.tags.join(',') : null,
+      isDeleted: entity.isDeleted,
+      deletedAt: entity.deletedAt?.toIso8601String(),
+      originalFolderId: entity.originalFolderId,
+      waveformDataJson: entity.waveformData != null 
+          ? jsonEncode(entity.waveformData) 
+          : null,
     );
   }
 
@@ -80,6 +95,10 @@ class RecordingModel {
       updatedAt: map['updated_at'] as String?,
       isFavorite: (map['is_favorite'] as int) == 1,
       tags: map['tags'] as String?,
+      isDeleted: (map['is_deleted'] as int?) == 1,
+      deletedAt: map['deleted_at'] as String?,
+      originalFolderId: map['original_folder_id'] as String?,
+      waveformDataJson: map.containsKey('waveform_data') ? map['waveform_data'] as String? : null,
     );
   }
 
@@ -101,6 +120,9 @@ class RecordingModel {
       updatedAt: json['updatedAt'] as String?,
       isFavorite: json['isFavorite'] as bool,
       tags: json['tags'] as String?,
+      isDeleted: json['isDeleted'] as bool? ?? false,
+      deletedAt: json['deletedAt'] as String?,
+      originalFolderId: json['originalFolderId'] as String?,
     );
   }
 
@@ -122,6 +144,12 @@ class RecordingModel {
       updatedAt: updatedAt != null ? DateTime.parse(updatedAt!) : null,
       isFavorite: isFavorite,
       tags: tags?.split(',').where((tag) => tag.trim().isNotEmpty).toList() ?? [],
+      isDeleted: isDeleted,
+      deletedAt: deletedAt != null ? DateTime.parse(deletedAt!) : null,
+      originalFolderId: originalFolderId,
+      waveformData: waveformDataJson != null 
+          ? (jsonDecode(waveformDataJson!) as List).cast<double>()
+          : null,
     );
   }
 
@@ -143,6 +171,10 @@ class RecordingModel {
       'updated_at': updatedAt,
       'is_favorite': isFavorite ? 1 : 0,
       'tags': tags,
+      'is_deleted': isDeleted ? 1 : 0,
+      'deleted_at': deletedAt,
+      'original_folder_id': originalFolderId,
+      'waveform_data': waveformDataJson,
     };
   }
 
@@ -164,6 +196,9 @@ class RecordingModel {
       'updatedAt': updatedAt,
       'isFavorite': isFavorite,
       'tags': tags,
+      'isDeleted': isDeleted,
+      'deletedAt': deletedAt,
+      'originalFolderId': originalFolderId,
     };
   }
 
@@ -226,6 +261,9 @@ class RecordingModel {
     String? updatedAt,
     bool? isFavorite,
     String? tags,
+    bool? isDeleted,
+    String? deletedAt,
+    String? originalFolderId,
   }) {
     return RecordingModel(
       id: id ?? this.id,
@@ -243,6 +281,9 @@ class RecordingModel {
       updatedAt: updatedAt ?? this.updatedAt,
       isFavorite: isFavorite ?? this.isFavorite,
       tags: tags ?? this.tags,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+      originalFolderId: originalFolderId ?? this.originalFolderId,
     );
   }
 

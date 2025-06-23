@@ -43,11 +43,11 @@ extension AudioFormatExtension on AudioFormat {
   Color get color {
     switch (this) {
       case AudioFormat.wav:
-        return Colors.cyan;
+        return Colors.pink;
       case AudioFormat.m4a:
         return Colors.green;
       case AudioFormat.flac:
-        return Colors.orange;
+        return Colors.teal;
     }
   }
 

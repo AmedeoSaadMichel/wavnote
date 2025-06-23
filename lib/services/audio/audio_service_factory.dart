@@ -4,7 +4,7 @@ import '../../core/constants/app_constants.dart';
 import 'audio_service_coordinator.dart';
 import 'audio_recorder_service.dart';
 import 'audio_player_service.dart';
-import 'real_audio_recorder_service.dart';
+
 
 /// Audio operation types for factory configuration
 enum AudioOperation {
@@ -32,14 +32,13 @@ class AudioServiceFactory {
   }
 
   /// Create audio service instance (Legacy method)
+  /// 
+  /// Note: AudioRecorderService is already the real implementation.
+  /// The useRealAudio parameter is kept for backward compatibility.
   static IAudioServiceRepository createAudioService({
-    bool useRealAudio = false, // Default to mock for backward compatibility
+    bool useRealAudio = false, // Kept for backward compatibility
   }) {
-    if (useRealAudio && _canUseRealAudio()) {
-      return RealAudioRecorderService();
-    } else {
-      return AudioRecorderService(); // Mock service
-    }
+    return AudioRecorderService(); // Real audio service implementation
   }
 
   /// Create dedicated player service only
@@ -66,16 +65,6 @@ class AudioServiceFactory {
     return AudioRecorderService();
   }
 
-  /// Check if real audio recording is available
-  static bool _canUseRealAudio() {
-    try {
-      // For now, return true to enable real audio
-      // TODO: Add platform checks here if needed
-      return true; // Enabled for production use
-    } catch (e) {
-      return false;
-    }
-  }
 
   /// Create service based on app configuration
   static IAudioServiceRepository createFromConfig() {

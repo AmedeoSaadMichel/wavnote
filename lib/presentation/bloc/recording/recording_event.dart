@@ -22,7 +22,7 @@ class StartRecording extends RecordingEvent {
     this.folderName,
     required this.format,
     this.sampleRate = 44100,
-    this.bitRate = 128000,
+    this.bitRate = 128000, // Reverted back to original value
   });
 
   @override
@@ -109,15 +109,7 @@ class ClearRecordingSelection extends RecordingEvent {
   const ClearRecordingSelection();
 }
 
-/// Event to expand/collapse recording
-class ExpandRecording extends RecordingEvent {
-  final String recordingId;
-
-  const ExpandRecording({required this.recordingId});
-
-  @override
-  List<Object> get props => [recordingId];
-}
+// Removed ExpandRecording event - expansion now managed at screen level
 
 /// Event to update recording title
 class UpdateRecordingTitle extends RecordingEvent {
@@ -142,4 +134,79 @@ class DebugCreateTestRecording extends RecordingEvent {
 
   @override
   List<Object> get props => [folderId];
+}
+
+/// Event to delete a recording
+class DeleteRecording extends RecordingEvent {
+  final String recordingId;
+
+  const DeleteRecording(this.recordingId);
+
+  @override
+  List<Object> get props => [recordingId];
+}
+
+/// Event to soft delete a recording (move to Recently Deleted)
+class SoftDeleteRecording extends RecordingEvent {
+  final String recordingId;
+
+  const SoftDeleteRecording(this.recordingId);
+
+  @override
+  List<Object> get props => [recordingId];
+}
+
+/// Event to permanently delete a recording
+class PermanentDeleteRecording extends RecordingEvent {
+  final String recordingId;
+
+  const PermanentDeleteRecording(this.recordingId);
+
+  @override
+  List<Object> get props => [recordingId];
+}
+
+/// Event to restore a recording from Recently Deleted
+class RestoreRecording extends RecordingEvent {
+  final String recordingId;
+
+  const RestoreRecording(this.recordingId);
+
+  @override
+  List<Object> get props => [recordingId];
+}
+
+/// Event to cleanup expired recordings (auto-delete after 15 days)
+class CleanupExpiredRecordings extends RecordingEvent {
+  const CleanupExpiredRecordings();
+}
+
+/// Event to select all recordings
+class SelectAllRecordings extends RecordingEvent {
+  const SelectAllRecordings();
+}
+
+/// Event to deselect all recordings
+class DeselectAllRecordings extends RecordingEvent {
+  const DeselectAllRecordings();
+}
+
+/// Event to delete selected recordings
+class DeleteSelectedRecordings extends RecordingEvent {
+  final String folderId; // Context to determine delete type
+  
+  const DeleteSelectedRecordings({required this.folderId});
+  
+  @override
+  List<Object> get props => [folderId];
+}
+
+/// Event to toggle favorite status of a recording
+class ToggleFavoriteRecording extends RecordingEvent {
+  final String recordingId;
+  
+  const ToggleFavoriteRecording({required this.recordingId});
+  
+  @override
+  List<Object> get props => [recordingId];
 }

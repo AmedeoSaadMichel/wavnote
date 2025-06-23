@@ -22,6 +22,10 @@ class RecordingEntity extends Equatable {
   final DateTime? updatedAt;
   final bool isFavorite;
   final List<String> tags;
+  final bool isDeleted;
+  final DateTime? deletedAt;
+  final String? originalFolderId; // Store original folder before deletion
+  final List<double>? waveformData; // Real waveform amplitude data
 
   const RecordingEntity({
     required this.id,
@@ -39,6 +43,10 @@ class RecordingEntity extends Equatable {
     this.updatedAt,
     this.isFavorite = false,
     this.tags = const [],
+    this.isDeleted = false,
+    this.deletedAt,
+    this.originalFolderId,
+    this.waveformData,
   });
 
   // ==== BUSINESS LOGIC PROPERTIES ====
@@ -54,6 +62,22 @@ class RecordingEntity extends Equatable {
 
   /// Whether this recording has been modified since creation
   bool get isModified => updatedAt != null && updatedAt!.isAfter(createdAt);
+
+  /// Whether this recording is in Recently Deleted folder
+  bool get isInTrash => isDeleted && folderId == 'recently_deleted';
+
+  /// Days remaining before permanent deletion (15 days max)
+  int get daysUntilPermanentDeletion {
+    if (!isDeleted || deletedAt == null) return 0;
+    final daysSinceDeletion = DateTime.now().difference(deletedAt!).inDays;
+    return (15 - daysSinceDeletion).clamp(0, 15);
+  }
+
+  /// Whether this recording should be permanently deleted (older than 15 days)
+  bool get shouldBePermanentlyDeleted {
+    if (!isDeleted || deletedAt == null) return false;
+    return DateTime.now().difference(deletedAt!).inDays >= 15;
+  }
 
   /// File size in human-readable format
   String get fileSizeFormatted {
@@ -179,6 +203,10 @@ class RecordingEntity extends Equatable {
     DateTime? updatedAt,
     bool? isFavorite,
     List<String>? tags,
+    bool? isDeleted,
+    DateTime? deletedAt,
+    String? originalFolderId,
+    List<double>? waveformData,
   }) {
     return RecordingEntity(
       id: id ?? this.id,
@@ -196,6 +224,10 @@ class RecordingEntity extends Equatable {
       updatedAt: updatedAt ?? this.updatedAt,
       isFavorite: isFavorite ?? this.isFavorite,
       tags: tags ?? this.tags,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+      originalFolderId: originalFolderId ?? this.originalFolderId,
+      waveformData: waveformData ?? this.waveformData,
     );
   }
 
@@ -263,6 +295,30 @@ class RecordingEntity extends Equatable {
 
     return copyWith(
       tags: tags.where((t) => t != tag).toList(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// Soft delete recording - move to Recently Deleted folder
+  RecordingEntity softDelete() {
+    return copyWith(
+      originalFolderId: folderId, // Store current folder
+      folderId: 'recently_deleted', // Move to Recently Deleted
+      isDeleted: true,
+      deletedAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// Restore recording from Recently Deleted folder
+  RecordingEntity restore() {
+    if (!isDeleted || originalFolderId == null) return this;
+    
+    return copyWith(
+      folderId: originalFolderId, // Restore to original folder
+      isDeleted: false,
+      deletedAt: null,
+      originalFolderId: null,
       updatedAt: DateTime.now(),
     );
   }
@@ -402,6 +458,10 @@ class RecordingEntity extends Equatable {
     updatedAt,
     isFavorite,
     tags,
+    isDeleted,
+    deletedAt,
+    originalFolderId,
+    waveformData,
   ];
 
   @override

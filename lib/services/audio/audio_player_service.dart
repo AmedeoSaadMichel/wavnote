@@ -30,6 +30,11 @@ class AudioPlayerService implements IAudioServiceRepository {
   double _playbackSpeed = 1.0;
   double _playbackVolume = 1.0;
 
+  // LRU Cache for preloaded audio sources
+  final Map<String, AudioSource> _preloadedSources = {};
+  final List<String> _accessOrder = [];
+  static const int _maxCacheSize = 5; // Keep 5 most recent sources
+
   // Stream management
   StreamController<Duration>? _positionStreamController;
   StreamController<void>? _completionStreamController;
@@ -96,6 +101,10 @@ class AudioPlayerService implements IAudioServiceRepository {
 
       // Dispose audio player
       await _audioPlayer?.dispose();
+
+      // Clear cache
+      _preloadedSources.clear();
+      _accessOrder.clear();
 
       // Reset state
       _audioPlayer = null;
@@ -191,6 +200,8 @@ class AudioPlayerService implements IAudioServiceRepository {
     if (!_ensureInitialized()) return false;
 
     try {
+      debugPrint('🎵 AudioPlayerService: Starting playback for $filePath');
+
       // Validate file
       if (!await _validateAudioFile(filePath)) {
         debugPrint('❌ Invalid audio file: $filePath');
@@ -202,18 +213,39 @@ class AudioPlayerService implements IAudioServiceRepository {
         await stopPlaying();
       }
 
-      // Load and start playback
-      await _audioPlayer!.setAudioSource(AudioSource.file(filePath));
+      // Check if source is already cached
+      AudioSource? audioSource = _getCachedSource(filePath);
+      
+      if (audioSource != null) {
+        debugPrint('✅ Using cached audio source for $filePath');
+        await _audioPlayer!.setAudioSource(audioSource);
+      } else {
+        debugPrint('🔄 Loading and caching new audio source for $filePath');
+        audioSource = AudioSource.file(filePath);
+        await _audioPlayer!.setAudioSource(audioSource);
+        _cacheSource(filePath, audioSource);
+      }
+
       await _audioPlayer!.setSpeed(_playbackSpeed);
       await _audioPlayer!.setVolume(_playbackVolume);
-      await _audioPlayer!.play();
-
+      
+      // CRITICAL: Update state BEFORE calling play()
       _currentlyPlayingFile = filePath;
-      debugPrint('🎵 Started playing: $filePath');
+      _playbackActive = true;
+      _playbackPaused = false;
+      
+      await _audioPlayer!.play();
+      
+      // Start amplitude simulation for waveform
+      _startAmplitudeSimulation();
+
+      debugPrint('✅ AudioPlayerService: Started playing $filePath');
       return true;
 
     } catch (e) {
-      debugPrint('❌ Failed to start playback: $e');
+      debugPrint('❌ AudioPlayerService: Failed to start playback: $e');
+      _playbackActive = false;
+      _currentlyPlayingFile = null;
       return false;
     }
   }
@@ -224,15 +256,19 @@ class AudioPlayerService implements IAudioServiceRepository {
 
     try {
       await _audioPlayer!.stop();
+      
+      // CRITICAL: Update state after stopping
       _currentlyPlayingFile = null;
       _playbackPosition = Duration.zero;
+      _playbackActive = false;
+      _playbackPaused = false;
       _stopAmplitudeSimulation();
 
-      debugPrint('🎵 Playback stopped');
+      debugPrint('✅ AudioPlayerService: Playback stopped');
       return true;
 
     } catch (e) {
-      debugPrint('❌ Failed to stop playback: $e');
+      debugPrint('❌ AudioPlayerService: Failed to stop playback: $e');
       return false;
     }
   }
@@ -243,11 +279,16 @@ class AudioPlayerService implements IAudioServiceRepository {
 
     try {
       await _audioPlayer!.pause();
-      debugPrint('🎵 Playback paused');
+      
+      // CRITICAL: Update state after pausing
+      _playbackPaused = true;
+      _stopAmplitudeSimulation();
+      
+      debugPrint('✅ AudioPlayerService: Playback paused');
       return true;
 
     } catch (e) {
-      debugPrint('❌ Failed to pause playback: $e');
+      debugPrint('❌ AudioPlayerService: Failed to pause playback: $e');
       return false;
     }
   }
@@ -258,11 +299,16 @@ class AudioPlayerService implements IAudioServiceRepository {
 
     try {
       await _audioPlayer!.play();
-      debugPrint('🎵 Playback resumed');
+      
+      // CRITICAL: Update state after resuming
+      _playbackPaused = false;
+      _startAmplitudeSimulation();
+      
+      debugPrint('✅ AudioPlayerService: Playback resumed');
       return true;
 
     } catch (e) {
-      debugPrint('❌ Failed to resume playback: $e');
+      debugPrint('❌ AudioPlayerService: Failed to resume playback: $e');
       return false;
     }
   }
@@ -272,7 +318,7 @@ class AudioPlayerService implements IAudioServiceRepository {
     if (!_ensureInitialized()) return false;
 
     try {
-      // Validate seek position
+      // Validate seek position - use player duration if available
       if (position.isNegative ||
           (_playbackDuration > Duration.zero && position > _playbackDuration)) {
         debugPrint('❌ Invalid seek position: $position');
@@ -286,6 +332,28 @@ class AudioPlayerService implements IAudioServiceRepository {
 
     } catch (e) {
       debugPrint('❌ Failed to seek: $e');
+      return false;
+    }
+  }
+
+  /// Seek to position with custom duration validation (for waveform seeking)
+  Future<bool> seekToWithRecordingDuration(Duration position, Duration recordingDuration) async {
+    if (!_ensureInitialized()) return false;
+
+    try {
+      // Validate against recording duration instead of player duration
+      if (position.isNegative || position > recordingDuration) {
+        debugPrint('❌ Invalid seek position: $position (max: $recordingDuration)');
+        return false;
+      }
+
+      await _audioPlayer!.seek(position);
+      _playbackPosition = position;
+      debugPrint('🎵 Seeked to waveform position: $position');
+      return true;
+
+    } catch (e) {
+      debugPrint('❌ Failed to seek to waveform position: $e');
       return false;
     }
   }
@@ -603,4 +671,88 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   /// Service initialization status
   bool get isServiceReady => _isServiceInitialized;
+
+  // ==== CACHE MANAGEMENT METHODS ====
+
+  /// Get cached audio source and update access order
+  AudioSource? _getCachedSource(String filePath) {
+    if (_preloadedSources.containsKey(filePath)) {
+      // Move to end of access order (most recently used)
+      _accessOrder.remove(filePath);
+      _accessOrder.add(filePath);
+      return _preloadedSources[filePath];
+    }
+    return null;
+  }
+
+  /// Cache audio source with LRU eviction
+  void _cacheSource(String filePath, AudioSource audioSource) {
+    // If already cached, just update access order
+    if (_preloadedSources.containsKey(filePath)) {
+      _accessOrder.remove(filePath);
+      _accessOrder.add(filePath);
+      return;
+    }
+
+    // If cache is full, remove least recently used
+    if (_preloadedSources.length >= _maxCacheSize) {
+      final lruFilePath = _accessOrder.removeAt(0);
+      _preloadedSources.remove(lruFilePath);
+      debugPrint('🗑️ Evicted LRU audio source: $lruFilePath');
+    }
+
+    // Add new source to cache
+    _preloadedSources[filePath] = audioSource;
+    _accessOrder.add(filePath);
+    debugPrint('💾 Cached audio source: $filePath (cache size: ${_preloadedSources.length})');
+  }
+
+  /// Preload an audio source without playing it
+  Future<bool> preloadAudioSource(String filePath) async {
+    if (!_ensureInitialized()) return false;
+
+    try {
+      // Check if already cached
+      if (_preloadedSources.containsKey(filePath)) {
+        debugPrint('✅ Audio source already cached: $filePath');
+        // Update access order
+        _accessOrder.remove(filePath);
+        _accessOrder.add(filePath);
+        return true;
+      }
+
+      // Validate file
+      if (!await _validateAudioFile(filePath)) {
+        debugPrint('❌ Invalid audio file for preload: $filePath');
+        return false;
+      }
+
+      // Create audio source and cache it
+      final audioSource = AudioSource.file(filePath);
+      _cacheSource(filePath, audioSource);
+      
+      debugPrint('✅ Preloaded audio source: $filePath');
+      return true;
+
+    } catch (e) {
+      debugPrint('❌ Failed to preload audio source: $e');
+      return false;
+    }
+  }
+
+  /// Clear all cached sources
+  void clearCache() {
+    _preloadedSources.clear();
+    _accessOrder.clear();
+    debugPrint('🗑️ Cleared audio source cache');
+  }
+
+  /// Get cache statistics
+  Map<String, dynamic> getCacheStats() {
+    return {
+      'size': _preloadedSources.length,
+      'maxSize': _maxCacheSize,
+      'files': _accessOrder.toList(),
+    };
+  }
 }

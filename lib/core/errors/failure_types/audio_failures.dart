@@ -1,5 +1,4 @@
 // File: core/errors/failure_types/audio_failures.dart
-import 'package:equatable/equatable.dart';
 import '../failures.dart';
 import '../exceptions.dart';
 

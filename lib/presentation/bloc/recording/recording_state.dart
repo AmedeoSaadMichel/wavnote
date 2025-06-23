@@ -21,7 +21,8 @@ abstract class RecordingState extends Equatable {
     return this is RecordingInitial ||
         this is RecordingPermissionStatus ||
         this is RecordingCompleted ||
-        this is RecordingCancelled;
+        this is RecordingCancelled ||
+        this is RecordingLoaded; // Can start recording while viewing recordings
   }
 
   /// Whether can stop recording
@@ -214,29 +215,25 @@ class RecordingLoaded extends RecordingState {
   final List<RecordingEntity> recordings;
   final bool isEditMode;
   final Set<String> selectedRecordings;
-  final String? expandedRecordingId;
 
   const RecordingLoaded(
     this.recordings, {
     this.isEditMode = false,
     this.selectedRecordings = const <String>{},
-    this.expandedRecordingId,
   });
 
   @override
-  List<Object?> get props => [recordings, isEditMode, selectedRecordings, expandedRecordingId];
+  List<Object?> get props => [recordings, isEditMode, selectedRecordings];
 
   RecordingLoaded copyWith({
     List<RecordingEntity>? recordings,
     bool? isEditMode,
     Set<String>? selectedRecordings,
-    String? expandedRecordingId,
   }) {
     return RecordingLoaded(
       recordings ?? this.recordings,
       isEditMode: isEditMode ?? this.isEditMode,
       selectedRecordings: selectedRecordings ?? this.selectedRecordings,
-      expandedRecordingId: expandedRecordingId,
     );
   }
 }

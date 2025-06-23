@@ -29,6 +29,23 @@ abstract class IRecordingRepository {
   /// Delete a recording by ID
   Future<bool> deleteRecording(String id);
 
+  // ==== SOFT DELETE OPERATIONS ====
+
+  /// Soft delete a recording (move to Recently Deleted)
+  Future<bool> softDeleteRecording(String id);
+
+  /// Restore a recording from Recently Deleted
+  Future<bool> restoreRecording(String id);
+
+  /// Permanently delete a recording
+  Future<bool> permanentlyDeleteRecording(String id);
+
+  /// Get recordings that should be auto-deleted (older than 15 days)
+  Future<List<RecordingEntity>> getExpiredDeletedRecordings();
+
+  /// Clean up expired recordings (auto-delete after 15 days)
+  Future<int> cleanupExpiredRecordings();
+
   // ==== SEARCH & FILTER OPERATIONS ====
 
   /// Search recordings by name or location
@@ -73,6 +90,9 @@ abstract class IRecordingRepository {
       List<String> recordingIds,
       bool isFavorite,
       );
+
+  /// Toggle favorite status of a single recording
+  Future<bool> toggleFavorite(String recordingId);
 
   /// Add tags to multiple recordings
   Future<bool> addTagsToRecordings(

@@ -30,14 +30,18 @@ class FolderLoading extends FolderState {
 class FolderLoaded extends FolderState {
   final List<FolderEntity> defaultFolders;
   final List<FolderEntity> customFolders;
+  final bool isEditMode;
+  final Set<String> selectedFolderIds;
 
   const FolderLoaded({
     required this.defaultFolders,
     required this.customFolders,
+    this.isEditMode = false,
+    this.selectedFolderIds = const <String>{},
   });
 
   @override
-  List<Object> get props => [defaultFolders, customFolders];
+  List<Object> get props => [defaultFolders, customFolders, isEditMode, selectedFolderIds];
 
   /// Get all folders combined
   List<FolderEntity> get allFolders => [...defaultFolders, ...customFolders];
@@ -83,8 +87,37 @@ class FolderLoaded extends FolderState {
     return sorted;
   }
 
+  /// Whether any folders are selected
+  bool get hasSelectedFolders => selectedFolderIds.isNotEmpty;
+
+  /// Number of selected folders
+  int get selectedFoldersCount => selectedFolderIds.length;
+
+  /// Get selected folders
+  List<FolderEntity> get selectedFolders {
+    return customFolders.where((folder) => selectedFolderIds.contains(folder.id)).toList();
+  }
+
+  /// Check if a folder is selected
+  bool isFolderSelected(String folderId) => selectedFolderIds.contains(folderId);
+
+  /// Copy with new values
+  FolderLoaded copyWith({
+    List<FolderEntity>? defaultFolders,
+    List<FolderEntity>? customFolders,
+    bool? isEditMode,
+    Set<String>? selectedFolderIds,
+  }) {
+    return FolderLoaded(
+      defaultFolders: defaultFolders ?? this.defaultFolders,
+      customFolders: customFolders ?? this.customFolders,
+      isEditMode: isEditMode ?? this.isEditMode,
+      selectedFolderIds: selectedFolderIds ?? this.selectedFolderIds,
+    );
+  }
+
   @override
-  String toString() => 'FolderLoaded { defaultFolders: ${defaultFolders.length}, customFolders: ${customFolders.length} }';
+  String toString() => 'FolderLoaded { defaultFolders: ${defaultFolders.length}, customFolders: ${customFolders.length}, isEditMode: $isEditMode, selectedCount: ${selectedFolderIds.length} }';
 }
 
 /// State when a folder is being created
@@ -92,6 +125,8 @@ class FolderCreating extends FolderLoaded {
   const FolderCreating({
     required super.defaultFolders,
     required super.customFolders,
+    super.isEditMode = false,
+    super.selectedFolderIds = const <String>{},
   });
 
   @override
@@ -106,10 +141,12 @@ class FolderCreated extends FolderLoaded {
     required super.defaultFolders,
     required super.customFolders,
     required this.createdFolder,
+    super.isEditMode = false,
+    super.selectedFolderIds = const <String>{},
   });
 
   @override
-  List<Object> get props => [defaultFolders, customFolders, createdFolder];
+  List<Object> get props => [defaultFolders, customFolders, isEditMode, selectedFolderIds, createdFolder];
 
   @override
   String toString() => 'FolderCreated { createdFolder: ${createdFolder.name} }';
@@ -125,13 +162,36 @@ class FolderDeleted extends FolderLoaded {
     required super.customFolders,
     required this.deletedFolderId,
     required this.deletedFolderName,
+    super.isEditMode = false,
+    super.selectedFolderIds = const <String>{},
   });
 
   @override
-  List<Object> get props => [defaultFolders, customFolders, deletedFolderId, deletedFolderName];
+  List<Object> get props => [defaultFolders, customFolders, isEditMode, selectedFolderIds, deletedFolderId, deletedFolderName];
 
   @override
   String toString() => 'FolderDeleted { deletedFolderId: $deletedFolderId, deletedFolderName: $deletedFolderName }';
+}
+
+/// State when multiple folders have been successfully deleted
+class FoldersDeleted extends FolderLoaded {
+  final List<String> deletedFolderIds;
+  final int deletedCount;
+
+  const FoldersDeleted({
+    required super.defaultFolders,
+    required super.customFolders,
+    required this.deletedFolderIds,
+    required this.deletedCount,
+    super.isEditMode = false,
+    super.selectedFolderIds = const <String>{},
+  });
+
+  @override
+  List<Object> get props => [defaultFolders, customFolders, isEditMode, selectedFolderIds, deletedFolderIds, deletedCount];
+
+  @override
+  String toString() => 'FoldersDeleted { deletedCount: $deletedCount }';
 }
 
 /// State when an error occurs
@@ -175,10 +235,12 @@ class FolderFiltered extends FolderLoaded {
     required super.customFolders,
     required this.searchQuery,
     required this.filteredCustomFolders,
+    super.isEditMode = false,
+    super.selectedFolderIds = const <String>{},
   });
 
   @override
-  List<Object> get props => [defaultFolders, customFolders, searchQuery, filteredCustomFolders];
+  List<Object> get props => [defaultFolders, customFolders, isEditMode, selectedFolderIds, searchQuery, filteredCustomFolders];
 
   /// Whether search is active
   bool get isSearchActive => searchQuery.isNotEmpty;

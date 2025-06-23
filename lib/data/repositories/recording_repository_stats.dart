@@ -11,16 +11,46 @@ import 'recording_repository_base.dart';
 class RecordingRepositoryStats extends RecordingRepositoryBase {
 
   /// Get recording count for a folder
+  /// Special handling for "all_recordings" and "recently_deleted" folders
   Future<int> getRecordingCountByFolder(String folderId) async {
     try {
       final db = await getDatabaseWithTable();
 
-      final result = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ?',
-        [folderId],
-      );
+      List<Map<String, dynamic>> result;
 
-      return Sqflite.firstIntValue(result) ?? 0;
+      if (folderId == 'all_recordings') {
+        // For "All Recordings", count recordings from all folders except "recently_deleted"
+        // Also exclude soft-deleted recordings
+        result = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+        print('📊 All Recordings count: excluding recently_deleted and soft-deleted');
+      } else if (folderId == 'favourites') {
+        // For "Favourites", count favorite recordings from all folders except "recently_deleted"
+        result = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND is_favorite = 1 AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+        print('❤️ Favourites count: favorite recordings excluding recently_deleted and soft-deleted');
+      } else if (folderId == 'recently_deleted') {
+        // For "Recently Deleted", count only soft-deleted recordings
+        result = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM ${DatabaseHelper.recordingsTable} WHERE is_deleted = 1',
+        );
+        print('🗑️ Recently Deleted count: only soft-deleted recordings');
+      } else {
+        // For other folders, count recordings specifically in that folder (excluding soft-deleted)
+        result = await db.rawQuery(
+          'SELECT COUNT(*) as count FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          [folderId],
+        );
+        print('📁 Specific folder count: folder $folderId (excluding soft-deleted)');
+      }
+
+      final count = Sqflite.firstIntValue(result) ?? 0;
+      print('📊 Recording count for folder $folderId: $count');
+      return count;
     } catch (e) {
       print('❌ Error getting recording count: $e');
       return 0;
@@ -28,14 +58,37 @@ class RecordingRepositoryStats extends RecordingRepositoryBase {
   }
 
   /// Get total duration for recordings in a folder
+  /// Special handling for "all_recordings" and "recently_deleted" folders
   Future<Duration> getTotalDurationByFolder(String folderId) async {
     try {
       final db = await getDatabaseWithTable();
 
-      final result = await db.rawQuery(
-        'SELECT SUM(duration_seconds) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ?',
-        [folderId],
-      );
+      List<Map<String, dynamic>> result;
+
+      if (folderId == 'all_recordings') {
+        // For "All Recordings", sum duration from all folders except "recently_deleted"
+        result = await db.rawQuery(
+          'SELECT SUM(duration_seconds) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+      } else if (folderId == 'favourites') {
+        // For "Favourites", sum duration for favorite recordings from all folders except "recently_deleted"
+        result = await db.rawQuery(
+          'SELECT SUM(duration_seconds) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND is_favorite = 1 AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+      } else if (folderId == 'recently_deleted') {
+        // For "Recently Deleted", sum duration for soft-deleted recordings
+        result = await db.rawQuery(
+          'SELECT SUM(duration_seconds) as total FROM ${DatabaseHelper.recordingsTable} WHERE is_deleted = 1',
+        );
+      } else {
+        // For other folders, sum duration for recordings in that folder (excluding soft-deleted)
+        result = await db.rawQuery(
+          'SELECT SUM(duration_seconds) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          [folderId],
+        );
+      }
 
       final totalSeconds = Sqflite.firstIntValue(result) ?? 0;
       return Duration(seconds: totalSeconds);
@@ -46,14 +99,37 @@ class RecordingRepositoryStats extends RecordingRepositoryBase {
   }
 
   /// Get total file size for recordings in a folder
+  /// Special handling for "all_recordings" and "recently_deleted" folders
   Future<int> getTotalFileSizeByFolder(String folderId) async {
     try {
       final db = await getDatabaseWithTable();
 
-      final result = await db.rawQuery(
-        'SELECT SUM(file_size) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ?',
-        [folderId],
-      );
+      List<Map<String, dynamic>> result;
+
+      if (folderId == 'all_recordings') {
+        // For "All Recordings", sum file size from all folders except "recently_deleted"
+        result = await db.rawQuery(
+          'SELECT SUM(file_size) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+      } else if (folderId == 'favourites') {
+        // For "Favourites", sum file size for favorite recordings from all folders except "recently_deleted"
+        result = await db.rawQuery(
+          'SELECT SUM(file_size) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id != ? AND is_favorite = 1 AND (is_deleted = 0 OR is_deleted IS NULL)',
+          ['recently_deleted'],
+        );
+      } else if (folderId == 'recently_deleted') {
+        // For "Recently Deleted", sum file size for soft-deleted recordings
+        result = await db.rawQuery(
+          'SELECT SUM(file_size) as total FROM ${DatabaseHelper.recordingsTable} WHERE is_deleted = 1',
+        );
+      } else {
+        // For other folders, sum file size for recordings in that folder (excluding soft-deleted)
+        result = await db.rawQuery(
+          'SELECT SUM(file_size) as total FROM ${DatabaseHelper.recordingsTable} WHERE folder_id = ? AND (is_deleted = 0 OR is_deleted IS NULL)',
+          [folderId],
+        );
+      }
 
       return Sqflite.firstIntValue(result) ?? 0;
     } catch (e) {
