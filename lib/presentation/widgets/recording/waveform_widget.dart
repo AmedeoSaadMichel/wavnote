@@ -108,6 +108,14 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Debug: Log amplitude statistics for initial paint
+    if (amplitudes.isNotEmpty && amplitudes.length == 200) {
+      final minAmp = amplitudes.reduce((a, b) => a < b ? a : b);
+      final maxAmp = amplitudes.reduce((a, b) => a > b ? a : b);
+      final avgAmp = amplitudes.reduce((a, b) => a + b) / amplitudes.length;
+      print('🎨 Waveform paint - Min: ${minAmp.toStringAsFixed(3)}, Max: ${maxAmp.toStringAsFixed(3)}, Avg: ${avgAmp.toStringAsFixed(3)}, Count: ${amplitudes.length}');
+    }
+    
     // Paint object for played/active portion of waveform (red color like in the image)
     final Paint active = Paint()
       ..color = Colors.red
@@ -139,8 +147,11 @@ class _WaveformPainter extends CustomPainter {
       final int sampleIndex = (i * sampleStep).clamp(0, amplitudes.length - 1);
       final double amplitude = amplitudes[sampleIndex];
 
-      // Scale amplitude to fit widget height
-      final double height = amplitude * size.height;
+      // Scale amplitude to fit widget height with better visibility
+      // Ensure minimum height for very quiet parts and enhance variation
+      final double minHeight = size.height * 0.1; // Minimum 10% height
+      final double maxHeight = size.height * 0.9; // Maximum 90% height
+      final double height = minHeight + (amplitude * (maxHeight - minHeight));
 
       // Determine color: red if played, grey if not yet played
       final Paint paint = (i / totalBars) < progress

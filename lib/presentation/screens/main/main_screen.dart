@@ -8,7 +8,8 @@ import '../../bloc/settings/settings_bloc.dart';
 import '../../widgets/folder/folder_item.dart';
 import '../../widgets/dialogs/create_folder_dialog.dart';
 import '../../widgets/dialogs/audio_format_dialog.dart';
-import '../recording/recording_list_screen.dart';
+import '../../../core/routing/app_router.dart';
+import '../../../data/database/database_pool.dart';
 
 import '../../../domain/entities/folder_entity.dart';
 import '../../../core/enums/audio_format.dart';
@@ -110,26 +111,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-
-  /// Handle folder tap navigation
-  void _onFolderTap(FolderEntity folder) async {
+  /// Handle folder tap navigation using GoRouter
+  void _onFolderTap(FolderEntity folder) {
     setState(() {
       _selectedFolder = folder;
     });
 
-    // Navigate to recording list and refresh folders when returning
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RecordingListScreen(folder: folder),
-      ),
-    );
-    
-    // Refresh folder counts when returning from recording list
-    print('🔄 Refreshing folder counts after returning to main screen');
-    if (mounted) {
-      BlocProvider.of<FolderBloc>(context).add(const RefreshFolders());
-    }
+    // Save folder choice using ultra-fast database pool
+    print('📁 MainScreen: User selected folder ${folder.name}, saving with pool');
+    DatabasePool.saveLastFolderId(folder.id); // Ultra-fast save
+    context.read<SettingsBloc>().add(UpdateLastOpenedFolder(folder.id)); // Also update BLoC
+
+    // Navigate to folder
+    context.goToFolderEntity(folder);
   }
 
   /// Toggle edit mode for multi-selection
@@ -249,6 +243,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(

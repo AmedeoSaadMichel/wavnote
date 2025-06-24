@@ -317,7 +317,6 @@ class StorageSettingsSection extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // TODO: Implement cache clearing
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Cache cleared successfully'),

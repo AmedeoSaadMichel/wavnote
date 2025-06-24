@@ -119,6 +119,17 @@ class AudioRecorderImpl {
         sampleRate: sampleRate,
         bitRate: bitRate,
       );
+      
+      // Start amplitude monitoring with subscription to onProgress
+      _recorder!.onProgress!.listen((RecordingDisposition disposition) {
+        // Extract real amplitude from the recording disposition
+        final amplitude = disposition.decibels != null 
+            ? _normalizeDecibels(disposition.decibels!) 
+            : 0.0;
+        
+        // Send real amplitude to listeners
+        _amplitudeController?.add(amplitude);
+      });
 
       // Set recording state
       _currentFilePath = absolutePath;
@@ -372,6 +383,14 @@ class AudioRecorderImpl {
   String _generateRecordingTitle() {
     final now = DateTime.now();
     return 'Recording ${DateFormatter.formatDateTime(now)}';
+  }
+
+  /// Normalize decibels to 0.0-1.0 amplitude range
+  double _normalizeDecibels(double decibels) {
+    // Decibels typically range from -60 (very quiet) to 0 (very loud)
+    // Normalize to 0.0-1.0 range
+    final normalized = ((decibels + 60) / 60).clamp(0.0, 1.0);
+    return normalized;
   }
 
   /// Simulate amplitude for visual feedback

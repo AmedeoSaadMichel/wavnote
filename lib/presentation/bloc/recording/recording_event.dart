@@ -31,7 +31,12 @@ class StartRecording extends RecordingEvent {
 
 /// Event to stop recording
 class StopRecording extends RecordingEvent {
-  const StopRecording();
+  final List<double>? waveformData;
+  
+  const StopRecording({this.waveformData});
+  
+  @override
+  List<Object?> get props => [waveformData];
 }
 
 /// Event to pause recording

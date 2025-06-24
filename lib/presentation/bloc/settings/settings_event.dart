@@ -129,3 +129,16 @@ class ImportSettings extends SettingsEvent {
   @override
   String toString() => 'ImportSettings { data: $settingsData }';
 }
+
+/// Event to update last opened folder for navigation persistence
+class UpdateLastOpenedFolder extends SettingsEvent {
+  final String? folderId;
+
+  const UpdateLastOpenedFolder(this.folderId);
+
+  @override
+  List<Object?> get props => [folderId];
+
+  @override
+  String toString() => 'UpdateLastOpenedFolder { folderId: $folderId }';
+}

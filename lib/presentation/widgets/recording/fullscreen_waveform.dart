@@ -1,5 +1,6 @@
 // File: presentation/widgets/recording/fullscreen_waveform.dart
 import 'package:flutter/material.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'dart:math' as math;
 
 /// Fullscreen waveform widget for expanded recording view
@@ -10,12 +11,14 @@ class FullScreenWaveform extends StatefulWidget {
   final String? filePath;
   final double amplitude;
   final bool isRecording;
+  final RecorderController? recorderController;
 
   const FullScreenWaveform({
     super.key,
     this.filePath,
     this.amplitude = 0.0,
     this.isRecording = false,
+    this.recorderController,
   });
 
   @override
@@ -110,11 +113,18 @@ class _FullScreenWaveformState extends State<FullScreenWaveform>
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          // Main waveform display
-          Expanded(
-            flex: 3,
-            child: _buildMainWaveform(),
-          ),
+          // Real-time waveform using audio_waveforms
+          if (widget.recorderController != null && widget.isRecording)
+            Expanded(
+              flex: 3,
+              child: _buildRealTimeWaveform(),
+            )
+          else
+            // Fallback to custom waveform
+            Expanded(
+              flex: 3,
+              child: _buildMainWaveform(),
+            ),
 
           const SizedBox(height: 16),
 
@@ -125,6 +135,43 @@ class _FullScreenWaveformState extends State<FullScreenWaveform>
           ),
         ],
       ),
+    );
+  }
+
+  /// Build real-time waveform using audio_waveforms
+  Widget _buildRealTimeWaveform() {
+    return AudioWaveforms(
+      enableGesture: false,
+      size: Size.infinite,
+      recorderController: widget.recorderController!,
+      waveStyle: WaveStyle(
+        waveColor: Colors.red,
+        showDurationLabel: false,
+        spacing: 5.0,
+        showBottom: true,
+        extendWaveform: true,   // Re-enable for smooth visualization
+        showMiddleLine: true,
+        middleLineColor: Colors.white.withValues(alpha: 0.05),
+        middleLineThickness: 0.5,
+        scaleFactor: 150,       // Back to balanced sensitivity
+        waveThickness: 4.5,
+        gradient: LinearGradient(
+          colors: [
+            Colors.red.withValues(alpha: 0.5),
+            Colors.red.withValues(alpha: 0.8),
+            Colors.red.withValues(alpha: 1.0),
+            Colors.red.withValues(alpha: 0.8),
+            Colors.red.withValues(alpha: 0.5),
+          ],
+          stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(const Rect.fromLTWH(0, 0, 400, 200)),
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
     );
   }
 

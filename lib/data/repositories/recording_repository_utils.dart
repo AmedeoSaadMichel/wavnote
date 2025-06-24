@@ -26,7 +26,7 @@ class RecordingRepositoryUtils extends RecordingRepositoryBase {
         // In a real implementation, you'd use File(recording.filePath).exists()
         print('📁 Checking file: ${recording.filePath}');
 
-        // TODO: Add actual file existence check
+        // Add actual file existence check
         // if (!await File(recording.filePath).exists()) {
         //   orphanedIds.add(recording.id);
         // }

@@ -21,6 +21,7 @@ class AudioPlayerManager {
   Duration _duration = Duration.zero;
   bool _isPlaying = false;
   bool _isLoading = false;
+  bool _hasCompletedCurrentPlayback = false; // Flag to prevent multiple completion triggers
   
   // Stream subscriptions
   StreamSubscription<Duration>? _positionSubscription;
@@ -48,20 +49,53 @@ class AudioPlayerManager {
   void _setupAudioListeners() {
     _positionSubscription = _audioPlayer.positionStream.listen((position) {
       _position = position;
+      if (_duration.inMilliseconds > 0) {
+        final percentage = (position.inMilliseconds / _duration.inMilliseconds * 100);
+        print('🕒 Position: ${_formatTime(position)} / ${_formatTime(_duration)} (${percentage.toStringAsFixed(1)}%)');
+        
+        // Trigger completion when we reach 99% to avoid overrun
+        if (percentage >= 99.0 && _isPlaying && !_hasCompletedCurrentPlayback) {
+          print('🔚 Audio reached 99%, triggering completion');
+          _hasCompletedCurrentPlayback = true;
+          _position = Duration.zero;
+          _isPlaying = false;
+          _onStateChanged?.call();
+          
+          _audioPlayer.pause().then((_) {
+            print('🔚 Audio paused at 99%');
+            return _audioPlayer.seek(Duration.zero);
+          }).then((_) {
+            print('🔚 Audio reset to beginning from 99% threshold');
+          }).catchError((e) {
+            print('❌ Error pausing/seeking at 99%: $e');
+          });
+        }
+      } else {
+        print('🕒 Position: ${_formatTime(position)} / ${_formatTime(_duration)} (duration not set)');
+      }
       _onStateChanged?.call();
     });
 
     _durationSubscription = _audioPlayer.durationStream.listen((duration) {
-      if (duration != null) {
+      if (duration != null && duration > Duration.zero) {
+        final oldDuration = _duration;
         _duration = duration;
-        print('🕒 Audio player duration updated: ${_formatTime(duration)}');
+        print('🕒 Duration changed: ${_formatTime(oldDuration)} → ${_formatTime(duration)}');
         _onStateChanged?.call();
+      } else if (duration != null) {
+        print('🕒 Audio player reported zero duration, keeping current: ${_formatTime(_duration)}');
       }
     });
 
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       _isPlaying = state.playing;
       print('🎵 Player state changed: playing=${state.playing}, processingState=${state.processingState}');
+      
+      // Note: Completion is now handled in positionStream at 99% threshold
+      
+      // Debug all state changes
+      print('🎵 Audio state: playing=${state.playing}, processing=${state.processingState}');
+      
       _onStateChanged?.call();
     });
   }
@@ -127,9 +161,10 @@ class AudioPlayerManager {
 
       _expandedRecordingId = recording.id;
       _position = Duration.zero;
-      _duration = Duration.zero;
+      _duration = recording.duration; // Use the recording's known duration
       _isPlaying = false;
       _isLoading = false;
+      _hasCompletedCurrentPlayback = false; // Reset completion flag for new recording
 
       print('✅ Audio setup complete for: ${recording.name}');
       print('📁 Working file path: $workingFilePath');
@@ -155,6 +190,9 @@ class AudioPlayerManager {
       if (_audioPlayer.playing) {
         await _audioPlayer.pause();
       } else {
+        // Reset completion flag when starting new playback
+        _hasCompletedCurrentPlayback = false;
+        
         // Handle completed state
         if (_position >= _duration && _duration > Duration.zero) {
           await _audioPlayer.seek(Duration.zero);

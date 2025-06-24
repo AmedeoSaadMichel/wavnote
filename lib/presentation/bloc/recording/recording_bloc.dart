@@ -147,6 +147,16 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       _startAmplitudeUpdates();
       _startDurationUpdates();
 
+      // Get location-based title immediately for UI display
+      String? locationTitle;
+      try {
+        locationTitle = await _geolocationService.getRecordingLocationName();
+        print('📍 Got location title for recording: $locationTitle');
+      } catch (e) {
+        print('⚠️ Failed to get location title: $e');
+        locationTitle = null; // Will fall back to "New Recording"
+      }
+
       emit(RecordingInProgress(
         filePath: filePath,
         folderId: event.folderId,
@@ -157,6 +167,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         duration: Duration.zero,
         amplitude: 0.0,
         startTime: DateTime.now(),
+        title: locationTitle, // Now includes the address name
       ));
 
       print('✅ Recording started successfully: $filePath');
@@ -201,8 +212,18 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           
           // Generate location-based name and update the recording
           print('🔄 Generating location-based name...');
-          final finalRecording = await _generateLocationBasedRecording(recording);
+          final locationBasedRecording = await _generateLocationBasedRecording(recording);
+          
+          // Add waveform data if provided
+          final finalRecording = event.waveformData != null && event.waveformData!.isNotEmpty
+              ? locationBasedRecording.copyWith(waveformData: event.waveformData)
+              : locationBasedRecording;
+          
           print('✅ Location-based name generated: ${finalRecording.name}');
+          print('🎵 Waveform data included: ${finalRecording.waveformData?.length ?? 0} points');
+          if (finalRecording.waveformData != null && finalRecording.waveformData!.isNotEmpty) {
+            print('🎵 Sample final waveform values: ${finalRecording.waveformData!.take(5).map((v) => v.toStringAsFixed(3)).join(", ")}...');
+          }
           
           print('🔄 Saving recording to repository...');
           final savedRecording = await _recordingRepository.createRecording(finalRecording);

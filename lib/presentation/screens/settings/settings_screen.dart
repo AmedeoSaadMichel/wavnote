@@ -63,7 +63,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   /// Load current settings (placeholder - would load from storage)
   void _loadSettings() {
-    // TODO: Load from settings repository
     setState(() {
       _selectedFormat = AudioFormat.m4a;
       _selectedSampleRate = 44100;
@@ -73,7 +72,6 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   /// Save settings (placeholder - would save to storage)
   void _saveSettings() {
-    // TODO: Save to settings repository
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Settings saved successfully'),

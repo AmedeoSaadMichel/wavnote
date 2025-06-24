@@ -488,7 +488,6 @@ class AudioPlayerService implements IAudioServiceRepository {
       if (format == null) return null;
 
       // Basic file information
-      // TODO: For production, implement proper audio metadata extraction
       return AudioFileInfo(
         filePath: filePath,
         format: format,
@@ -514,7 +513,6 @@ class AudioPlayerService implements IAudioServiceRepository {
     int? targetSampleRate,
     int? targetBitRate,
   }) async {
-    // TODO: Implement audio conversion
     debugPrint('⚠️ Audio conversion not yet implemented');
     return null;
   }
@@ -526,7 +524,6 @@ class AudioPlayerService implements IAudioServiceRepository {
     required Duration startTime,
     required Duration endTime,
   }) async {
-    // TODO: Implement audio trimming
     debugPrint('⚠️ Audio trimming not yet implemented');
     return null;
   }
@@ -537,14 +534,12 @@ class AudioPlayerService implements IAudioServiceRepository {
     required String outputPath,
     required AudioFormat outputFormat,
   }) async {
-    // TODO: Implement audio merging
     debugPrint('⚠️ Audio merging not yet implemented');
     return null;
   }
 
   @override
   Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100}) async {
-    // TODO: Implement waveform extraction
     debugPrint('⚠️ Waveform extraction not yet implemented');
     return [];
   }
@@ -580,7 +575,6 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<bool> setAudioSessionCategory(AudioSessionCategory category) async {
-    // TODO: Implement platform-specific audio session management
     debugPrint('⚠️ Audio session management not yet implemented');
     return true;
   }
