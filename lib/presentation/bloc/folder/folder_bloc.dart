@@ -1,17 +1,95 @@
 // File: presentation/bloc/folder/folder_bloc.dart
+// 
+// Folder BLoC - Presentation Layer
+// ===============================
+//
+// State management for voice memo folder operations in the WavNote app.
+// This BLoC handles all folder-related UI interactions and coordinates with
+// the data layer for persistent storage of folder information.
+//
+// Key Responsibilities:
+// - Load and manage default system folders (All Recordings, Favorites, Recently Deleted)
+// - Handle custom user folder creation, deletion, and modification
+// - Manage folder organization and recording count updates
+// - Provide edit mode functionality with multi-selection capabilities
+// - Coordinate folder operations with database persistence
+//
+// Architecture Features:
+// - Implements BLoC pattern for reactive state management
+// - Uses Clean Architecture with repository dependency
+// - Maintains immutable state with Equatable
+// - Handles async operations with proper error management
+// - Provides real-time folder count updates
+//
+// Folder Types:
+// - Default Folders: System-provided folders that cannot be deleted
+//   - All Recordings: Contains all user recordings
+//   - Favorites: Contains user-marked favorite recordings
+//   - Recently Deleted: Contains soft-deleted recordings (15-day retention)
+// - Custom Folders: User-created folders with custom icons and colors
+//
+// State Management:
+// - FolderInitial: Initial loading state
+// - FolderLoading: Loading folders from database
+// - FolderLoaded: Folders loaded with counts and edit capabilities
+// - FolderError: Error states with descriptive messages
+// - FolderCreated: Folder successfully created
+// - FolderDeleted: Folder successfully deleted
+//
+// Edit Mode Features:
+// - Multi-selection of custom folders for bulk operations
+// - Bulk deletion with confirmation dialogs
+// - Edit mode toggle for better UX
+// - Selection state management
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
-import '../../../domain/entities/folder_entity.dart';
-import '../../../data/repositories/folder_repository.dart';
 
-part 'folder_event.dart';
-part 'folder_state.dart';
+// Domain imports
+import '../../../domain/entities/folder_entity.dart';   // Folder business entity
 
-/// Bloc responsible for managing folder state and operations
+// Data layer imports
+import '../../../data/repositories/folder_repository.dart'; // Folder data access
+
+// BLoC parts
+part 'folder_event.dart'; // Folder events (user actions)
+part 'folder_state.dart'; // Folder states (app states)
+
+/// BLoC responsible for managing folder state and operations
 ///
 /// Handles folder loading, creation, deletion, and updates.
 /// Uses real repository for persistent storage.
+///
+/// Key features:
+/// - Default and custom folder management
+/// - Real-time recording count updates
+/// - Multi-selection edit mode for bulk operations
+/// - Persistent storage with SQLite database
+/// - Error handling with user-friendly messages
+///
+/// Example usage:
+/// ```dart
+/// // Load folders
+/// context.read<FolderBloc>().add(const LoadFolders());
+/// 
+/// // Create custom folder
+/// context.read<FolderBloc>().add(CreateFolder(
+///   name: 'My Folder',
+///   color: Colors.blue,
+///   icon: Icons.folder,
+/// ));
+/// 
+/// // Listen to state changes
+/// BlocBuilder<FolderBloc, FolderState>(
+///   builder: (context, state) {
+///     if (state is FolderLoaded) {
+///       return ListView(children: state.allFolders.map(...));
+///     }
+///     return CircularProgressIndicator();
+///   },
+/// );
+/// ```
 class FolderBloc extends Bloc<FolderEvent, FolderState> {
   final FolderRepository _folderRepository = FolderRepository();
 

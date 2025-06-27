@@ -22,7 +22,7 @@ class CompactAudioWaveform extends StatelessWidget {
         size: Size(MediaQuery.of(context).size.width - 64, 100), // Full width minus margins
         recorderController: recorderController,
         waveStyle: WaveStyle(
-          waveColor: Colors.red,
+          waveColor: Colors.cyan,
           showDurationLabel: false,
           spacing: 4.0,
           showBottom: true,
@@ -32,10 +32,10 @@ class CompactAudioWaveform extends StatelessWidget {
           waveThickness: 3.5,
           gradient: LinearGradient(
             colors: [
-              Colors.red.withValues(alpha: 0.7),
-              Colors.red.withValues(alpha: 1.0),
-              Colors.red.withValues(alpha: 1.0),
-              Colors.red.withValues(alpha: 0.7),
+              Colors.cyan.withValues(alpha: 0.7),
+              Colors.cyan.withValues(alpha: 1.0),
+              Colors.blue.withValues(alpha: 1.0),
+              Colors.cyan.withValues(alpha: 0.7),
             ],
             stops: const [0.0, 0.3, 0.7, 1.0],
             begin: Alignment.centerLeft,
@@ -69,7 +69,7 @@ class FullscreenAudioWaveform extends StatelessWidget {
       size: Size(MediaQuery.of(context).size.width - 40, 200),
       recorderController: recorderController,
       waveStyle: WaveStyle(
-        waveColor: Colors.red,
+        waveColor: Colors.cyan,
         showDurationLabel: false,
         spacing: 3.0,
         showBottom: true,

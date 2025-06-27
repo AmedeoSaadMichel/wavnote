@@ -1,17 +1,83 @@
 // File: data/repositories/recording_repository.dart
-import '../../domain/entities/recording_entity.dart';
-import '../../domain/repositories/i_recording_repository.dart';
-import '../../core/enums/audio_format.dart';
-import 'recording_repository_crud.dart';
-import 'recording_repository_search.dart';
-import 'recording_repository_bulk.dart';
-import 'recording_repository_stats.dart';
-import 'recording_repository_utils.dart';
+// 
+// Recording Repository - Data Layer
+// =================================
+//
+// Primary implementation of the recording repository interface using SQLite
+// as the persistent storage mechanism. This repository serves as the main
+// data access layer for all recording-related operations in the WavNote app.
+//
+// Architecture Pattern:
+// - Implements Repository pattern from Clean Architecture
+// - Uses composition to delegate to specialized operation classes
+// - Maintains single responsibility by splitting concerns across files
+// - Provides a unified interface while keeping implementation modular
+//
+// Key Responsibilities:
+// - Provide data access interface implementation for domain layer
+// - Coordinate between specialized operation classes
+// - Maintain data consistency and integrity
+// - Handle database transactions and error management
+// - Abstract SQLite implementation details from business logic
+//
+// Specialized Operation Classes:
+// - RecordingRepositoryCrud: Basic CRUD operations (Create, Read, Update, Delete)
+// - RecordingRepositorySearch: Advanced search and filtering capabilities
+// - RecordingRepositoryBulk: Bulk operations for multiple recordings
+// - RecordingRepositoryStats: Statistics and analytics operations
+// - RecordingRepositoryUtils: Utility operations and data maintenance
+//
+// Database Design:
+// - Uses SQLite for local storage with high performance
+// - Optimized queries with proper indexing
+// - Supports complex filtering and search operations
+// - Maintains referential integrity between recordings and folders
+// - Includes soft delete functionality with 15-day retention
+//
+// Performance Features:
+// - Connection pooling for optimal database access
+// - Batch operations for bulk data manipulation
+// - Efficient query optimization and indexing
+// - Memory-conscious data loading strategies
+// - Background cleanup of expired data
+
+import '../../domain/entities/recording_entity.dart';      // Recording business entity
+import '../../domain/repositories/i_recording_repository.dart'; // Repository interface
+import '../../core/enums/audio_format.dart';               // Audio format definitions
+
+// Specialized operation classes for modular design
+import 'recording_repository_crud.dart';   // CRUD operations
+import 'recording_repository_search.dart'; // Search and filtering
+import 'recording_repository_bulk.dart';   // Bulk operations
+import 'recording_repository_stats.dart';  // Statistics and analytics
+import 'recording_repository_utils.dart';  // Utility operations
 
 /// Main SQLite implementation of recording repository
 ///
 /// Delegates operations to specialized service classes to maintain
 /// single responsibility and keep file sizes manageable.
+///
+/// This repository provides a complete data access layer for recordings,
+/// supporting all operations from basic CRUD to advanced analytics and
+/// bulk operations. The modular design ensures maintainability and
+/// allows for easy testing and extension of functionality.
+///
+/// Example usage:
+/// ```dart
+/// final repository = RecordingRepository();
+/// 
+/// // Save a new recording
+/// await repository.saveRecording(recording);
+/// 
+/// // Get recordings by folder
+/// final recordings = await repository.getRecordingsByFolder('folder_id');
+/// 
+/// // Search recordings
+/// final searchResults = await repository.searchRecordings(
+///   query: 'meeting',
+///   folderId: 'work_folder',
+/// );
+/// ```
 class RecordingRepository implements IRecordingRepository {
   late final RecordingRepositoryCrud _crudOps;
   late final RecordingRepositorySearch _searchOps;

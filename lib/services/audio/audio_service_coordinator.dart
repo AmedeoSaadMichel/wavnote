@@ -1,17 +1,67 @@
 // File: services/audio/audio_service_coordinator.dart
+// 
+// Audio Service Coordinator - Service Layer
+// ========================================
+//
+// Central coordinator for all audio operations in the WavNote app. This service
+// implements the Coordinator pattern to manage complex interactions between
+// recording and playback services while providing a unified interface.
+//
+// Architecture Pattern:
+// - Implements IAudioServiceRepository interface (Clean Architecture)
+// - Coordinates specialized services without tight coupling
+// - Manages service lifecycle and resource allocation
+// - Provides unified event streams for the presentation layer
+//
+// Key Responsibilities:
+// - Initialize and manage AudioRecorderService and AudioPlayerService
+// - Coordinate between recording and playback operations
+// - Unify event streams (amplitude, position, completion) 
+// - Handle service state transitions and conflicts
+// - Manage resource cleanup and disposal
+//
+// Service Coordination Rules:
+// - Only one service can be active at a time (recording OR playback)
+// - Automatic cleanup when switching between services
+// - Unified error handling and state management
+// - Stream multiplexing for consistent event delivery
+//
+// Performance Features:
+// - Lazy initialization of stream controllers
+// - Efficient subscription management
+// - Memory leak prevention through proper disposal
+// - Resource pooling for optimal memory usage
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../../domain/entities/recording_entity.dart';
-import '../../domain/repositories/i_audio_service_repository.dart';
-import '../../core/enums/audio_format.dart';
-import 'audio_recorder_service.dart';
-import 'audio_player_service.dart';
+
+// Domain imports
+import '../../domain/entities/recording_entity.dart';       // Recording business entity
+import '../../domain/repositories/i_audio_service_repository.dart'; // Audio service interface
+import '../../core/enums/audio_format.dart';                // Audio format definitions
+
+// Specialized service imports
+import 'audio_recorder_service.dart';  // Handles audio recording operations
+import 'audio_player_service.dart';    // Handles audio playback operations
 
 /// Audio service coordinator that manages both recording and playback
 ///
 /// Coordinates between specialized recording and playback services
 /// while implementing the full IAudioServiceRepository interface.
 /// Provides a unified interface for all audio operations.
+///
+/// Example usage:
+/// ```dart
+/// final coordinator = AudioServiceCoordinator();
+/// await coordinator.initialize();
+/// 
+/// // Start recording
+/// await coordinator.startRecording('/path/to/file.m4a');
+/// 
+/// // Later, stop recording and play it back
+/// await coordinator.stopRecording();
+/// await coordinator.startPlayback('/path/to/file.m4a');
+/// ```
 class AudioServiceCoordinator implements IAudioServiceRepository {
 
   // Specialized services
@@ -198,6 +248,12 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   Stream<double> getRecordingAmplitudeStream() {
     return _amplitudeController?.stream ?? const Stream.empty();
   }
+
+  @override
+  Stream<double>? get amplitudeStream => _amplitudeController?.stream;
+
+  @override
+  Stream<Duration>? get durationStream => _positionController?.stream;
 
   // ==== PLAYBACK OPERATIONS ====
 

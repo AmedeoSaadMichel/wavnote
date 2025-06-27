@@ -37,7 +37,7 @@ class RecordingControls extends StatelessWidget {
         Expanded(
           flex: 2,
           child: _buildControlButton(
-            icon: _buildSkipIcon('10', Icons.fast_rewind),
+            icon: const Icon(Icons.replay_10, color: Colors.cyan, size: 28),
             onPressed: onSkipBackward,
           ),
         ),
@@ -68,14 +68,14 @@ class RecordingControls extends StatelessWidget {
         Expanded(
           flex: 2,
           child: _buildControlButton(
-            icon: _buildSkipIcon('10', Icons.fast_forward),
+            icon: const Icon(Icons.forward_10, color: Colors.cyan, size: 28),
             onPressed: onSkipForward,
           ),
         ),
         Expanded(
           flex: 2,
           child: _buildControlButton(
-            icon: const FaIcon(FontAwesomeIcons.skull, color: Colors.blue, size: 24),
+            icon: const FaIcon(FontAwesomeIcons.skull, color: Colors.cyan, size: 24),
             onPressed: onDelete,
           ),
         ),

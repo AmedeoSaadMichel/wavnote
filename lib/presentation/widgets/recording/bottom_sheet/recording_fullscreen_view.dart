@@ -91,7 +91,7 @@ class RecordingFullscreenView extends StatelessWidget {
       width: 50,
       height: 5,
       decoration: BoxDecoration(
-        color: Colors.grey,
+        color: Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(3),
       ),
     );
@@ -118,7 +118,7 @@ class RecordingFullscreenView extends StatelessWidget {
     return Text(
       '$timeString  $_formattedTime',
       style: TextStyle(
-        color: Colors.grey[400],
+        color: Colors.white.withValues(alpha: 0.7),
         fontSize: 16,
         fontWeight: FontWeight.w400,
       ),

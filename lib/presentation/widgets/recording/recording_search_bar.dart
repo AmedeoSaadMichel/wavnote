@@ -10,7 +10,7 @@ class RecordingSearchBar extends StatefulWidget {
 
   const RecordingSearchBar({
     Key? key,
-    this.hintText = 'Titles, Transcripts',
+    this.hintText = 'Titles',
     required this.onSearchChanged,
     this.onVoiceSearch,
     this.showVoiceIcon = true,
@@ -37,33 +37,52 @@ class _RecordingSearchBarState extends State<RecordingSearchBar> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       height: 44,
       decoration: BoxDecoration(
-        color: Colors.grey[800]?.withValues(alpha: 0.8),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF8E2DE2), // Recording card purple
+            Color(0xFFDA22FF), // Recording card magenta
+            Color(0xFFFF4E50), // Recording card coral
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFA855F7).withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFFF3E8FF), // Light cosmic purple
           fontSize: 16,
+          fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
           hintText: widget.hintText,
-          hintStyle: TextStyle(
-            color: Colors.grey[400],
+          hintStyle: const TextStyle(
+            color: Color(0xFFD1C4E9), // Mystic light purple
             fontSize: 16,
+            fontWeight: FontWeight.w400,
           ),
-          prefixIcon: Icon(
+          prefixIcon: const Icon(
             Icons.search,
-            color: Colors.grey[400],
+            color: Color(0xFFA855F7), // Ethereal purple
             size: 20,
           ),
           suffixIcon: widget.showVoiceIcon
               ? GestureDetector(
                   onTap: widget.onVoiceSearch,
-                  child: Icon(
+                  child: const Icon(
                     Icons.mic,
-                    color: Colors.grey[400],
+                    color: Color(0xFFA855F7), // Ethereal purple
                     size: 20,
                   ),
                 )
@@ -73,9 +92,9 @@ class _RecordingSearchBarState extends State<RecordingSearchBar> {
                         _controller.clear();
                         widget.onSearchChanged('');
                       },
-                      child: Icon(
+                      child: const Icon(
                         Icons.clear,
-                        color: Colors.grey[400],
+                        color: Color(0xFFA855F7), // Ethereal purple
                         size: 20,
                       ),
                     )

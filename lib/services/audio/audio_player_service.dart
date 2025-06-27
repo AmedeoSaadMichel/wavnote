@@ -82,42 +82,95 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Future<void> dispose() async {
+    debugPrint('🔧 Audio player service: Starting disposal...');
+    
+    // Stop any active playback first
     try {
-      // Stop any active playback
       if (_playbackActive) {
         await stopPlaying();
       }
-
-      // Cancel all subscriptions
-      await _positionSubscription?.cancel();
-      await _stateSubscription?.cancel();
-      await _durationSubscription?.cancel();
-      _amplitudeSimulationTimer?.cancel();
-
-      // Close stream controllers
-      await _positionStreamController?.close();
-      await _completionStreamController?.close();
-      await _amplitudeStreamController?.close();
-
-      // Dispose audio player
-      await _audioPlayer?.dispose();
-
-      // Clear cache
-      _preloadedSources.clear();
-      _accessOrder.clear();
-
-      // Reset state
-      _audioPlayer = null;
-      _isServiceInitialized = false;
-      _playbackActive = false;
-      _playbackPaused = false;
-      _currentlyPlayingFile = null;
-
-      debugPrint('✅ Audio player service disposed');
-
     } catch (e) {
-      debugPrint('❌ Error disposing audio player service: $e');
+      debugPrint('⚠️ Error stopping playback during disposal: $e');
     }
+
+    // Cancel all subscriptions with guaranteed cleanup
+    try {
+      await _positionSubscription?.cancel();
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling position subscription: $e');
+    } finally {
+      _positionSubscription = null;
+    }
+
+    try {
+      await _stateSubscription?.cancel();
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling state subscription: $e');
+    } finally {
+      _stateSubscription = null;
+    }
+
+    try {
+      await _durationSubscription?.cancel();
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling duration subscription: $e');
+    } finally {
+      _durationSubscription = null;
+    }
+
+    try {
+      _amplitudeSimulationTimer?.cancel();
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling amplitude timer: $e');
+    } finally {
+      _amplitudeSimulationTimer = null;
+    }
+
+    // Close stream controllers with guaranteed cleanup
+    try {
+      await _positionStreamController?.close();
+    } catch (e) {
+      debugPrint('⚠️ Error closing position stream controller: $e');
+    } finally {
+      _positionStreamController = null;
+    }
+
+    try {
+      await _completionStreamController?.close();
+    } catch (e) {
+      debugPrint('⚠️ Error closing completion stream controller: $e');
+    } finally {
+      _completionStreamController = null;
+    }
+
+    try {
+      await _amplitudeStreamController?.close();
+    } catch (e) {
+      debugPrint('⚠️ Error closing amplitude stream controller: $e');
+    } finally {
+      _amplitudeStreamController = null;
+    }
+
+    // Dispose audio player with guaranteed cleanup
+    try {
+      await _audioPlayer?.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Error disposing audio player: $e');
+    } finally {
+      _audioPlayer = null;
+    }
+
+    // Clear cache and reset state (guaranteed to execute)
+    _preloadedSources.clear();
+    _accessOrder.clear();
+    _isServiceInitialized = false;
+    _playbackActive = false;
+    _playbackPaused = false;
+    _currentlyPlayingFile = null;
+    _playbackPosition = Duration.zero;
+    _playbackDuration = Duration.zero;
+
+    debugPrint('✅ Audio player service disposed successfully');
   }
 
   /// Initialize audio player event listeners
@@ -474,6 +527,12 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   @override
   Stream<double> getRecordingAmplitudeStream() => const Stream.empty();
+
+  @override
+  Stream<double>? get amplitudeStream => null; // Player service doesn't record
+
+  @override
+  Stream<Duration>? get durationStream => null; // Player service doesn't record
 
   // ==== AUDIO FILE OPERATIONS ====
 

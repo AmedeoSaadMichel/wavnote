@@ -1,16 +1,97 @@
 // File: presentation/bloc/settings/settings_bloc.dart
+// 
+// Settings BLoC - Presentation Layer
+// =================================
+//
+// State management for application settings and user preferences in WavNote.
+// This BLoC handles all configuration-related operations and provides persistent
+// storage of user preferences using SQLite database.
+//
+// Key Responsibilities:
+// - Manage audio recording settings (format, quality, sample rate, bitrate)
+// - Handle UI/UX preferences (animations, haptic feedback, visualizations)
+// - Store and retrieve user preferences persistently
+// - Provide default settings with intelligent fallbacks
+// - Export/import settings for backup and transfer
+//
+// Architecture Features:
+// - Implements BLoC pattern for reactive settings management
+// - Uses SQLite for persistent local storage
+// - Maintains immutable state with Equatable
+// - Provides type-safe settings with enums
+// - Handles async operations with proper error management
+//
+// Settings Categories:
+// 1. Audio Settings:
+//    - Audio format (M4A, MP3, WAV, AAC)
+//    - Audio quality presets (High, Medium, Low)
+//    - Sample rate (8kHz to 48kHz)
+//    - Bitrate (64kbps to 320kbps)
+//
+// 2. Visual Settings:
+//    - Real-time waveform visualization
+//    - Amplitude monitoring display
+//    - UI animations and transitions
+//
+// 3. Interaction Settings:
+//    - Haptic feedback for user actions
+//    - Last opened folder persistence
+//
+// 4. Data Management:
+//    - Settings export to JSON
+//    - Settings import from backup
+//    - Factory reset to defaults
+//
+// State Management:
+// - SettingsInitial: Initial loading state
+// - SettingsLoading: Loading settings from storage
+// - SettingsLoaded: Settings loaded and ready
+// - SettingsError: Error loading or saving settings
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../core/enums/audio_format.dart';
-import '../../../data/database/database_helper.dart';
 
-part 'settings_event.dart';
-part 'settings_state.dart';
+// Core imports
+import '../../../core/enums/audio_format.dart';    // Audio format definitions
 
-/// Bloc responsible for managing app settings and configuration
+// Data layer imports
+import '../../../data/database/database_helper.dart'; // Database operations
+
+// BLoC parts
+part 'settings_event.dart'; // Settings events (user actions)
+part 'settings_state.dart'; // Settings states (app states)
+
+/// BLoC responsible for managing app settings and configuration
 ///
 /// Handles audio format preferences, quality settings, and other app preferences.
 /// Provides persistent storage of user preferences.
+///
+/// Key features:
+/// - Comprehensive audio recording configuration
+/// - Real-time settings updates with immediate UI reflection
+/// - Persistent storage with SQLite database
+/// - Settings backup and restore functionality
+/// - Intelligent defaults for optimal user experience
+/// - Type-safe configuration with enums
+///
+/// Example usage:
+/// ```dart
+/// // Load settings
+/// context.read<SettingsBloc>().add(const LoadSettings());
+/// 
+/// // Update audio format
+/// context.read<SettingsBloc>().add(UpdateAudioFormat(AudioFormat.m4a));
+/// 
+/// // Listen to settings changes
+/// BlocBuilder<SettingsBloc, SettingsState>(
+///   builder: (context, state) {
+///     if (state is SettingsLoaded) {
+///       return Text('Format: ${state.settings.audioFormat.name}');
+///     }
+///     return CircularProgressIndicator();
+///   },
+/// );
+/// ```
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   SettingsBloc() : super(const SettingsInitial()) {

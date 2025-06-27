@@ -1,23 +1,70 @@
 // File: presentation/screens/main/main_screen.dart
+// 
+// Main Screen - Presentation Layer
+// ===============================
+//
+// The primary screen of the WavNote app, displaying the folder organization interface.
+// This screen serves as the main entry point where users can:
+//
+// Core Features:
+// - View all voice memo folders (default and custom)
+// - Create new custom folders with icons and colors
+// - Navigate to individual folder contents
+// - Configure audio recording settings (format, quality)
+// - Perform bulk operations on folders (multi-select delete)
+// - Access app settings and preferences
+//
+// Architecture:
+// - Uses BLoC pattern for state management
+// - Implements Clean Architecture principles
+// - Responsive design with midnight gospel inspired UI
+// - Optimized performance with database connection pooling
+//
+// Key BLoCs:
+// - FolderBloc: Manages folder CRUD operations
+// - RecordingBloc: Handles recording lifecycle and cleanup
+// - SettingsBloc: Manages app configuration
+//
+// UI Features:
+// - Gradient background with cosmic color scheme
+// - Card-based folder layout with glassmorphism effects
+// - Edit mode with multi-selection capabilities
+// - Real-time folder count updates
+// - Smooth animations and transitions
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../../bloc/folder/folder_bloc.dart';
-import '../../bloc/recording/recording_bloc.dart';
-import '../../bloc/settings/settings_bloc.dart';
-import '../../widgets/folder/folder_item.dart';
-import '../../widgets/dialogs/create_folder_dialog.dart';
-import '../../widgets/dialogs/audio_format_dialog.dart';
-import '../../../core/routing/app_router.dart';
-import '../../../data/database/database_pool.dart';
 
-import '../../../domain/entities/folder_entity.dart';
-import '../../../core/enums/audio_format.dart';
+// BLoC imports for state management
+import '../../bloc/folder/folder_bloc.dart';      // Folder operations
+import '../../bloc/recording/recording_bloc.dart'; // Recording operations
+import '../../bloc/settings/settings_bloc.dart';   // App settings
+
+// Widget imports
+import '../../widgets/folder/folder_item.dart';           // Individual folder display
+import '../../widgets/dialogs/create_folder_dialog.dart'; // Folder creation dialog
+import '../../widgets/dialogs/audio_format_dialog.dart';  // Audio format selection
+
+// Core imports
+import '../../../core/routing/app_router.dart';       // Navigation routing
+import '../../../data/database/database_pool.dart';   // High-performance database access
+
+// Domain imports
+import '../../../domain/entities/folder_entity.dart'; // Folder business entity
+import '../../../core/enums/audio_format.dart';       // Audio format options
 
 /// Main screen displaying voice memo folders with enhanced recording integration
 ///
 /// This screen shows default and custom folders using the Bloc pattern
 /// for state management and includes a floating action button for quick recording.
+///
+/// Key responsibilities:
+/// - Display folder hierarchy with real-time count updates
+/// - Handle folder creation, deletion, and organization
+/// - Provide access to audio format configuration
+/// - Manage app lifecycle events for optimal performance
+/// - Coordinate with database pool for ultra-fast data access
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -363,7 +410,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                             ),
                             child: const Row(
                               children: [
-                                Icon(Icons.delete, color: Colors.white, size: 16),
+                                FaIcon(FontAwesomeIcons.skull, color: Colors.white, size: 14),
                                 SizedBox(width: 4),
                                 Text(
                                   'Delete',

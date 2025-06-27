@@ -213,15 +213,15 @@ class AudioPlayerManager {
     _audioPlayer.seek(target);
   }
 
-  /// Skip backward
+  /// Skip backward 10 seconds
   void skipBackward() {
-    final newPosition = Duration(milliseconds: (_position.inMilliseconds - 15000).clamp(0, _duration.inMilliseconds));
+    final newPosition = Duration(milliseconds: (_position.inMilliseconds - 10000).clamp(0, _duration.inMilliseconds));
     _audioPlayer.seek(newPosition);
   }
 
-  /// Skip forward
+  /// Skip forward 10 seconds
   void skipForward() {
-    final newPosition = Duration(milliseconds: (_position.inMilliseconds + 15000).clamp(0, _duration.inMilliseconds));
+    final newPosition = Duration(milliseconds: (_position.inMilliseconds + 10000).clamp(0, _duration.inMilliseconds));
     _audioPlayer.seek(newPosition);
   }
 

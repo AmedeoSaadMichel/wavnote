@@ -1,3 +1,19 @@
+// File: domain/entities/folder_entity.dart
+// 
+// Folder Entity - Domain Layer
+// ===========================
+//
+// This file defines the core business entity for voice memo folders in the WavNote app.
+// As part of the Domain layer in Clean Architecture, this entity contains only pure
+// business logic and has no dependencies on external frameworks, databases, or UI.
+//
+// Key Features:
+// - Immutable data structure using Equatable for value equality
+// - Business logic for validation and operations
+// - Factory constructors for different folder types
+// - Data conversion methods for persistence layer
+// - Support for both default (system) and custom (user-created) folders
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import '../../core/enums/folder_type.dart';
@@ -6,6 +22,13 @@ import '../../core/enums/folder_type.dart';
 ///
 /// This entity contains only business logic and has no dependencies
 /// on external frameworks or UI components beyond basic Flutter types.
+/// 
+/// Folders serve as organizational containers for voice recordings, with two types:
+/// - Default folders: System-provided folders (All Recordings, Favorites, Recently Deleted)
+/// - Custom folders: User-created folders for personal organization
+///
+/// The entity includes comprehensive validation, business rules, and immutable
+/// update methods following functional programming principles.
 class FolderEntity extends Equatable {
   final String id;
   final String name;

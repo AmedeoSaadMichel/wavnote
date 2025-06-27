@@ -39,9 +39,15 @@ class RecordingCardInfo extends StatelessWidget {
                     child: Text(
                       recording.name,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFFF3E8FF), // Ethereal light purple
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(
+                            color: Color(0xFF8B5CF6),
+                            blurRadius: 4,
+                          ),
+                        ],
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -55,7 +61,7 @@ class RecordingCardInfo extends StatelessWidget {
               Text(
                 recording.createdAt.userFriendlyFormat,
                 style: TextStyle(
-                  color: Colors.grey[400],
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 14,
                 ),
               ),
@@ -113,7 +119,7 @@ class RecordingCardInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.purple,
+        color: const Color(0xFF5A2B8C),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -133,7 +139,7 @@ class RecordingCardInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.amber,
+        color: Colors.yellowAccent,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(

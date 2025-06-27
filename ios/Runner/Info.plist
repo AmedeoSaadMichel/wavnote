@@ -57,6 +57,10 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<true/>
+		<key>UIFileSharingEnabled</key>
+        <true/>
+        <key>UISupportsDocumentBrowser</key>
+        <true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
 	</dict>

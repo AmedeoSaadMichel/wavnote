@@ -42,6 +42,12 @@ abstract class IAudioServiceRepository {
   /// Get current recording amplitude (for visualization)
   Stream<double> getRecordingAmplitudeStream();
 
+  /// Get current recording amplitude stream (direct access)
+  Stream<double>? get amplitudeStream;
+
+  /// Get current recording duration stream (direct access)
+  Stream<Duration>? get durationStream;
+
   // ==== PLAYBACK OPERATIONS ====
 
   /// Start playing an audio file

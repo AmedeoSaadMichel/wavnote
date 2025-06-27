@@ -1,6 +1,7 @@
 // File: presentation/widgets/recording/recording_edit_toolbar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../bloc/recording/recording_bloc.dart';
 
@@ -63,10 +64,10 @@ class RecordingEditToolbar extends StatelessWidget {
               const SizedBox(width: 16),
               IconButton(
                 onPressed: selectedCount > 0 ? onDeleteSelected : null,
-                icon: Icon(
-                  Icons.delete,
+                icon: FaIcon(
+                  FontAwesomeIcons.skull,
                   color: selectedCount > 0 ? Colors.red : Colors.grey[600],
-                  size: 24,
+                  size: 20,
                 ),
               ),
             ],

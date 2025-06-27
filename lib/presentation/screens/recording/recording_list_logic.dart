@@ -7,6 +7,7 @@ import '../../../core/enums/audio_format.dart';
 import '../../bloc/recording/recording_bloc.dart';
 import '../../bloc/folder/folder_bloc.dart';
 import '../../bloc/settings/settings_bloc.dart';
+import '../../../services/permission/permission_service.dart';
 import 'audio_player_manager.dart';
 
 /// Mixin containing all business logic for RecordingListScreen
@@ -21,16 +22,48 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   String get searchQuery => _searchQuery;
 
   void initializeRecordingList() {
+    print('🚀 VERBOSE: initializeRecordingList() called for folder: ${folder.id} (${folder.name})');
     audioPlayerManager.initialize(() => setState(() {}));
     _loadFolderNames();
     
+    // Clean architecture: Handle permissions at screen level, then load data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('🚀 Loading recordings for folder: ${folder.id}');
+      _ensurePermissionsAndLoadRecordings();
+    });
+  }
+
+  /// Handle permissions at infrastructure level, separate from data flow
+  Future<void> _ensurePermissionsAndLoadRecordings() async {
+    if (!mounted) return;
+    
+    print('🔐 ARCHITECTURE: Ensuring permissions before loading data');
+    
+    try {
+      // Use PermissionService directly - clean separation from BLoC
+      print('🔐 Checking microphone permission...');
+      final hasPermission = await PermissionService.hasMicrophonePermission();
+      print('🔐 Permission check result: $hasPermission');
+      
+      if (!hasPermission) {
+        print('🔐 Requesting microphone permission...');
+        final result = await PermissionService.requestMicrophonePermission();
+        if (!result.isGranted) {
+          print('❌ Permission denied - cannot load recordings');
+          // Could show a permission dialog here
+          return;
+        }
+        print('✅ Permission granted');
+      }
+      
+      // Clean data flow: Initial → Loading → Loaded (no permission states)
+      print('🚀 CLEAN FLOW: Loading recordings for folder: ${folder.id}');
       context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
       
-      print('🔍 Checking recording permissions');
-      context.read<RecordingBloc>().add(const CheckRecordingPermissions());
-    });
+    } catch (e) {
+      print('❌ Error in permission handling: $e');
+      // Fallback: try loading anyway
+      context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
+    }
   }
 
   void _loadFolderNames() {
@@ -90,12 +123,6 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
         print('🔄 Recording count decreased, will refresh folders when navigating back');
       }
       _previousRecordingCount = currentCount;
-    } else if (state is RecordingPermissionStatus) {
-      print('🔐 Permission status: canRecord=${state.canRecord}');
-      if (!state.canRecord) {
-        print('🔐 Requesting microphone permission...');
-        context.read<RecordingBloc>().add(const RequestRecordingPermissions());
-      }
     } else if (state is RecordingError) {
       print('❌ Recording error: ${state.message}');
       ScaffoldMessenger.of(context).showSnackBar(

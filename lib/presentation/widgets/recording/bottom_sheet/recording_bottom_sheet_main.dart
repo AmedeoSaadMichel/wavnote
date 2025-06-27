@@ -289,22 +289,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     maxHeight = MediaQuery.of(context).size.height * 0.9;
 
     // When not recording, sheet is fixed height and not draggable
+    // Add safe area bottom padding to ensure it reaches the screen bottom
     final double currentHeight = widget.isRecording
-        ? minHeight + (maxHeight - minHeight) * _sheetOffset
-        : 180;
+        ? minHeight + (maxHeight - minHeight) * _sheetOffset + MediaQuery.of(context).padding.bottom
+        : 180 + MediaQuery.of(context).padding.bottom;
 
-    return AnimatedPositioned(
+    return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeInOutCubic,
-      height: currentHeight,
-      child: GestureDetector(
-        onVerticalDragStart: widget.isRecording ? _onVerticalDragStart : null,
-        onVerticalDragUpdate: widget.isRecording ? _onVerticalDragUpdate : null,
-        onVerticalDragEnd: widget.isRecording ? _onVerticalDragEnd : null,
-        child: _buildContainer(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOutCubic,
+        height: currentHeight,
+        child: GestureDetector(
+          onVerticalDragStart: widget.isRecording ? _onVerticalDragStart : null,
+          onVerticalDragUpdate: widget.isRecording ? _onVerticalDragUpdate : null,
+          onVerticalDragEnd: widget.isRecording ? _onVerticalDragEnd : null,
+          child: _buildContainer(),
+        ),
       ),
     );
   }
@@ -313,12 +316,22 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   Widget _buildContainer() {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        color: Colors.grey[900]?.withValues(alpha: 0.95),
+      // Add bottom padding to extend beyond safe area
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF8E2DE2), // Main screen purple
+            Color(0xFFDA22FF), // Main screen magenta
+            Color(0xFFFF4E50), // Main screen coral
+          ],
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black26,
             blurRadius: 20,
             spreadRadius: 2,
           ),

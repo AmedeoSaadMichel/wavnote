@@ -86,9 +86,9 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   @override
   Future<void> dispose() async {
+    debugPrint('$_tag: Disposing real audio service...');
+    
     try {
-      debugPrint('$_tag: Disposing real audio service...');
-
       // Stop any ongoing operations
       if (_isRecording) {
         await cancelRecording();
@@ -96,32 +96,66 @@ class AudioRecorderService implements IAudioServiceRepository {
       if (_isPlaying) {
         await stopPlaying();
       }
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Error stopping operations during disposal: $e');
+    }
 
+    // Guaranteed cleanup using try-finally pattern
+    try {
       // Close Flutter Sound instances
       await _recorder?.closeRecorder();
-      await _player?.closePlayer();
-
-      // Close stream controllers
-      await _amplitudeController?.close();
-      await _positionController?.close();
-      await _completionController?.close();
-
-      // Reset state
-      _recorder = null;
-      _player = null;
-      _amplitudeController = null;
-      _positionController = null;
-      _completionController = null;
-      _isInitialized = false;
-      _isRecording = false;
-      _isPlaying = false;
-      _currentRecordingPath = null;
-
-      debugPrint('$_tag: ✅ Real audio service disposed');
-
     } catch (e) {
-      debugPrint('$_tag: ❌ Error during disposal: $e');
+      debugPrint('$_tag: ⚠️ Error closing recorder: $e');
+    } finally {
+      _recorder = null;
     }
+
+    try {
+      await _player?.closePlayer();
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Error closing player: $e');
+    } finally {
+      _player = null;
+    }
+
+    // Close stream controllers with guaranteed cleanup
+    try {
+      await _amplitudeController?.close();
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Error closing amplitude controller: $e');
+    } finally {
+      _amplitudeController = null;
+    }
+
+    try {
+      await _positionController?.close();
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Error closing position controller: $e');
+    } finally {
+      _positionController = null;
+    }
+
+    try {
+      await _completionController?.close();
+    } catch (e) {
+      debugPrint('$_tag: ⚠️ Error closing completion controller: $e');
+    } finally {
+      _completionController = null;
+    }
+
+    // Reset state (guaranteed to execute)
+    _isInitialized = false;
+    _isRecording = false;
+    _isPlaying = false;
+    _isRecordingPaused = false;
+    _isPlaybackPaused = false;
+    _currentRecordingPath = null;
+    _recordingStartTime = null;
+    _pausedDuration = Duration.zero;
+    _pauseStartTime = null;
+    _lastError = null;
+
+    debugPrint('$_tag: ✅ Real audio service disposed successfully');
   }
 
   // ==== PERMISSION METHODS ====
@@ -283,15 +317,19 @@ class AudioRecorderService implements IAudioServiceRepository {
     try {
       debugPrint('$_tag: Stopping real recording...');
 
-      // Stop monitoring first
+      // Capture final duration BEFORE stopping anything to avoid timing issues
+      final finalDuration = _calculateTotalRecordingDuration();
+      debugPrint('$_tag: Final duration captured: ${finalDuration.inSeconds} seconds');
+
+      // Stop monitoring after capturing duration
       _stopAmplitudeMonitoring();
       _stopDurationMonitoring();
 
       // Stop real recording with flutter_sound
       await _recorder!.stopRecorder();
 
-      // Calculate total duration
-      final totalDuration = _calculateTotalRecordingDuration();
+      // Use the captured duration instead of recalculating
+      final totalDuration = finalDuration;
       debugPrint('$_tag: Recording duration: ${totalDuration.inSeconds} seconds');
 
       // Update state
@@ -449,6 +487,12 @@ class AudioRecorderService implements IAudioServiceRepository {
   Stream<double> getRecordingAmplitudeStream() {
     return _amplitudeController?.stream ?? const Stream.empty();
   }
+
+  @override
+  Stream<double>? get amplitudeStream => _amplitudeController?.stream;
+
+  @override
+  Stream<Duration>? get durationStream => _positionController?.stream;
 
   // ==== PLAYBACK OPERATIONS ====
 
@@ -819,7 +863,12 @@ class AudioRecorderService implements IAudioServiceRepository {
       adjustedPausedDuration += now.difference(_pauseStartTime!);
     }
 
-    return totalElapsed - adjustedPausedDuration;
+    final actualDuration = totalElapsed - adjustedPausedDuration;
+    
+    // Add a small buffer (100ms) to account for processing delays
+    // This helps prevent recordings from being slightly trimmed at the end
+    const processingBuffer = Duration(milliseconds: 100);
+    return actualDuration + processingBuffer;
   }
 
   /// Get full file system path

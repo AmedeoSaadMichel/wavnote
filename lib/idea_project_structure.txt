@@ -112,18 +112,18 @@
 │   │   └── i_file_repository.dart              # File repository interface ❌ MISSING
 │   └── usecases/
 │       └── recording/
-│           ├── audio_service_integration_usecase.dart # Audio service integration ✅ IMPLEMENTED
-│           ├── bulk_operations_usecase.dart        # Bulk operations ✅ IMPLEMENTED
-│           ├── create_recording_usecase.dart       # Create new recording ✅ IMPLEMENTED
-│           ├── delete_recording_usecase.dart       # Delete recording ✅ IMPLEMENTED
-│           ├── filter_models.dart                  # Filter models & enums ✅ IMPLEMENTED
-│           ├── filter_recordings_usecase.dart      # Filter recordings ✅ IMPLEMENTED
-│           ├── filter_statistics.dart              # Filter statistics ✅ IMPLEMENTED
-│           ├── import_export_usecase.dart          # Import/export operations ✅ IMPLEMENTED
-│           ├── move_recording_usecase.dart         # Move recordings ✅ IMPLEMENTED
+│           ├── audio_service_integration_usecase.dart # Audio service integration ❌ MISSING
+│           ├── bulk_operations_usecase.dart        # Bulk operations ❌ MISSING
+│           ├── create_recording_usecase.dart       # Create new recording ❌ MISSING
+│           ├── delete_recording_usecase.dart       # Delete recording ❌ MISSING
+│           ├── filter_models.dart                  # Filter models & enums ❌ MISSING
+│           ├── filter_recordings_usecase.dart      # Filter recordings ❌ MISSING
+│           ├── filter_statistics.dart              # Filter statistics ❌ MISSING
+│           ├── import_export_usecase.dart          # Import/export operations ❌ MISSING
+│           ├── move_recording_usecase.dart         # Move recordings ❌ MISSING
 │           ├── pause_recording_usecase.dart        # Pause recording ✅ IMPLEMENTED
-│           ├── play_recording_usecase.dart         # Play recording ✅ IMPLEMENTED
-│           ├── search_recordings_usecase.dart      # Search recordings ✅ IMPLEMENTED
+│           ├── play_recording_usecase.dart         # Play recording ❌ MISSING
+│           ├── search_recordings_usecase.dart      # Search recordings ❌ MISSING
 │           ├── start_recording_usecase.dart        # Start recording ✅ IMPLEMENTED
 │           └── stop_recording_usecase.dart         # Stop recording ✅ IMPLEMENTED
 

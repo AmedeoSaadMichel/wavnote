@@ -1,27 +1,102 @@
 // File: presentation/bloc/recording/recording_bloc.dart
+// 
+// Recording BLoC - Presentation Layer
+// ==================================
+//
+// Central state management for all recording operations in the WavNote app.
+// This BLoC implements the BLoC pattern to provide a clean separation between
+// UI components and business logic for audio recording functionality.
+//
+// Key Responsibilities:
+// - Manage recording lifecycle (start, pause, resume, stop)
+// - Handle real-time recording updates (amplitude, duration)
+// - Coordinate with use cases for complex business logic
+// - Manage recording list operations (load, delete, search, organize)
+// - Handle edit mode and multi-selection for bulk operations
+// - Provide error handling and user feedback
+//
+// Architecture Features:
+// - Uses Clean Architecture with dependency injection
+// - Implements use case pattern for complex operations
+// - Provides reactive streams for real-time UI updates
+// - Maintains immutable state with Equatable
+// - Handles async operations with proper error management
+//
+// State Management:
+// - RecordingInitial: Initial/idle state
+// - RecordingStarting: Preparing to record
+// - RecordingInProgress: Active recording with real-time updates
+// - RecordingPaused: Recording paused by user
+// - RecordingCompleted: Recording finished successfully
+// - RecordingLoaded: List of recordings with edit capabilities
+// - RecordingError: Error states with descriptive messages
+//
+// Real-time Features:
+// - Live amplitude monitoring for waveform visualization
+// - Continuous duration updates during recording
+// - Automatic cleanup of expired recordings (15+ days)
+// - Background recording state preservation
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../domain/entities/recording_entity.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
-import '../../../domain/repositories/i_recording_repository.dart';
-import '../../../core/enums/audio_format.dart';
-import '../../../services/location/geolocation_service.dart';
-import '../../../services/audio/waveform_processing_service.dart';
 
-part 'recording_event.dart';
-part 'recording_state.dart';
+// Domain imports
+import '../../../domain/entities/recording_entity.dart';              // Recording business entity
+import '../../../domain/repositories/i_audio_service_repository.dart'; // Audio service interface
+import '../../../domain/repositories/i_recording_repository.dart';     // Recording data interface
+import '../../../core/enums/audio_format.dart';                       // Audio format definitions
 
-/// Bloc responsible for managing audio recording state and operations
+// Use case imports for complex business logic
+import '../../../domain/usecases/recording/start_recording_usecase.dart'; // Recording initiation
+import '../../../domain/usecases/recording/stop_recording_usecase.dart';  // Recording completion
+import '../../../domain/usecases/recording/pause_recording_usecase.dart'; // Recording pause/resume
+
+// Service imports
+import '../../../services/location/geolocation_service.dart'; // Location-based recording naming
+
+// BLoC parts
+part 'recording_event.dart'; // Recording events (user actions)
+part 'recording_state.dart'; // Recording states (app states)
+
+/// BLoC responsible for managing audio recording state and operations
 ///
 /// Handles recording start/stop/pause, real-time updates, and error states.
 /// Provides clean separation between UI and audio service logic.
+///
+/// Key features:
+/// - Real-time recording with amplitude and duration updates
+/// - Location-based automatic recording naming
+/// - Multi-format audio support (M4A, MP3, WAV, AAC)
+/// - Edit mode with multi-selection capabilities
+/// - Automatic cleanup of expired recordings
+/// - Comprehensive error handling and recovery
+///
+/// Example usage:
+/// ```dart
+/// // Start recording
+/// context.read<RecordingBloc>().add(StartRecording(
+///   folderId: 'my_folder',
+///   format: AudioFormat.m4a,
+/// ));
+/// 
+/// // Listen to state changes
+/// BlocBuilder<RecordingBloc, RecordingState>(
+///   builder: (context, state) {
+///     if (state is RecordingInProgress) {
+///       return Text('Recording: ${state.duration}');
+///     }
+///     return SizedBox.shrink();
+///   },
+/// );
+/// ```
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
-  final GeolocationService _geolocationService;
-  final WaveformProcessingService _waveformProcessingService;
+  final StartRecordingUseCase _startRecordingUseCase;
+  final StopRecordingUseCase _stopRecordingUseCase;
+  final PauseRecordingUseCase _pauseRecordingUseCase;
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
@@ -30,12 +105,24 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   RecordingBloc({
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
-    GeolocationService? geolocationService,
-    WaveformProcessingService? waveformProcessingService,
+    required GeolocationService geolocationService,
+    StartRecordingUseCase? startRecordingUseCase,
+    StopRecordingUseCase? stopRecordingUseCase,
+    PauseRecordingUseCase? pauseRecordingUseCase,
   }) : _audioService = audioService,
         _recordingRepository = recordingRepository,
-        _geolocationService = geolocationService ?? GeolocationService(),
-        _waveformProcessingService = waveformProcessingService ?? WaveformProcessingService(),
+        _startRecordingUseCase = startRecordingUseCase ?? StartRecordingUseCase(
+          audioService: audioService,
+          geolocationService: geolocationService,
+        ),
+        _stopRecordingUseCase = stopRecordingUseCase ?? StopRecordingUseCase(
+          audioService: audioService,
+          recordingRepository: recordingRepository,
+          geolocationService: geolocationService,
+        ),
+        _pauseRecordingUseCase = pauseRecordingUseCase ?? PauseRecordingUseCase(
+          audioService: audioService,
+        ),
         super(const RecordingInitial()) {
 
     on<StartRecording>(_onStartRecording);
@@ -111,66 +198,41 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       print('🎤 Starting recording...');
       emit(const RecordingStarting());
 
-      // Check permissions first
-      final hasPermission = await _audioService.hasMicrophonePermission();
-      if (!hasPermission) {
-        print('❌ No microphone permission');
-        emit(const RecordingError(
-          'Microphone permission required to start recording',
-          errorType: RecordingErrorType.permission,
-        ));
-        return;
-      }
-
-      // Generate file path
-      final filePath = _generateFilePath(event.format, event.folderId);
-      print('📁 Recording file path: $filePath');
-
-      // Start recording
-      final success = await _audioService.startRecording(
-        filePath: filePath,
+      // Use the StartRecordingUseCase
+      final result = await _startRecordingUseCase.execute(
+        folderId: event.folderId ?? 'all_recordings',
         format: event.format,
         sampleRate: event.sampleRate,
         bitRate: event.bitRate,
       );
 
-      if (!success) {
-        print('❌ Failed to start recording');
-        emit(const RecordingError(
-          'Failed to start recording',
-          errorType: RecordingErrorType.recording,
+      if (result.isSuccess) {
+        // Start real-time updates
+        _startAmplitudeUpdates();
+        _startDurationUpdates();
+
+        emit(RecordingInProgress(
+          filePath: result.filePath!,
+          folderId: result.folderId!,
+          folderName: event.folderName,
+          format: result.format!,
+          sampleRate: result.sampleRate!,
+          bitRate: result.bitRate!,
+          duration: Duration.zero,
+          amplitude: 0.0,
+          startTime: result.startTime!,
+          title: result.title,
         ));
-        return;
+
+        print('✅ Recording started successfully: ${result.filePath}');
+      } else {
+        print('❌ Failed to start recording: ${result.errorMessage}');
+        final errorType = _mapStartRecordingErrorType(result.errorType!);
+        emit(RecordingError(
+          result.errorMessage!,
+          errorType: errorType,
+        ));
       }
-
-      // Start real-time updates
-      _startAmplitudeUpdates();
-      _startDurationUpdates();
-
-      // Get location-based title immediately for UI display
-      String? locationTitle;
-      try {
-        locationTitle = await _geolocationService.getRecordingLocationName();
-        print('📍 Got location title for recording: $locationTitle');
-      } catch (e) {
-        print('⚠️ Failed to get location title: $e');
-        locationTitle = null; // Will fall back to "New Recording"
-      }
-
-      emit(RecordingInProgress(
-        filePath: filePath,
-        folderId: event.folderId,
-        folderName: event.folderName,
-        format: event.format,
-        sampleRate: event.sampleRate,
-        bitRate: event.bitRate,
-        duration: Duration.zero,
-        amplitude: 0.0,
-        startTime: DateTime.now(),
-        title: locationTitle, // Now includes the address name
-      ));
-
-      print('✅ Recording started successfully: $filePath');
 
     } catch (e, stackTrace) {
       print('❌ Error starting recording: $e');
@@ -202,46 +264,31 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       _stopAmplitudeUpdates();
       _stopDurationUpdates();
 
-      // Stop recording and get the recording entity
-      final recording = await _audioService.stopRecording();
+      // Get current duration from state before stopping
+      Duration? currentDuration;
+      if (state is RecordingInProgress) {
+        currentDuration = (state as RecordingInProgress).duration;
+      } else if (state is RecordingPaused) {
+        currentDuration = (state as RecordingPaused).duration;
+      }
+      
+      print('\ud83d\udd50 Using BLoC duration for recording: ${currentDuration?.inSeconds ?? 0} seconds');
 
-      if (recording != null) {
-        // Save recording to repository with proper location-based naming
-        try {
-          print('🔄 Starting recording save process...');
-          
-          // Generate location-based name and update the recording
-          print('🔄 Generating location-based name...');
-          final locationBasedRecording = await _generateLocationBasedRecording(recording);
-          
-          // Add waveform data if provided
-          final finalRecording = event.waveformData != null && event.waveformData!.isNotEmpty
-              ? locationBasedRecording.copyWith(waveformData: event.waveformData)
-              : locationBasedRecording;
-          
-          print('✅ Location-based name generated: ${finalRecording.name}');
-          print('🎵 Waveform data included: ${finalRecording.waveformData?.length ?? 0} points');
-          if (finalRecording.waveformData != null && finalRecording.waveformData!.isNotEmpty) {
-            print('🎵 Sample final waveform values: ${finalRecording.waveformData!.take(5).map((v) => v.toStringAsFixed(3)).join(", ")}...');
-          }
-          
-          print('🔄 Saving recording to repository...');
-          final savedRecording = await _recordingRepository.createRecording(finalRecording);
-          print('✅ Recording saved to repository with ID: ${savedRecording.id}');
-          
-          print('🔄 Emitting RecordingCompleted event...');
-          emit(RecordingCompleted(recording: savedRecording));
-          print('✅ Recording completed and saved: ${savedRecording.name} in folder: ${savedRecording.folderId}');
-          
-        } catch (e) {
-          print('❌ Error saving recording to repository: $e');
-          emit(RecordingCompleted(recording: recording));
-          print('✅ Recording completed (not saved to repository): ${recording.name}');
-        }
+      // Use the StopRecordingUseCase with accurate duration from UI state
+      final result = await _stopRecordingUseCase.execute(
+        waveformData: event.waveformData,
+        overrideDuration: currentDuration,
+      );
+
+      if (result.isSuccess) {
+        emit(RecordingCompleted(recording: result.recording!));
+        print('✅ Recording completed and saved: ${result.recording!.name}');
       } else {
-        emit(const RecordingError(
-          'Failed to complete recording',
-          errorType: RecordingErrorType.recording,
+        print('❌ Failed to stop recording: ${result.errorMessage}');
+        final errorType = _mapStopRecordingErrorType(result.errorType!);
+        emit(RecordingError(
+          result.errorMessage!,
+          errorType: errorType,
         ));
       }
 
@@ -262,8 +309,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is! RecordingInProgress) return;
 
     try {
-      final success = await _audioService.pauseRecording();
-      if (success) {
+      final result = await _pauseRecordingUseCase.executePause();
+      if (result.isSuccess) {
         final currentState = state as RecordingInProgress;
         emit(RecordingPaused(
           filePath: currentState.filePath,
@@ -272,10 +319,12 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           format: currentState.format,
           sampleRate: currentState.sampleRate,
           bitRate: currentState.bitRate,
-          duration: currentState.duration,
+          duration: result.duration ?? currentState.duration,
           startTime: currentState.startTime,
         ));
         print('⏸️ Recording paused');
+      } else {
+        print('❌ Failed to pause recording: ${result.errorMessage}');
       }
     } catch (e) {
       print('❌ Error pausing recording: $e');
@@ -290,8 +339,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is! RecordingPaused) return;
 
     try {
-      final success = await _audioService.resumeRecording();
-      if (success) {
+      final result = await _pauseRecordingUseCase.executeResume();
+      if (result.isSuccess) {
         final currentState = state as RecordingPaused;
         emit(RecordingInProgress(
           filePath: currentState.filePath,
@@ -300,7 +349,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           format: currentState.format,
           sampleRate: currentState.sampleRate,
           bitRate: currentState.bitRate,
-          duration: currentState.duration,
+          duration: result.duration ?? currentState.duration,
           amplitude: 0.0,
           startTime: currentState.startTime,
         ));
@@ -310,6 +359,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         _startDurationUpdates();
 
         print('▶️ Recording resumed');
+      } else {
+        print('❌ Failed to resume recording: ${result.errorMessage}');
       }
     } catch (e) {
       print('❌ Error resuming recording: $e');
@@ -488,13 +539,38 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     _durationTimer?.cancel();
   }
 
-  /// Generate file path for recording
-  String _generateFilePath(AudioFormat format, String? folderId) {
-    final now = DateTime.now();
-    final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-    final folderPath = folderId ?? 'all_recordings';
-    final extension = format.fileExtension;
-    return '$folderPath/recording_$timestamp$extension';
+  /// Map StartRecordingErrorType to RecordingErrorType
+  RecordingErrorType _mapStartRecordingErrorType(StartRecordingErrorType errorType) {
+    switch (errorType) {
+      case StartRecordingErrorType.permissionDenied:
+        return RecordingErrorType.permission;
+      case StartRecordingErrorType.audioServiceError:
+        return RecordingErrorType.recording;
+      case StartRecordingErrorType.invalidConfiguration:
+        return RecordingErrorType.state;
+      case StartRecordingErrorType.fileSystemError:
+        return RecordingErrorType.recording;
+      case StartRecordingErrorType.unknown:
+        return RecordingErrorType.unknown;
+    }
+  }
+
+  /// Map StopRecordingErrorType to RecordingErrorType
+  RecordingErrorType _mapStopRecordingErrorType(StopRecordingErrorType errorType) {
+    switch (errorType) {
+      case StopRecordingErrorType.noActiveRecording:
+        return RecordingErrorType.state;
+      case StopRecordingErrorType.audioServiceError:
+        return RecordingErrorType.recording;
+      case StopRecordingErrorType.invalidRecording:
+        return RecordingErrorType.state;
+      case StopRecordingErrorType.repositoryError:
+        return RecordingErrorType.unknown;
+      case StopRecordingErrorType.fileSystemError:
+        return RecordingErrorType.recording;
+      case StopRecordingErrorType.unknown:
+        return RecordingErrorType.unknown;
+    }
   }
 
   /// Handle UI events
@@ -822,7 +898,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       final testRecording = RecordingEntity.create(
         name: 'Test Recording ${DateTime.now().millisecondsSinceEpoch}',
         filePath: '/test/path/recording.m4a',
-        folderId: event.folderId,
+        folderId: event.folderId ?? 'all_recordings',
         format: AudioFormat.m4a,
         duration: const Duration(seconds: 30),
         fileSize: 1024,
@@ -844,95 +920,4 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     }
   }
 
-  /// Generate location-based recording with incremental naming
-  Future<RecordingEntity> _generateLocationBasedRecording(RecordingEntity recording) async {
-    try {
-      // Get the current address from geolocation with timeout
-      String locationName;
-      
-      try {
-        // Add a shorter timeout to prevent blocking
-        locationName = await _geolocationService.getRecordingLocationName()
-            .timeout(const Duration(seconds: 3));
-        print('📍 Using geolocation address for recording: "$locationName"');
-      } catch (e) {
-        print('⚠️ Geolocation timeout/error, using fallback naming: $e');
-        // Use timestamp-based fallback if geolocation fails
-        final now = DateTime.now();
-        locationName = 'Recording ${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
-        print('📍 Using fallback name: "$locationName"');
-      }
-
-      // Get existing recordings in this folder to determine the next number
-      final existingRecordings = await _recordingRepository.getRecordingsByFolder(recording.folderId);
-      
-      // Filter recordings that start with the location name
-      final matchingRecordings = existingRecordings.where((r) => 
-        r.name.startsWith(locationName)
-      ).toList();
-
-      // Determine the next number
-      String newName;
-      if (matchingRecordings.isEmpty) {
-        // First recording with this location name
-        newName = locationName;
-      } else {
-        // Find the highest number used
-        int highestNumber = 1;
-        for (final existingRecording in matchingRecordings) {
-          if (existingRecording.name == locationName) {
-            // This is the base name without number
-            highestNumber = math.max(highestNumber, 1);
-          } else {
-            // Try to extract number from name like "Via Cerlini 19 2"
-            final escapedLocationName = RegExp.escape(locationName);
-            final regex = RegExp('^$escapedLocationName (\\d+)\$');
-            final match = regex.firstMatch(existingRecording.name);
-            if (match != null) {
-              final number = int.tryParse(match.group(1) ?? '0') ?? 0;
-              highestNumber = math.max(highestNumber, number);
-            }
-          }
-        }
-        
-        // Next recording should be the next number
-        newName = '$locationName ${highestNumber + 1}';
-      }
-
-      print('📝 Generated location-based name: "$newName" for location: $locationName');
-      print('📊 Found ${matchingRecordings.length} existing recordings with this location name');
-
-      // Create updated recording with the new name and location
-      return recording.copyWith(
-        name: newName,
-        locationName: locationName,
-      );
-
-    } catch (e) {
-      print('❌ Error generating location-based recording name: $e');
-      // Return original recording if naming fails
-      return recording;
-    }
-  }
-
-  /// Process waveform data in background after recording completion
-  void _processWaveformInBackground(RecordingEntity recording) async {
-    try {
-      print('🎵 Starting background waveform processing for: ${recording.name}');
-      
-      // Process waveform in background (don't await to avoid blocking)
-      _waveformProcessingService.processRecordingWaveform(recording).then((processedRecording) {
-        if (processedRecording != null && processedRecording.waveformData != null) {
-          print('✅ Background waveform processing completed for: ${recording.name}');
-          // Optionally emit an event to refresh the UI with updated waveform data
-          // add(RefreshRecordingWaveform(recording: processedRecording));
-        }
-      }).catchError((error) {
-        print('❌ Background waveform processing failed for ${recording.name}: $error');
-      });
-      
-    } catch (e) {
-      print('❌ Error starting background waveform processing: $e');
-    }
-  }
 }
