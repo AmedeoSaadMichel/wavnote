@@ -128,19 +128,22 @@ class StopRecordingUseCase {
         newName = locationName;
       } else {
         // Find the highest number used
-        int highestNumber = 1;
+        int highestNumber = 0; // Start from 0, so first recording without number = 1
+        
         for (final existingRecording in matchingRecordings) {
           if (existingRecording.name == locationName) {
-            // This is the base name without number
-            highestNumber = 1;
+            // This is the base name without number (represents number 1)
+            highestNumber = highestNumber > 1 ? highestNumber : 1;
           } else {
-            // Try to extract number from name like "Via Cerlini 19 2"
+            // Try to extract number from name like "88 Bostall Lane 2"
             final escapedLocationName = RegExp.escape(locationName);
             final regex = RegExp('^$escapedLocationName (\\d+)\$');
             final match = regex.firstMatch(existingRecording.name);
             if (match != null) {
               final number = int.tryParse(match.group(1) ?? '0') ?? 0;
-              highestNumber = highestNumber > number ? highestNumber : number;
+              if (number > highestNumber) {
+                highestNumber = number;
+              }
             }
           }
         }

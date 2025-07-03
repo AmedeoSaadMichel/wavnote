@@ -37,8 +37,11 @@ class _WaveformWidgetState extends State<WaveformWidget> {
   @override
   void didUpdateWidget(WaveformWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update position if initial progress changed from parent
-    if (oldWidget.initialProgress != widget.initialProgress) {
+    // Only update position if there's a significant change to prevent flutter from excessive rebuilds
+    const positionThreshold = 0.001; // 0.1% threshold
+    final positionDifference = (oldWidget.initialProgress - widget.initialProgress).abs();
+    
+    if (positionDifference > positionThreshold) {
       _currentPosition = widget.initialProgress.clamp(0.0, 1.0);
     }
   }

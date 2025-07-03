@@ -43,7 +43,7 @@ class AudioServiceFactory {
 
   /// Create dedicated player service only
   static AudioPlayerService createPlayerService() {
-    return AudioPlayerService();
+    return AudioPlayerService.instance;
   }
 
   /// Create service for recording screen (UPDATED)

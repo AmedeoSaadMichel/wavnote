@@ -19,6 +19,7 @@ abstract class RecordingRepositoryBase {
           folder_id TEXT NOT NULL,
           format_index INTEGER NOT NULL,
           duration_seconds INTEGER NOT NULL,
+          duration_milliseconds INTEGER,
           file_size INTEGER NOT NULL,
           sample_rate INTEGER NOT NULL,
           latitude REAL,

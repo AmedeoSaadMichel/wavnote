@@ -44,6 +44,7 @@ import 'package:flutter/material.dart';
 
 // Domain imports
 import '../../../../domain/entities/recording_entity.dart'; // Recording business entity
+import '../../../../services/audio/audio_state_manager.dart'; // Audio state management
 
 // Widget component imports
 import 'recording_card_info.dart';    // Recording metadata display
@@ -72,7 +73,10 @@ class RecordingCard extends StatefulWidget {
   final VoidCallback? onRestore; // Callback for restore action
   final VoidCallback? onToggleFavorite; // Callback for toggle favorite
   
-  // Audio state passed from parent
+  // OPTIMIZED: Audio state manager instead of individual parameters
+  final AudioStateManager? audioStateManager;
+  
+  // Legacy parameters for backward compatibility
   final bool isPlaying;
   final bool isLoading;
   final Duration currentPosition;
@@ -92,6 +96,34 @@ class RecordingCard extends StatefulWidget {
   final bool isEditMode; // Whether edit mode is active
   final bool isSelected; // Whether this recording is selected
   final VoidCallback? onSelectionToggle; // Callback for selection toggle
+  
+  // Performance optimization: Override operator == to enable better widget caching
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is RecordingCard &&
+        other.recording.id == recording.id &&
+        other.isExpanded == isExpanded &&
+        other.isPlaying == isPlaying &&
+        other.isLoading == isLoading &&
+        other.isEditMode == isEditMode &&
+        other.isSelected == isSelected &&
+        // Only check position if expanded (to prevent constant rebuilds)
+        (!isExpanded || other.currentPosition == currentPosition) &&
+        other.actualDuration == actualDuration;
+  }
+  
+  @override
+  int get hashCode => Object.hash(
+    recording.id,
+    isExpanded,
+    isPlaying,
+    isLoading,
+    isEditMode,
+    isSelected,
+    isExpanded ? currentPosition : null,
+    actualDuration,
+  );
 
   const RecordingCard({
     Key? key,
@@ -104,6 +136,9 @@ class RecordingCard extends StatefulWidget {
     required this.onMoreActions,
     this.onRestore,
     this.onToggleFavorite,
+    // OPTIMIZED: Audio state manager (preferred)
+    this.audioStateManager,
+    // Legacy parameters for backward compatibility
     required this.isPlaying,
     required this.isLoading,
     required this.currentPosition,
@@ -200,12 +235,12 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     
     // Detect when audio stops playing (end of recording)
     if (widget.isExpanded && _wasPlayingLastUpdate && !widget.isPlaying) {
-      final actualDuration = widget.actualDuration ?? widget.recording.duration;
-      final totalDurationMs = actualDuration.inMilliseconds;
+      final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
+      final totalDurationMs = effectiveDuration.inMilliseconds;
       final currentPositionMs = widget.currentPosition.inMilliseconds;
       final isNearEnd = (totalDurationMs - currentPositionMs) <= 500; // Within 500ms of end
       
-      print('🔚 Audio stopped - Position: ${currentPositionMs}ms/${totalDurationMs}ms (actual), Near end: $isNearEnd');
+      print('🔚 Audio stopped - Position: ${currentPositionMs}ms/${totalDurationMs}ms (effective), Near end: $isNearEnd');
       
       if (isNearEnd) {
         print('🔚 Recording finished, resetting slider to beginning');
@@ -222,9 +257,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
   }
   
   void _syncSliderWithAudio() {
-    // Use actual audio player duration when available, fallback to recording duration
-    final actualDuration = widget.actualDuration ?? widget.recording.duration;
-    final totalDurationMs = actualDuration.inMilliseconds;
+    // Always prioritize actual audio player duration when available
+    final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
+    final totalDurationMs = effectiveDuration.inMilliseconds;
     final currentPositionMs = widget.currentPosition.inMilliseconds;
     
     if (totalDurationMs > 0 && widget.isExpanded) {
@@ -314,16 +349,24 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
         }
       },
       onTap: () {
-        // Hide swipe actions when tapping
+        print('🎯 TAP: swipeVisible=$_isSwipeActionsVisible, favoriteVisible=$_isFavoriteActionVisible, editMode=${widget.isEditMode}');
+        
+        // SIMPLIFIED LOGIC: Always try expansion first, then hide actions
+        if (!widget.isEditMode) {
+          print('🎯 Calling onTap for recording: ${widget.recording.name}');
+          widget.onTap?.call();
+        } else {
+          print('🎯 Edit mode - calling selection toggle');
+          widget.onSelectionToggle?.call();
+        }
+        
+        // Hide any visible actions after handling main tap
         if (_isSwipeActionsVisible) {
           _hideSwipeActions();
-        } else if (_isFavoriteActionVisible) {
-          _hideFavoriteAction();
-        } else if (!widget.isEditMode) {
-          // Normal mode, expand/collapse recording
-          widget.onTap?.call();
         }
-        // In edit mode, selection is handled by the toggle button only
+        if (_isFavoriteActionVisible) {
+          _hideFavoriteAction();
+        }
       },
       child: Stack(
         clipBehavior: Clip.none,
@@ -550,16 +593,14 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: widget.isEditMode ? null : widget.onTap,
-            child: SizedBox(
-              height: 50,
-              child: RecordingCardInfo(
-                recording: widget.recording,
-                currentFolderId: widget.currentFolderId,
-                folderNames: widget.folderNames,
-                onToggleFavorite: widget.onToggleFavorite,
-              ),
+          // Remove conflicting GestureDetector - main handler covers all taps
+          SizedBox(
+            height: 50,
+            child: RecordingCardInfo(
+              recording: widget.recording,
+              currentFolderId: widget.currentFolderId,
+              folderNames: widget.folderNames,
+              onToggleFavorite: widget.onToggleFavorite,
             ),
           ),
           const SizedBox(height: 12),
@@ -590,8 +631,96 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
 
 
 
-  /// Build audio progress slider
+  /// Build audio progress slider - OPTIMIZED with ValueListenableBuilder
   Widget _buildAudioSlider() {
+    // Use optimized ValueListenableBuilder if audioStateManager is available
+    if (widget.audioStateManager != null) {
+      return _buildOptimizedAudioSlider();
+    }
+    
+    // Fallback to legacy approach for backward compatibility
+    return _buildLegacyAudioSlider();
+  }
+  
+  /// OPTIMIZED: Audio slider with ValueListenableBuilder (no setState)
+  Widget _buildOptimizedAudioSlider() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        children: [
+          // Progress slider - OPTIMIZED
+          ValueListenableBuilder<Duration>(
+            valueListenable: widget.audioStateManager!.positionNotifier,
+            builder: (context, position, child) {
+              return ValueListenableBuilder<Duration>(
+                valueListenable: widget.audioStateManager!.durationNotifier,
+                builder: (context, duration, child) {
+                  final progress = duration.inMilliseconds > 0 
+                      ? position.inMilliseconds / duration.inMilliseconds 
+                      : 0.0;
+                  
+                  return SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 6.0,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12.0),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
+                      activeTrackColor: const Color(0xFF8B5CF6), // Cosmic purple
+                      inactiveTrackColor: const Color(0xFF2E1065).withValues(alpha: 0.4), // Midnight purple
+                      thumbColor: const Color(0xFFA855F7), // Ethereal purple
+                      overlayColor: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                    ),
+                    child: Slider(
+                      value: progress.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: widget.isLoading ? null : (value) => widget.onSeek(value),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          
+          // Time labels - OPTIMIZED
+          ValueListenableBuilder<Duration>(
+            valueListenable: widget.audioStateManager!.positionNotifier,
+            builder: (context, position, child) {
+              return ValueListenableBuilder<Duration>(
+                valueListenable: widget.audioStateManager!.durationNotifier,
+                builder: (context, duration, child) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatTime(position),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          _formatTime(duration),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// LEGACY: Original audio slider approach (for backward compatibility)
+  Widget _buildLegacyAudioSlider() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
@@ -629,7 +758,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                   ),
                 ),
                 Text(
-                  _formatTime(widget.recording.duration),
+                  _formatTime(widget.actualDuration ?? widget.recording.duration),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 12,

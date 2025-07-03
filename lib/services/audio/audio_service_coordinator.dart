@@ -89,7 +89,7 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
 
   AudioServiceCoordinator() {
     _recordingService = AudioRecorderService();
-    _playbackService = AudioPlayerService();
+    _playbackService = AudioPlayerService.instance;
   }
 
   // ==== INITIALIZATION ====

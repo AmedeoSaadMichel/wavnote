@@ -12,7 +12,7 @@ import '../../widgets/recording/recording_card/recording_card.dart';
 import '../../widgets/recording/recording_list_header.dart';
 import '../../widgets/recording/pull_to_search_list.dart';
 import '../../widgets/common/skeleton_screen.dart';
-import 'audio_player_manager.dart';
+import '../../../services/audio/audio_player_service.dart';
 import 'recording_list_logic.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_router.dart';
@@ -40,10 +40,9 @@ class RecordingListScreen extends StatefulWidget {
 
 class _RecordingListScreenState extends State<RecordingListScreen> with RecordingListLogic {
   @override
-  final AudioPlayerManager audioPlayerManager = AudioPlayerManager();
-  
-  @override
   FolderEntity get folder => widget.folder;
+  
+  AudioPlayerService get audioPlayerService => AudioPlayerService.instance;
 
   @override
   void initState() {
@@ -54,7 +53,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
 
   @override
   void dispose() {
-    audioPlayerManager.dispose();
+    // AudioPlayerService is a singleton, don't dispose it here
     super.dispose();
   }
 
@@ -124,6 +123,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                         context.goToMain();
                         print('📁 RecordingListScreen: Navigation to main completed');
                       },
+                      onShowFormatDialog: _showAudioFormatDialog,
                     ),
                     Expanded(
                       child: _buildRecordingsList(context),
@@ -229,33 +229,37 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                 : null,
             itemBuilder: (context, index) {
               final recording = filteredRecordings[index];
-              final isExpanded = audioPlayerManager.expandedRecordingId == recording.id;
+              final isExpanded = audioPlayerService.expandedRecordingId == recording.id;
+              print('🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded');
               return RecordingCard(
-                recording: recording,
-                isExpanded: isExpanded,
-                onTap: () => expandRecording(recording),
-                onShowWaveform: () {},
-                onDelete: () => deleteRecording(recording),
-                onMoveToFolder: () => moveRecordingToFolder(recording),
-                onMoreActions: () => showMoreActions(recording),
-                onRestore: () => restoreRecording(recording),
-                onToggleFavorite: () => toggleFavoriteRecording(recording),
-                isPlaying: isExpanded ? audioPlayerManager.isPlaying : false,
-                isLoading: isExpanded ? audioPlayerManager.isLoading : false,
-                currentPosition: isExpanded ? audioPlayerManager.position : Duration.zero,
-                actualDuration: isExpanded ? audioPlayerManager.duration : null,
-                onPlayPause: togglePlayback,
-                onSeek: seekToPosition,
-                onSkipBackward: skipBackward,
-                onSkipForward: skipForward,
-                currentFolderId: widget.folder.id,
-                folderNames: folderNames,
-                isEditMode: state.isEditMode,
-                isSelected: state.selectedRecordings.contains(recording.id),
-                onSelectionToggle: () => context.read<RecordingBloc>().add(
-                  ToggleRecordingSelection(recordingId: recording.id),
-                ),
-              );
+                    recording: recording,
+                    isExpanded: isExpanded,
+                    onTap: () => expandRecording(recording),
+                    onShowWaveform: () {},
+                    onDelete: () => deleteRecording(recording),
+                    onMoveToFolder: () => moveRecordingToFolder(recording),
+                    onMoreActions: () => showMoreActions(recording),
+                    onRestore: () => restoreRecording(recording),
+                    onToggleFavorite: () => toggleFavoriteRecording(recording),
+                    // OPTIMIZED: Always pass audio state manager (only used when expanded)
+                    audioStateManager: audioPlayerService.audioState,
+                    // Legacy parameters for backward compatibility
+                    isPlaying: isExpanded ? audioPlayerService.isCurrentlyPlaying : false,
+                    isLoading: isExpanded ? audioPlayerService.isLoading : false,
+                    currentPosition: isExpanded ? audioPlayerService.position : Duration.zero,
+                    actualDuration: isExpanded ? audioPlayerService.duration : null,
+                    onPlayPause: togglePlayback,
+                    onSeek: seekToPosition,
+                    onSkipBackward: skipBackward,
+                    onSkipForward: skipForward,
+                    currentFolderId: widget.folder.id,
+                    folderNames: folderNames,
+                    isEditMode: state.isEditMode,
+                    isSelected: state.selectedRecordings.contains(recording.id),
+                    onSelectionToggle: () => context.read<RecordingBloc>().add(
+                      ToggleRecordingSelection(recordingId: recording.id),
+                    ),
+                  );
             },
           );
         }
@@ -370,7 +374,8 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           : null,
       itemBuilder: (context, index) {
         final recording = filteredRecordings[index];
-        final isExpanded = audioPlayerManager.expandedRecordingId == recording.id;
+        final isExpanded = audioPlayerService.expandedRecordingId == recording.id;
+        print('🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded');
         return RecordingCard(
           recording: recording,
           isExpanded: isExpanded,
@@ -381,10 +386,13 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           onMoreActions: () => showMoreActions(recording),
           onRestore: () => restoreRecording(recording),
           onToggleFavorite: () => toggleFavoriteRecording(recording),
-          isPlaying: isExpanded ? audioPlayerManager.isPlaying : false,
-          isLoading: isExpanded ? audioPlayerManager.isLoading : false,
-          currentPosition: isExpanded ? audioPlayerManager.position : Duration.zero,
-          actualDuration: isExpanded ? audioPlayerManager.duration : null,
+          // OPTIMIZED: Always pass audio state manager (only used when expanded)
+          audioStateManager: audioPlayerService.audioState,
+          // Legacy parameters for backward compatibility
+          isPlaying: isExpanded ? audioPlayerService.isCurrentlyPlaying : false,
+          isLoading: isExpanded ? audioPlayerService.isLoading : false,
+          currentPosition: isExpanded ? audioPlayerService.position : Duration.zero,
+          actualDuration: isExpanded ? audioPlayerService.duration : null,
           onPlayPause: togglePlayback,
           onSeek: seekToPosition,
           onSkipBackward: skipBackward,
@@ -406,10 +414,12 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
 class _RecordingListHeaderWrapper extends StatelessWidget {
   final FolderEntity folder;
   final VoidCallback onBack;
+  final VoidCallback onShowFormatDialog;
 
   const _RecordingListHeaderWrapper({
     required this.folder,
     required this.onBack,
+    required this.onShowFormatDialog,
   });
 
   @override
@@ -418,6 +428,7 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
     return RecordingListHeader(
       folderName: folder.name,
       onBack: onBack,
+      onShowFormatDialog: onShowFormatDialog,
     );
   }
 }

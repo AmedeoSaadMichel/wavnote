@@ -76,8 +76,12 @@ class _FullScreenWaveformState extends State<FullScreenWaveform>
   void didUpdateWidget(FullScreenWaveform oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    // Throttle amplitude updates to prevent excessive rebuilds
+    final amplitudeDifference = (widget.amplitude - oldWidget.amplitude).abs();
+    const amplitudeThreshold = 0.05; // Only update if amplitude changes significantly
+    
     // Update amplitude history
-    if (widget.amplitude != oldWidget.amplitude) {
+    if (amplitudeDifference > amplitudeThreshold) {
       setState(() {
         _amplitudeHistory.add(widget.amplitude);
         if (_amplitudeHistory.length > _maxBars) {

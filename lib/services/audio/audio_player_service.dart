@@ -3,17 +3,29 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../../domain/repositories/i_audio_service_repository.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
+import 'audio_state_manager.dart';
 
 /// Audio playback service using just_audio
 ///
 /// Provides complete audio playback functionality for the voice memo app.
 /// Focused specifically on playback operations while implementing the full
 /// IAudioServiceRepository interface for compatibility.
+/// 
+/// Now includes expansion logic and state management previously in AudioPlayerManager.
 class AudioPlayerService implements IAudioServiceRepository {
+
+  // Singleton instance
+  static AudioPlayerService? _instance;
+  static AudioPlayerService get instance => _instance ??= AudioPlayerService._internal();
+  
+  AudioPlayerService._internal();
 
   // Core audio player
   AudioPlayer? _audioPlayer;
@@ -21,6 +33,17 @@ class AudioPlayerService implements IAudioServiceRepository {
   // Service state
   bool _isServiceInitialized = false;
   String? _currentlyPlayingFile;
+
+  // Expansion state (from AudioPlayerManager)
+  String? _expandedRecordingId;
+  bool _isLoading = false;
+  bool _hasCompletedCurrentPlayback = false;
+  
+  // AudioStateManager for optimized UI updates
+  AudioStateManager? _audioStateManager;
+  
+  // Callback for expansion state changes
+  VoidCallback? _onExpansionChanged;
 
   // Playback state
   bool _playbackActive = false;
@@ -44,33 +67,57 @@ class AudioPlayerService implements IAudioServiceRepository {
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<PlayerState>? _stateSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
+  
+  // Timer for throttled updates (from AudioPlayerManager)
+  Timer? _positionUpdateTimer;
+  static const Duration _updateInterval = Duration(milliseconds: 100); // 10fps
+  
+  // Performance optimization: throttle position updates
+  DateTime _lastPositionUpdate = DateTime(0);
+  static const Duration _positionUpdateInterval = Duration(milliseconds: 500); // 2 updates per second
 
   // Amplitude simulation
   Timer? _amplitudeSimulationTimer;
 
   // ==== SERVICE LIFECYCLE ====
 
+  /// Initialize audio player with expansion callback
   @override
-  Future<bool> initialize() async {
+  Future<bool> initialize([VoidCallback? onStateChanged]) async {
     try {
+      debugPrint('🔧 AUDIO_SVC: Initialize called, isInitialized: $_isServiceInitialized');
+      
       // Clean up any existing instance
       if (_isServiceInitialized) {
+        debugPrint('🔧 AUDIO_SVC: Service already initialized, disposing first');
         await dispose();
       }
 
       // Create new audio player instance
       _audioPlayer = AudioPlayer();
+      
+      // Initialize AudioStateManager
+      _audioStateManager = AudioStateManager();
 
       // Initialize stream controllers
       _positionStreamController = StreamController<Duration>.broadcast();
       _completionStreamController = StreamController<void>.broadcast();
       _amplitudeStreamController = StreamController<double>.broadcast();
+      
+      // Setup expansion callback
+      if (onStateChanged != null) {
+        debugPrint('🔧 AUDIO_SVC: Setting up expansion callback');
+        _audioStateManager!.addListener(onStateChanged);
+        _onExpansionChanged = onStateChanged;
+      } else {
+        debugPrint('⚠️ AUDIO_SVC: No expansion callback provided');
+      }
 
       // Setup audio player listeners
       await _initializePlayerListeners();
 
       _isServiceInitialized = true;
-      debugPrint('✅ Audio player service initialized successfully');
+      debugPrint('✅ Audio player service initialized successfully with callback: ${_onExpansionChanged != null}');
       return true;
 
     } catch (e) {
@@ -160,6 +207,24 @@ class AudioPlayerService implements IAudioServiceRepository {
       _audioPlayer = null;
     }
 
+    // Dispose AudioStateManager
+    try {
+      _audioStateManager?.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Error disposing audio state manager: $e');
+    } finally {
+      _audioStateManager = null;
+    }
+    
+    // Cancel position update timer
+    try {
+      _positionUpdateTimer?.cancel();
+    } catch (e) {
+      debugPrint('⚠️ Error cancelling position timer: $e');
+    } finally {
+      _positionUpdateTimer = null;
+    }
+
     // Clear cache and reset state (guaranteed to execute)
     _preloadedSources.clear();
     _accessOrder.clear();
@@ -169,85 +234,364 @@ class AudioPlayerService implements IAudioServiceRepository {
     _currentlyPlayingFile = null;
     _playbackPosition = Duration.zero;
     _playbackDuration = Duration.zero;
+    _lastPositionUpdate = DateTime(0);
+    _expandedRecordingId = null;
+    _isLoading = false;
+    _hasCompletedCurrentPlayback = false;
+    _onExpansionChanged = null;
 
     debugPrint('✅ Audio player service disposed successfully');
   }
 
-  /// Initialize audio player event listeners
+  /// Initialize audio player event listeners (enhanced from AudioPlayerManager)
   Future<void> _initializePlayerListeners() async {
-    if (_audioPlayer == null) return;
+    if (_audioPlayer == null || _audioStateManager == null) return;
 
     try {
-      // Position tracking
-      _positionSubscription = _audioPlayer!.positionStream.listen(
-            (position) {
-          _playbackPosition = position;
-          _positionStreamController?.add(position);
-        },
-        onError: (error) => debugPrint('❌ Position stream error: $error'),
-      );
-
-      // State changes
-      _stateSubscription = _audioPlayer!.playerStateStream.listen(
-            (state) => _handlePlayerStateChange(state),
-        onError: (error) => debugPrint('❌ Player state error: $error'),
-      );
-
-      // Duration updates
-      _durationSubscription = _audioPlayer!.durationStream.listen(
-            (duration) {
-          if (duration != null) {
-            _playbackDuration = duration;
+      // OPTIMIZED: Throttled position updates (10fps instead of 60fps)
+      _positionSubscription = _audioPlayer!.positionStream.listen((position) {
+        // Skip processing if already completed to prevent unnecessary rebuilds
+        if (_hasCompletedCurrentPlayback && !_audioStateManager!.isPlaying) {
+          return;
+        }
+        
+        // Handle position overrun by forcing completion
+        if (_audioStateManager!.duration.inMilliseconds > 0 && position.inMilliseconds > _audioStateManager!.duration.inMilliseconds) {
+          if (!_hasCompletedCurrentPlayback) {
+            debugPrint('⚠️ Position overrun detected: ${position.inMilliseconds}ms > ${_audioStateManager!.duration.inMilliseconds}ms, forcing completion');
+            _audioStateManager!.updatePosition(_audioStateManager!.duration); // Cap at 100%
+            _audioStateManager!.updatePlaybackState(isPlaying: false);
+            _hasCompletedCurrentPlayback = true;
+            
+            // Force stop the audio player to prevent continuous overrun
+            _audioPlayer!.pause().then((_) {
+              _audioPlayer!.seek(Duration.zero);
+              _audioStateManager!.updatePosition(Duration.zero); // Update position to 0 after seek
+              debugPrint('🔚 Audio forcibly stopped due to overrun, position reset to 0');
+            });
           }
-        },
-        onError: (error) => debugPrint('❌ Duration stream error: $error'),
-      );
+          return; // Don't process further or trigger more rebuilds
+        }
+        
+        // OPTIMIZED: Update position via AudioStateManager (no setState)
+        _audioStateManager!.updatePosition(position);
+        _playbackPosition = position;
+        
+        // Emit position for legacy stream consumers
+        final now = DateTime.now();
+        if (now.difference(_lastPositionUpdate) >= _positionUpdateInterval) {
+          _positionStreamController?.add(position);
+          _lastPositionUpdate = now;
+        }
+        
+        if (_audioStateManager!.duration.inMilliseconds > 0) {
+          final percentage = (position.inMilliseconds / _audioStateManager!.duration.inMilliseconds * 100);
+          debugPrint('🕒 Position: ${_formatTime(position)} (${position.inMilliseconds}ms) / ${_formatTime(_audioStateManager!.duration)} (${_audioStateManager!.duration.inMilliseconds}ms) = ${percentage.toStringAsFixed(1)}%');
+          
+          // Check for near-completion to trigger natural completion handling
+          if (percentage >= 99.5 && _audioStateManager!.isPlaying && !_hasCompletedCurrentPlayback) {
+            debugPrint('🔚 Audio approaching completion at ${percentage.toStringAsFixed(1)}% (${position.inMilliseconds}ms/${_audioStateManager!.duration.inMilliseconds}ms)');
+            _hasCompletedCurrentPlayback = true;
+            _audioStateManager!.updatePlaybackState(isPlaying: false);
+            _audioStateManager!.updatePosition(_audioStateManager!.duration); // Set to 100% completion
+          }
+        } else {
+          debugPrint('🕒 Position: ${_formatTime(position)} (${position.inMilliseconds}ms) / ${_formatTime(_audioStateManager!.duration)} (${_audioStateManager!.duration.inMilliseconds}ms) - duration not set');
+        }
+      }, onError: (error) => debugPrint('❌ Position stream error: $error'));
+
+      _durationSubscription = _audioPlayer!.durationStream.listen((duration) {
+        if (duration != null && duration > Duration.zero) {
+          final oldDuration = _audioStateManager!.duration;
+          _audioStateManager!.updateDuration(duration); // OPTIMIZED: Update via AudioStateManager
+          _playbackDuration = duration;
+          debugPrint('🕒 Duration updated from audio player:');
+          debugPrint('   Old: ${_formatTime(oldDuration)} (${oldDuration.inMilliseconds}ms)');
+          debugPrint('   New: ${_formatTime(duration)} (${duration.inMilliseconds}ms)');
+          debugPrint('   Difference: ${(duration.inMilliseconds - oldDuration.inMilliseconds)}ms');
+        } else if (duration != null) {
+          debugPrint('🕒 Audio player reported zero duration, keeping current: ${_formatTime(_audioStateManager!.duration)} (${_audioStateManager!.duration.inMilliseconds}ms)');
+        }
+      }, onError: (error) => debugPrint('❌ Duration stream error: $error'));
+
+      _stateSubscription = _audioPlayer!.playerStateStream.listen((state) {
+        // OPTIMIZED: Update playing state via AudioStateManager
+        _audioStateManager!.updatePlaybackState(
+          isPlaying: state.playing,
+          isBuffering: state.processingState == ProcessingState.buffering,
+        );
+        _playbackActive = state.playing;
+        _playbackPaused = !state.playing && state.processingState == ProcessingState.ready;
+        
+        // Trigger UI rebuild when playback state changes
+        _onExpansionChanged?.call();
+        
+        debugPrint('🎵 Player state changed: playing=${state.playing}, processingState=${state.processingState}');
+        
+        // Handle natural completion
+        if (state.processingState == ProcessingState.completed && !_hasCompletedCurrentPlayback) {
+          debugPrint('🔚 Audio completed naturally at 100%');
+          _audioStateManager!.updatePlaybackState(isPlaying: false);
+          _audioStateManager!.updatePosition(_audioStateManager!.duration); // Set to full duration for 100% completion
+          _hasCompletedCurrentPlayback = true;
+          _playbackActive = false;
+          _playbackPaused = false;
+          _completionStreamController?.add(null);
+          
+          // Auto-reset to beginning after completion (with longer delay to prevent loops)
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            if (_hasCompletedCurrentPlayback) { // Double-check to prevent multiple resets
+              _audioPlayer!.seek(Duration.zero);
+              _audioStateManager!.updatePosition(Duration.zero);
+              debugPrint('🔚 Audio reset to beginning after natural completion');
+            }
+          });
+        }
+        
+        // Debug all state changes
+        debugPrint('🎵 Audio state: playing=${state.playing}, processing=${state.processingState}');
+      }, onError: (error) => debugPrint('❌ Player state error: $error'));
 
     } catch (e) {
       debugPrint('❌ Error setting up player listeners: $e');
     }
   }
 
-  /// Handle audio player state changes
-  void _handlePlayerStateChange(PlayerState state) {
-    switch (state.processingState) {
-      case ProcessingState.completed:
-        _playbackActive = false;
-        _playbackPaused = false;
-        _stopAmplitudeSimulation();
-        _completionStreamController?.add(null);
-        debugPrint('🎵 Playback completed');
-        break;
+  // This method is now integrated into _initializePlayerListeners()
 
-      case ProcessingState.ready:
-        if (state.playing) {
-          _playbackActive = true;
-          _playbackPaused = false;
-          _startAmplitudeSimulation();
-          debugPrint('🎵 Playback active');
-        } else {
-          _playbackActive = false;
-          _playbackPaused = true;
-          _stopAmplitudeSimulation();
-          debugPrint('🎵 Playback paused');
-        }
-        break;
-
-      case ProcessingState.idle:
-        _playbackActive = false;
-        _playbackPaused = false;
-        _stopAmplitudeSimulation();
-        break;
-
-      case ProcessingState.loading:
-      case ProcessingState.buffering:
-      // Keep current state during loading
-        break;
+  // ==== EXPANSION AND RECORDING OPERATIONS (from AudioPlayerManager) ====
+  
+  /// Expand/collapse recording
+  Future<void> expandRecording(RecordingEntity recording) async {
+    debugPrint('🎯 AUDIO_SVC: expandRecording called for: ${recording.name} (ID: ${recording.id}), current expanded: $_expandedRecordingId');
+    
+    if (_expandedRecordingId == recording.id) {
+      // Collapse current recording
+      debugPrint('🎯 AUDIO_SVC: Collapsing recording: ${recording.name}');
+      await stopPlaying();
+      _expandedRecordingId = null;
+      _audioStateManager?.reset(); // OPTIMIZED: Reset all state via AudioStateManager
+      debugPrint('🎯 AUDIO_SVC: Calling _onExpansionChanged to trigger UI rebuild');
+      _onExpansionChanged?.call(); // Notify UI of expansion change
+    } else {
+      // Expand new recording (stop any current playback first)
+      debugPrint('🎯 AUDIO_SVC: Expanding recording: ${recording.name} (ID: ${recording.id})');
+      if (_expandedRecordingId != null) {
+        debugPrint('🎯 AUDIO_SVC: Stopping previous recording (ID: $_expandedRecordingId) before expanding new one');
+        await stopPlaying();
+      }
+      await setupAudioForRecording(recording);
     }
   }
+  
+  /// Reset expansion state - call this when UI state gets out of sync
+  void resetExpansionState() {
+    debugPrint('🎯 AUDIO_SVC: Resetting expansion state');
+    _expandedRecordingId = null;
+    _audioStateManager?.reset();
+    _onExpansionChanged?.call();
+  }
+  
+  /// Update expansion callback without full re-initialization
+  void setExpansionCallback(VoidCallback? callback) {
+    debugPrint('🔧 AUDIO_SVC: Setting expansion callback: ${callback != null}');
+    _onExpansionChanged = callback;
+    if (callback != null && _audioStateManager != null) {
+      _audioStateManager!.addListener(callback);
+    }
+  }
+  
+  /// Setup audio for a recording
+  Future<void> setupAudioForRecording(RecordingEntity recording) async {
+    _isLoading = true;
+    _audioStateManager?.updateError(null); // Clear any previous errors
 
+    try {
+      // STEP 1: Check if file exists, if not try to find it in current app directory
+      String workingFilePath = recording.filePath;
+      File file = File(workingFilePath);
+      
+      if (!await file.exists()) {
+        // Try to migrate path to current app container
+        workingFilePath = await _tryMigrateFilePath(recording.filePath);
+        file = File(workingFilePath);
+        
+        if (!await file.exists()) {
+          throw Exception('Recording file not found: ${recording.filePath}');
+        }
+        
+        debugPrint('📁 Migrated file path: ${recording.filePath} -> $workingFilePath');
+      }
+      
+      // STEP 2: Validate file size
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        throw Exception('Recording file is empty: $workingFilePath');
+      }
+      
+      debugPrint('📁 Validating file: $workingFilePath');
+      debugPrint('📦 File size: $fileSize bytes');
+      debugPrint('🎵 Expected format: ${recording.format.name}');
+
+      // STEP 3: Setup audio player with working file path
+      debugPrint('🔧 Setting up audio player...');
+      await _audioPlayer!.setFilePath(workingFilePath);
+      
+      // STEP 4: Get actual audio properties from player
+      final playerDuration = _audioPlayer!.duration;
+      debugPrint('🎵 Audio file analysis:');
+      debugPrint('   Player duration: ${playerDuration != null ? _formatTime(playerDuration) : 'null'} ${playerDuration != null ? '(${playerDuration.inMilliseconds}ms)' : ''}');
+      debugPrint('   Metadata duration: ${_formatTime(recording.duration)} (${recording.duration.inMilliseconds}ms)');
+      debugPrint('   Duration difference: ${playerDuration != null ? (playerDuration.inMilliseconds - recording.duration.inMilliseconds) : 'unknown'}ms');
+      debugPrint('   Sample rate: ${recording.sampleRate} Hz');
+      debugPrint('   Audio format: ${recording.format.name}');
+      debugPrint('   File size: $fileSize bytes');
+
+      _expandedRecordingId = recording.id;
+      _currentlyPlayingFile = workingFilePath;
+      _audioStateManager?.updateCurrentRecording(recording.id);
+      _audioStateManager?.updatePosition(Duration.zero);
+      // Start with recording duration, but audio player will update with actual duration
+      _audioStateManager?.updateDuration(recording.duration);
+      _audioStateManager?.updatePlaybackState(isPlaying: false, isBuffering: false);
+      _isLoading = false;
+      _hasCompletedCurrentPlayback = false; // Reset completion flag for new recording
+      debugPrint('🎯 AUDIO_SVC: Calling _onExpansionChanged to trigger UI rebuild');
+      if (_onExpansionChanged != null) {
+        debugPrint('🔄 AUDIO_SVC: Executing expansion callback');
+        _onExpansionChanged?.call();
+      } else {
+        debugPrint('❌ AUDIO_SVC: No expansion callback set!');
+      }
+
+      debugPrint('✅ Audio setup complete for: ${recording.name}');
+      debugPrint('📁 Working file path: $workingFilePath');
+      debugPrint('📦 File size: $fileSize bytes');
+      debugPrint('🕒 Initial duration: ${_formatTime(_audioStateManager?.duration ?? Duration.zero)} (${_audioStateManager?.duration.inMilliseconds ?? 0}ms)');
+      debugPrint('🕒 Recording metadata duration: ${_formatTime(recording.duration)} (${recording.duration.inMilliseconds}ms)');
+      
+      // If there's a significant difference, we might want to update the metadata
+      if (playerDuration != null && (playerDuration.inMilliseconds - recording.duration.inMilliseconds).abs() > 500) {
+        debugPrint('⚠️ Significant duration mismatch detected (>500ms difference)');
+        debugPrint('   Player duration: ${playerDuration.inMilliseconds}ms');
+        debugPrint('   Metadata duration: ${recording.duration.inMilliseconds}ms');
+        debugPrint('   Consider updating recording metadata for accuracy');
+      }
+      
+    } catch (e) {
+      debugPrint('❌ Error setting up audio: $e');
+      debugPrint('📁 Failed file path: ${recording.filePath}');
+      
+      _isLoading = false;
+      _audioStateManager?.updateError(e.toString());
+      
+      // Return error message for UI to handle
+      throw e;
+    }
+  }
+  
+  /// Try to migrate file path to current app container
+  Future<String> _tryMigrateFilePath(String oldPath) async {
+    try {
+      // Get current app documents directory
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final currentDocumentsPath = documentsDir.path;
+      
+      // Extract the relative path from old path (everything after /Documents/)
+      final documentsIndex = oldPath.indexOf('/Documents/');
+      if (documentsIndex == -1) {
+        return oldPath; // Return original if can't parse
+      }
+      
+      final relativePath = oldPath.substring(documentsIndex + '/Documents/'.length);
+      final newPath = path.join(currentDocumentsPath, relativePath);
+      
+      debugPrint('🔄 Attempting path migration:');
+      debugPrint('   Old: $oldPath');
+      debugPrint('   New: $newPath');
+      debugPrint('   Relative: $relativePath');
+      
+      return newPath;
+    } catch (e) {
+      debugPrint('❌ Error migrating path: $e');
+      return oldPath; // Return original on error
+    }
+  }
+  
+  /// Format time helper
+  String _formatTime(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
+  }
+  
+  /// Get the currently expanded recording
+  RecordingEntity? getCurrentlyExpandedRecording(List<RecordingEntity> recordings) {
+    if (_expandedRecordingId == null) return null;
+    
+    try {
+      return recordings.firstWhere((recording) => recording.id == _expandedRecordingId);
+    } catch (e) {
+      // Recording not found in current list - reset expansion state
+      debugPrint('⚠️ AUDIO_SVC: Expanded recording ID $_expandedRecordingId not found in current recordings, resetting state');
+      _expandedRecordingId = null;
+      _audioStateManager?.reset();
+      return null;
+    }
+  }
+  
   // ==== PLAYBACK OPERATIONS ====
 
+  /// Toggle playback (from AudioPlayerManager)
+  Future<void> togglePlayback() async {
+    try {
+      if (_audioPlayer!.playing) {
+        await pausePlaying();
+      } else {
+        // Reset completion flag when starting new playback
+        _hasCompletedCurrentPlayback = false;
+        
+        // Handle completed state
+        if ((_audioStateManager?.position ?? Duration.zero) >= (_audioStateManager?.duration ?? Duration.zero) && 
+            (_audioStateManager?.duration ?? Duration.zero) > Duration.zero) {
+          await seekTo(Duration.zero);
+        }
+        await resumePlaying();
+      }
+    } catch (e) {
+      debugPrint('❌ Error toggling playback: $e');
+    }
+  }
+  
+  /// Seek to position with percentage
+  void seekToPosition(double percent) {
+    final effectiveDuration = _audioStateManager?.duration ?? const Duration(seconds: 1);
+    final target = Duration(milliseconds: (effectiveDuration.inMilliseconds * percent).round());
+    
+    debugPrint('🎯 Target position: ${_formatTime(target)} of ${_formatTime(effectiveDuration)}');
+    seekTo(target);
+    _audioStateManager?.seekTo(target); // Update state immediately for responsive UI
+  }
+  
+  /// Skip backward 10 seconds
+  void skipBackward() {
+    final currentPos = _audioStateManager?.position ?? Duration.zero;
+    final duration = _audioStateManager?.duration ?? Duration.zero;
+    final newPosition = Duration(milliseconds: (currentPos.inMilliseconds - 10000).clamp(0, duration.inMilliseconds));
+    seekTo(newPosition);
+    _audioStateManager?.seekTo(newPosition);
+  }
+  
+  /// Skip forward 10 seconds
+  void skipForward() {
+    final currentPos = _audioStateManager?.position ?? Duration.zero;
+    final duration = _audioStateManager?.duration ?? Duration.zero;
+    final newPosition = Duration(milliseconds: (currentPos.inMilliseconds + 10000).clamp(0, duration.inMilliseconds));
+    seekTo(newPosition);
+    _audioStateManager?.seekTo(newPosition);
+  }
+  
   @override
   Future<bool> startPlaying(String filePath) async {
     if (!_ensureInitialized()) return false;
@@ -380,6 +724,7 @@ class AudioPlayerService implements IAudioServiceRepository {
 
       await _audioPlayer!.seek(position);
       _playbackPosition = position;
+      _audioStateManager?.updatePosition(position); // Update AudioStateManager
       debugPrint('🎵 Seeked to: $position');
       return true;
 
@@ -711,7 +1056,28 @@ class AudioPlayerService implements IAudioServiceRepository {
     _amplitudeStreamController?.add(0.0);
   }
 
-  // ==== PUBLIC GETTERS (No conflicts with interface) ====
+  // ==== PUBLIC GETTERS (Enhanced from AudioPlayerManager) ====
+  
+  /// Current expansion state
+  String? get expandedRecordingId => _expandedRecordingId;
+  
+  /// Current loading state
+  bool get isLoading => _isLoading;
+  
+  /// Audio state manager for UI optimization
+  AudioStateManager? get audioState => _audioStateManager;
+  
+  /// Current position (from AudioStateManager or fallback)
+  Duration get position => _audioStateManager?.position ?? _playbackPosition;
+  
+  /// Current duration (from AudioStateManager or fallback)
+  Duration get duration => _audioStateManager?.duration ?? _playbackDuration;
+  
+  /// Is currently playing (from AudioStateManager or fallback)
+  bool get isCurrentlyPlaying => _audioStateManager?.isPlaying ?? _playbackActive;
+  
+  /// Audio player instance (for direct access if needed)
+  AudioPlayer? get audioPlayer => _audioPlayer;
 
   /// Current playback speed
   double get playbackSpeed => _playbackSpeed;

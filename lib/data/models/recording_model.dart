@@ -13,7 +13,8 @@ class RecordingModel {
   final String filePath;
   final String folderId;
   final int formatIndex;
-  final int durationSeconds;
+  final int durationSeconds; // Legacy column - kept for backwards compatibility
+  final int? durationMilliseconds; // New precise duration column
   final int fileSize;
   final int sampleRate;
   final double? latitude;
@@ -35,6 +36,7 @@ class RecordingModel {
     required this.folderId,
     required this.formatIndex,
     required this.durationSeconds,
+    this.durationMilliseconds,
     required this.fileSize,
     required this.sampleRate,
     this.latitude,
@@ -58,7 +60,8 @@ class RecordingModel {
       filePath: entity.filePath,
       folderId: entity.folderId,
       formatIndex: entity.format.index,
-      durationSeconds: entity.duration.inSeconds,
+      durationSeconds: entity.duration.inSeconds, // Keep for compatibility
+      durationMilliseconds: entity.duration.inMilliseconds, // Precise duration
       fileSize: entity.fileSize,
       sampleRate: entity.sampleRate,
       latitude: entity.latitude,
@@ -86,6 +89,7 @@ class RecordingModel {
       folderId: map['folder_id'] as String,
       formatIndex: map['format_index'] as int,
       durationSeconds: map['duration_seconds'] as int,
+      durationMilliseconds: map['duration_milliseconds'] as int?,
       fileSize: map['file_size'] as int,
       sampleRate: map['sample_rate'] as int,
       latitude: map['latitude'] as double?,
@@ -111,6 +115,7 @@ class RecordingModel {
       folderId: json['folderId'] as String,
       formatIndex: json['formatIndex'] as int,
       durationSeconds: json['durationSeconds'] as int,
+      durationMilliseconds: json['durationMilliseconds'] as int?,
       fileSize: json['fileSize'] as int,
       sampleRate: json['sampleRate'] as int,
       latitude: json['latitude'] as double?,
@@ -134,7 +139,9 @@ class RecordingModel {
       filePath: filePath,
       folderId: folderId,
       format: AudioFormat.values[formatIndex],
-      duration: Duration(seconds: durationSeconds),
+      duration: durationMilliseconds != null 
+          ? Duration(milliseconds: durationMilliseconds!) 
+          : Duration(seconds: durationSeconds), // Fallback to seconds for legacy data
       fileSize: fileSize,
       sampleRate: sampleRate,
       latitude: latitude,
@@ -162,6 +169,7 @@ class RecordingModel {
       'folder_id': folderId,
       'format_index': formatIndex,
       'duration_seconds': durationSeconds,
+      'duration_milliseconds': durationMilliseconds,
       'file_size': fileSize,
       'sample_rate': sampleRate,
       'latitude': latitude,
@@ -187,6 +195,7 @@ class RecordingModel {
       'folderId': folderId,
       'formatIndex': formatIndex,
       'durationSeconds': durationSeconds,
+      'durationMilliseconds': durationMilliseconds,
       'fileSize': fileSize,
       'sampleRate': sampleRate,
       'latitude': latitude,

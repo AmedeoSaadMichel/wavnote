@@ -319,7 +319,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
       // Capture final duration BEFORE stopping anything to avoid timing issues
       final finalDuration = _calculateTotalRecordingDuration();
-      debugPrint('$_tag: Final duration captured: ${finalDuration.inSeconds} seconds');
+      debugPrint('$_tag: Final duration captured: ${finalDuration.inSeconds}.${(finalDuration.inMilliseconds % 1000).toString().padLeft(3, '0')} seconds (${finalDuration.inMilliseconds}ms)');
 
       // Stop monitoring after capturing duration
       _stopAmplitudeMonitoring();
@@ -330,7 +330,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
       // Use the captured duration instead of recalculating
       final totalDuration = finalDuration;
-      debugPrint('$_tag: Recording duration: ${totalDuration.inSeconds} seconds');
+      debugPrint('$_tag: Recording duration: ${totalDuration.inSeconds}.${(totalDuration.inMilliseconds % 1000).toString().padLeft(3, '0')} seconds (${totalDuration.inMilliseconds}ms)');
 
       // Update state
       _isRecording = false;
@@ -868,7 +868,18 @@ class AudioRecorderService implements IAudioServiceRepository {
     // Add a small buffer (100ms) to account for processing delays
     // This helps prevent recordings from being slightly trimmed at the end
     const processingBuffer = Duration(milliseconds: 100);
-    return actualDuration + processingBuffer;
+    final finalDuration = actualDuration + processingBuffer;
+    
+    debugPrint('$_tag: Duration calculation details:');
+    debugPrint('   Start time: $_recordingStartTime');
+    debugPrint('   Stop time: $now');
+    debugPrint('   Total elapsed: ${totalElapsed.inMilliseconds}ms');
+    debugPrint('   Paused duration: ${adjustedPausedDuration.inMilliseconds}ms');
+    debugPrint('   Actual duration: ${actualDuration.inMilliseconds}ms');
+    debugPrint('   Processing buffer: ${processingBuffer.inMilliseconds}ms');
+    debugPrint('   Final duration: ${finalDuration.inMilliseconds}ms (${finalDuration.inSeconds}.${(finalDuration.inMilliseconds % 1000).toString().padLeft(3, '0')}s)');
+    
+    return finalDuration;
   }
 
   /// Get full file system path

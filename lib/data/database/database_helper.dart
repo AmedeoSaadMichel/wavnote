@@ -11,7 +11,7 @@ import 'dart:io';
 class DatabaseHelper {
   static Database? _database;
   static const String _databaseName = 'voice_memo.db';
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 4;
 
   // Table names
   static const String foldersTable = 'folders';
@@ -144,6 +144,24 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE $recordingsTable ADD COLUMN waveform_data TEXT');
         
         print('✅ Successfully migrated to version 3');
+      }
+
+      // Version 4: Add duration_milliseconds column for precise duration storage
+      if (oldVersion < 4) {
+        print('🔄 Migrating to version 4: Adding duration_milliseconds column...');
+        
+        // Add duration_milliseconds column to recordings table
+        await db.execute('ALTER TABLE $recordingsTable ADD COLUMN duration_milliseconds INTEGER');
+        
+        // Migrate existing data: convert seconds to milliseconds
+        await db.execute('''
+          UPDATE $recordingsTable 
+          SET duration_milliseconds = duration_seconds * 1000 
+          WHERE duration_milliseconds IS NULL
+        ''');
+        
+        print('✅ Successfully migrated to version 4');
+        print('📊 Converted existing duration_seconds to duration_milliseconds');
       }
     } catch (e) {
       print('❌ Error during database migration: $e');
