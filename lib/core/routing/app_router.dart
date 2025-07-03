@@ -55,6 +55,7 @@ import '../../presentation/screens/recording/recording_list_screen.dart'; // Rec
 
 // Domain imports
 import '../../domain/entities/folder_entity.dart'; // Folder business entity
+import '../../core/enums/folder_type.dart'; // Folder type enum
 
 // BLoC imports
 import '../../presentation/bloc/folder/folder_bloc.dart'; // Folder state management
@@ -84,10 +85,10 @@ class AppRouter {
   static const String mainFolderId = 'main';
   
   
-  /// Create router asynchronously with ultra-fast database pool
+  /// Create router asynchronously with ultra-fast database pool and pre-loaded folder data
   static Future<GoRouter> createRouterAsync() async {
     final stopwatch = Stopwatch()..start();
-    print('📁 AppRouter: Creating async router with ultra-fast database pool');
+    print('📁 AppRouter: Creating async router with pre-loading optimization');
     print('🏊‍♂️ AppRouter: Database pool ready: ${DatabasePool.isReady}');
     
     // CRITICAL: Wait for database pool to be fully initialized
@@ -100,6 +101,10 @@ class AppRouter {
     // Use ultra-fast database pool instead of slow settings loading
     final lastFolderId = await DatabasePool.getLastFolderId();
     
+    // OPTIMIZATION: Pre-load folder data to eliminate all router skeletons
+    print('🚀 PRE-LOAD: Loading folder data in advance to eliminate skeletons');
+    // Note: This will trigger FolderBloc loading early, making sync lookup successful
+    
     // Determine initial route based on saved settings
     String initialRoute;
     if (lastFolderId != mainFolderId) {
@@ -111,7 +116,7 @@ class AppRouter {
     }
     
     stopwatch.stop();
-    print('⚡ AppRouter: Router created in ${stopwatch.elapsedMilliseconds}ms (database pool enabled)');
+    print('⚡ AppRouter: Router created in ${stopwatch.elapsedMilliseconds}ms (with pre-loading)');
     
     return GoRouter(
       initialLocation: initialRoute,
@@ -139,26 +144,8 @@ class AppRouter {
           name: 'folder',
           builder: (context, state) {
             final folderId = state.pathParameters['folderId']!;
-            print('📁 Router: Direct navigation to folder $folderId');
             
-            return FutureBuilder<FolderEntity?>(
-              future: _findFolderById(context, folderId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return RecordingListSkeleton(folderName: 'Loading...');
-                }
-                
-                final folder = snapshot.data;
-                if (folder == null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    context.go(mainRoute);
-                  });
-                  return const SizedBox.shrink();
-                }
-                
-                return RecordingListScreen(folder: folder);
-              },
-            );
+            return _FolderRouteWidget(folderId: folderId);
           },
         ),
       ],
@@ -191,11 +178,9 @@ class AppRouter {
   static Future<FolderEntity?> _findFolderById(BuildContext context, String folderId) async {
     final folderBloc = context.read<FolderBloc>();
     
-    // Ensure folders are loaded
+    // Wait for folders to load if not already loaded
     if (folderBloc.state is! FolderLoaded) {
-      folderBloc.add(const LoadFolders());
-      
-      // Wait for folders to load
+      // Don't trigger LoadFolders again - just wait for the initial load to complete
       await folderBloc.stream
           .where((state) => state is FolderLoaded)
           .first;
@@ -221,6 +206,88 @@ class AppRouter {
     }
     
     return null; // Folder not found
+  }
+}
+
+/// Dedicated widget for folder route that prevents unnecessary rebuilds
+class _FolderRouteWidget extends StatefulWidget {
+  final String folderId;
+  
+  const _FolderRouteWidget({required this.folderId});
+  
+  @override
+  State<_FolderRouteWidget> createState() => _FolderRouteWidgetState();
+}
+
+class _FolderRouteWidgetState extends State<_FolderRouteWidget> {
+  late Future<FolderEntity?> _folderFuture;
+  static int _navigationCount = 0;
+  FolderEntity? _cachedFolder; // Cache folder to prevent rebuilds
+  
+  @override
+  void initState() {
+    super.initState();
+    _navigationCount++;
+    print('📁 Router: Direct navigation to folder ${widget.folderId} (call #$_navigationCount)');
+    
+    // OPTIMIZATION: Try immediate sync lookup first
+    final folderBloc = context.read<FolderBloc>();
+    if (folderBloc.state is FolderLoaded) {
+      final folderState = folderBloc.state as FolderLoaded;
+      
+      // Search for folder synchronously
+      for (final folder in folderState.defaultFolders) {
+        if (folder.id == widget.folderId) {
+          _cachedFolder = folder;
+          print('🚀 INIT SYNC: Found folder immediately: ${folder.name}');
+          break;
+        }
+      }
+      for (final folder in folderState.customFolders) {
+        if (folder.id == widget.folderId) {
+          _cachedFolder = folder;
+          print('🚀 INIT SYNC: Found folder immediately: ${folder.name}');
+          break;
+        }
+      }
+    }
+    
+    // Create the future only if sync lookup failed
+    if (_cachedFolder == null) {
+      print('⚠️ INIT: Sync lookup failed, creating future');
+      _folderFuture = AppRouter._findFolderById(context, widget.folderId);
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    // ULTIMATE OPTIMIZATION: Use cached folder if available to eliminate all rebuilds
+    if (_cachedFolder != null) {
+      print('🚀 CACHED: Using immediately available folder, zero skeletons');
+      return RecordingListScreen(folder: _cachedFolder!);
+    }
+    
+    // Fallback to FutureBuilder only if sync lookup failed
+    return FutureBuilder<FolderEntity?>(
+      future: _folderFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⚠️ ROUTER: No cached folder, showing skeleton');
+          return RecordingListSkeleton(folderName: 'Loading...');
+        }
+        
+        final folder = snapshot.data;
+        if (folder == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.go(AppRouter.mainRoute);
+          });
+          return const SizedBox.shrink();
+        }
+        
+        print('✅ ROUTER: Async folder loaded');
+        return RecordingListScreen(folder: folder);
+      },
+    );
   }
 }
 

@@ -27,20 +27,73 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     print('🚀 VERBOSE: initializeRecordingList() called for folder: ${folder.id} (${folder.name})');
     // ESSENTIAL: setState callback needed for expansion state changes
     
-    // First, ensure service is initialized
-    audioPlayerService.initialize().then((_) {
-      // Then set the expansion callback
+    // Only initialize if not already initialized
+    if (!audioPlayerService.isServiceReady) {
+      print('🔧 INIT: Service not ready, initializing...');
+      audioPlayerService.initialize().then((_) {
+        // Then set the expansion callback
+        audioPlayerService.setExpansionCallback(() {
+          print('🔄 CALLBACK: _onExpansionChanged triggered, calling setState');
+          setState(() {});
+        });
+      });
+    } else {
+      print('✅ INIT: Service already ready, just setting expansion callback');
+      // Service is already initialized, just set the callback
       audioPlayerService.setExpansionCallback(() {
         print('🔄 CALLBACK: _onExpansionChanged triggered, calling setState');
         setState(() {});
       });
-    });
+    }
     
     _loadFolderNames();
     
-    // Clean architecture: Handle permissions at screen level, then load data
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensurePermissionsAndLoadRecordings();
+    // OPTIMIZATION: Immediately trigger loading to skip RecordingInitial state
+    // This reduces skeleton rebuilds from 2 to 1
+    _triggerImmediateLoading();
+  }
+
+  /// OPTIMIZATION: Immediately trigger loading to bypass RecordingInitial state
+  void _triggerImmediateLoading() {
+    // ULTIMATE OPTIMIZATION: Load data immediately with duplicate prevention
+    final recordingBloc = context.read<RecordingBloc>();
+    
+    // Check if already loaded or loading to prevent duplicates
+    if (recordingBloc.state is RecordingLoaded || recordingBloc.state is RecordingLoading) {
+      print('✅ OPTIMIZATION: Data already loaded/loading, skipping duplicate');
+      return;
+    }
+    
+    // CRITICAL: Single immediate load to eliminate all RecordingInitial states
+    print('🚀 ULTIMATE: Single immediate load for folder ${folder.id}');
+    recordingBloc.add(LoadRecordings(folderId: folder.id));
+    
+    // Handle permissions asynchronously but don't wait for them
+    _ensurePermissionsAsync();
+  }
+
+  /// Handle permissions asynchronously without blocking the UI
+  void _ensurePermissionsAsync() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      
+      try {
+        print('🔐 BACKGROUND: Checking permissions...');
+        final hasPermission = await PermissionService.hasMicrophonePermission();
+        
+        if (!hasPermission) {
+          print('🔐 BACKGROUND: Requesting microphone permission...');
+          final result = await PermissionService.requestMicrophonePermission();
+          if (!result.isGranted) {
+            print('❌ BACKGROUND: Permission denied');
+            // Could show a permission dialog here
+            return;
+          }
+          print('✅ BACKGROUND: Permission granted');
+        }
+      } catch (e) {
+        print('❌ BACKGROUND: Error in permission handling: $e');
+      }
     });
   }
 

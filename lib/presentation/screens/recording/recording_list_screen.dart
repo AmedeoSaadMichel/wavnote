@@ -161,20 +161,27 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
         print('🔍 BREAKPOINT: RecordingListScreen state changed to: ${state.runtimeType}');
         PerformanceLogger.logRebuild('_buildRecordingsList');
         
-        // Strategy: Try to show content immediately, fall back to skeleton
+        // OPTIMIZATION: Eliminate skeleton for RecordingInitial state completely
+        // Only show skeleton for RecordingLoading if it takes too long
         if (state is RecordingLoaded && state.recordings.isNotEmpty) {
           print('🚀 FAST PATH: Showing content immediately');
           final filteredRecordings = filterRecordings(state.recordings);
           return _buildRecordingContent(filteredRecordings, state);
         }
         
-        // Show skeleton for initial and loading states only
-        if (state is RecordingLoading || state is RecordingInitial) {
-          print('🟢 VERBOSE: Returning RecordingListSkeleton for state: ${state.runtimeType}');
-          print('🟢 VERBOSE: Folder name: ${widget.folder.name}');
+        // CRITICAL OPTIMIZATION: Skip skeleton for RecordingInitial - our immediate loading should prevent this
+        if (state is RecordingLoading) {
+          print('🟡 MINIMAL: Brief loading state, showing minimal skeleton');
           return RecordingListSkeleton(
             folderName: widget.folder.name,
           );
+        }
+        
+        // OPTIMIZATION: RecordingInitial should never show skeleton - immediate loading prevents this
+        if (state is RecordingInitial) {
+          print('⚠️ UNEXPECTED: RecordingInitial state reached - should be bypassed by immediate loading');
+          // Return empty container instead of skeleton to avoid unnecessary builds
+          return const SizedBox.shrink();
         }
 
         if (state is RecordingLoaded) {

@@ -80,8 +80,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Load folders when screen initializes
-    BlocProvider.of<FolderBloc>(context).add(const LoadFolders());
+    // Note: LoadFolders is already called in main.dart when creating the FolderBloc provider
+    // No need to call it again here to avoid double loading
     
     // Clean up expired recordings (15+ days old) on app start
     _scheduleExpiredRecordingsCleanup();

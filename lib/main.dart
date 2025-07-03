@@ -153,10 +153,14 @@ class WavNoteApp extends StatefulWidget {
 /// State class for the root application widget
 /// Implements WidgetsBindingObserver to monitor app lifecycle events
 class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
+  // Store router future to prevent recreation on every build
+  late final Future<GoRouter> _routerFuture;
   
   @override
   void initState() {
     super.initState();
+    // Create router future once during initialization
+    _routerFuture = AppRouter.createRouterAsync();
     // Register this widget as an observer for app lifecycle events
     // This allows us to respond to app state changes (foreground, background, etc.)
     WidgetsBinding.instance.addObserver(this);
@@ -248,7 +252,7 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
       // ========================================
       // Use FutureBuilder to handle async router creation
       child: FutureBuilder<GoRouter>(
-        future: AppRouter.createRouterAsync(),
+        future: _routerFuture,
         builder: (context, snapshot) {
           
           // Show loading screen while router is being created

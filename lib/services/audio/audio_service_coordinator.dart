@@ -274,7 +274,7 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
         }
       }
 
-      // Ensure playback service is ready
+      // Ensure playback service is ready (avoid redundant initialization)
       if (!_playbackService.isServiceReady) {
         debugPrint('🔄 AudioServiceCoordinator: Initializing playback service...');
         final playbackInit = await _playbackService.initialize();
@@ -282,6 +282,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
           debugPrint('❌ AudioServiceCoordinator: Failed to initialize playback service');
           return false;
         }
+      } else {
+        debugPrint('✅ AudioServiceCoordinator: Playback service already ready');
       }
 
       // Stop any active recording

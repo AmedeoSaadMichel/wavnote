@@ -5,6 +5,7 @@ import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../services/location/geolocation_service.dart';
+import '../../../services/audio/audio_service_coordinator.dart';
 
 /// Use case for managing recording lifecycle operations
 ///
@@ -153,10 +154,15 @@ class RecordingLifecycleUseCase {
   /// Get duration stream for real-time updates  
   Stream<Duration>? get durationStream => _audioService.durationStream;
 
-  /// Dispose audio service
+  /// Dispose audio service (only if it's a coordinator, not a singleton)
   Future<void> dispose() async {
     try {
-      await _audioService.dispose();
+      // Only dispose if it's a coordinator (not a singleton like AudioPlayerService)
+      if (_audioService is AudioServiceCoordinator) {
+        await _audioService.dispose();
+      } else {
+        print('✅ RecordingLifecycleUseCase: Skipping disposal of singleton audio service');
+      }
     } catch (e) {
       print('⚠️ RecordingLifecycleUseCase: Error disposing audio service: $e');
     }

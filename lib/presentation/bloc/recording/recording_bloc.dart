@@ -45,6 +45,7 @@ import 'package:equatable/equatable.dart';
 // Domain imports
 import '../../../domain/entities/recording_entity.dart';              // Recording business entity
 import '../../../domain/repositories/i_audio_service_repository.dart'; // Audio service interface
+import '../../../services/audio/audio_service_coordinator.dart';     // Audio service coordinator
 import '../../../domain/repositories/i_recording_repository.dart';     // Recording data interface
 import '../../../core/enums/audio_format.dart';                       // Audio format definitions
 
@@ -179,11 +180,16 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     await _durationSubscription?.cancel();
     _durationTimer?.cancel();
 
-    // Dispose audio service
-    try {
-      await _audioService.dispose();
-    } catch (e) {
-      print('⚠️ Error disposing audio service: $e');
+    // Don't dispose audio service - it's a singleton/global service
+    // Only dispose if it's a coordinator (not a singleton)
+    if (_audioService is AudioServiceCoordinator) {
+      try {
+        await _audioService.dispose();
+      } catch (e) {
+        print('⚠️ Error disposing audio service coordinator: $e');
+      }
+    } else {
+      print('✅ Skipping disposal of singleton audio service');
     }
 
     return super.close();

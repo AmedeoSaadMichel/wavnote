@@ -87,10 +87,13 @@ class AudioPlayerService implements IAudioServiceRepository {
     try {
       debugPrint('🔧 AUDIO_SVC: Initialize called, isInitialized: $_isServiceInitialized');
       
-      // Clean up any existing instance
+      // If already initialized, only update callback if provided
       if (_isServiceInitialized) {
-        debugPrint('🔧 AUDIO_SVC: Service already initialized, disposing first');
-        await dispose();
+        debugPrint('✅ AUDIO_SVC: Service already initialized, updating callback only');
+        if (onStateChanged != null) {
+          setExpansionCallback(onStateChanged);
+        }
+        return true;
       }
 
       // Create new audio player instance
@@ -399,6 +402,20 @@ class AudioPlayerService implements IAudioServiceRepository {
     if (callback != null && _audioStateManager != null) {
       _audioStateManager!.addListener(callback);
     }
+  }
+  
+  /// Reset audio state without disposing the service
+  void resetAudioState() {
+    debugPrint('🔄 AUDIO_SVC: Resetting audio state without disposal');
+    _expandedRecordingId = null;
+    _isLoading = false;
+    _hasCompletedCurrentPlayback = false;
+    _currentlyPlayingFile = null;
+    _playbackPosition = Duration.zero;
+    _playbackDuration = Duration.zero;
+    _playbackActive = false;
+    _playbackPaused = false;
+    _audioStateManager?.reset();
   }
   
   /// Setup audio for a recording
