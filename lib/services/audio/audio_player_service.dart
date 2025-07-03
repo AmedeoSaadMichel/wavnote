@@ -341,14 +341,9 @@ class AudioPlayerService implements IAudioServiceRepository {
           _playbackPaused = false;
           _completionStreamController?.add(null);
           
-          // Auto-reset to beginning after completion (with longer delay to prevent loops)
-          Future.delayed(const Duration(milliseconds: 1000), () {
-            if (_hasCompletedCurrentPlayback) { // Double-check to prevent multiple resets
-              _audioPlayer!.seek(Duration.zero);
-              _audioStateManager!.updatePosition(Duration.zero);
-              debugPrint('🔚 Audio reset to beginning after natural completion');
-            }
-          });
+          // DON'T auto-reset - let the user decide when to restart
+          // Position will be reset when user clicks play again via togglePlayback()
+          debugPrint('🔚 Audio completed, staying at end position - no auto-restart');
         }
         
         // Debug all state changes
@@ -583,12 +578,30 @@ class AudioPlayerService implements IAudioServiceRepository {
   
   /// Seek to position with percentage
   void seekToPosition(double percent) {
+    // CRITICAL: Remember current playback state before seeking
+    final wasPlaying = _audioStateManager?.isPlaying ?? false;
     final effectiveDuration = _audioStateManager?.duration ?? const Duration(seconds: 1);
     final target = Duration(milliseconds: (effectiveDuration.inMilliseconds * percent).round());
     
-    debugPrint('🎯 Target position: ${_formatTime(target)} of ${_formatTime(effectiveDuration)}');
+    debugPrint('🎯 Seeking to position: ${_formatTime(target)} of ${_formatTime(effectiveDuration)} (was playing: $wasPlaying)');
+    
+    // Reset completion flag since user is manually seeking
+    _hasCompletedCurrentPlayback = false;
+    
+    // Perform the seek
     seekTo(target);
     _audioStateManager?.seekTo(target); // Update state immediately for responsive UI
+    
+    // CRITICAL: Preserve playback state - if wasn't playing before seek, ensure it stays paused
+    if (!wasPlaying && _audioPlayer != null) {
+      debugPrint('🎯 Ensuring audio stays paused after seek (was not playing before)');
+      _audioPlayer!.pause().then((_) {
+        _audioStateManager?.updatePlaybackState(isPlaying: false);
+        _onExpansionChanged?.call(); // Update UI to reflect paused state
+      });
+    } else if (wasPlaying) {
+      debugPrint('🎯 Audio was playing before seek, maintaining playback');
+    }
   }
   
   /// Skip backward 10 seconds
