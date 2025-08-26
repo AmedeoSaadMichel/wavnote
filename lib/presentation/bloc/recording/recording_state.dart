@@ -215,25 +215,29 @@ class RecordingLoaded extends RecordingState {
   final List<RecordingEntity> recordings;
   final bool isEditMode;
   final Set<String> selectedRecordings;
+  final DateTime timestamp; // Force state differentiation
 
-  const RecordingLoaded(
+  RecordingLoaded(
     this.recordings, {
     this.isEditMode = false,
     this.selectedRecordings = const <String>{},
-  });
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 
   @override
-  List<Object?> get props => [recordings, isEditMode, selectedRecordings];
+  List<Object?> get props => [recordings, isEditMode, selectedRecordings, timestamp];
 
   RecordingLoaded copyWith({
     List<RecordingEntity>? recordings,
     bool? isEditMode,
     Set<String>? selectedRecordings,
+    bool? forceUpdate,
   }) {
     return RecordingLoaded(
       recordings ?? this.recordings,
       isEditMode: isEditMode ?? this.isEditMode,
       selectedRecordings: selectedRecordings ?? this.selectedRecordings,
+      timestamp: (forceUpdate == true) ? DateTime.now() : timestamp,
     );
   }
 }

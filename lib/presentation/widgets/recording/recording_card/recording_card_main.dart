@@ -102,7 +102,7 @@ class RecordingCard extends StatefulWidget {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is RecordingCard &&
-        other.recording.id == recording.id &&
+        other.recording == recording && // Compare full RecordingEntity equality
         other.isExpanded == isExpanded &&
         other.isPlaying == isPlaying &&
         other.isLoading == isLoading &&
@@ -115,7 +115,7 @@ class RecordingCard extends StatefulWidget {
   
   @override
   int get hashCode => Object.hash(
-    recording.id,
+    recording, // Use full RecordingEntity hashCode
     isExpanded,
     isPlaying,
     isLoading,

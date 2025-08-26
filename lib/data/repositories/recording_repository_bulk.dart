@@ -96,26 +96,32 @@ class RecordingRepositoryBulk extends RecordingRepositoryBase {
   /// Toggle favorite status of a single recording
   Future<bool> toggleFavorite(String recordingId) async {
     try {
-      print('❤️ Toggling favorite status for recording: $recordingId');
+      print('❤️ REPO DEBUG: Starting toggleFavorite for recording: $recordingId');
       final db = await getDatabaseWithTable();
 
       // Get current favorite status
+      print('🔍 REPO DEBUG: Querying current favorite status...');
       final result = await db.query(
         DatabaseHelper.recordingsTable,
-        columns: ['is_favorite'],
+        columns: ['is_favorite', 'name'],
         where: 'id = ?',
         whereArgs: [recordingId],
       );
 
       if (result.isEmpty) {
-        print('❌ Recording not found: $recordingId');
+        print('❌ REPO DEBUG: Recording not found: $recordingId');
         return false;
       }
 
+      final recordingName = result.first['name'] as String? ?? 'Unknown';
       final currentFavoriteStatus = (result.first['is_favorite'] as int? ?? 0) == 1;
       final newFavoriteStatus = !currentFavoriteStatus;
+      
+      print('🔍 REPO DEBUG: Recording "$recordingName" current favorite: $currentFavoriteStatus');
+      print('🔍 REPO DEBUG: Will change to: $newFavoriteStatus');
 
       // Update favorite status
+      print('🔄 REPO DEBUG: Updating database...');
       final rowsAffected = await db.update(
         DatabaseHelper.recordingsTable,
         {
@@ -126,15 +132,40 @@ class RecordingRepositoryBulk extends RecordingRepositoryBase {
         whereArgs: [recordingId],
       );
 
+      print('🔄 REPO DEBUG: Rows affected: $rowsAffected');
+
       if (rowsAffected > 0) {
-        print('✅ Toggled favorite status for recording: $recordingId -> $newFavoriteStatus');
-        return true;
+        // Verify the change was actually made
+        print('🔍 REPO DEBUG: Verifying database update...');
+        final verifyResult = await db.query(
+          DatabaseHelper.recordingsTable,
+          columns: ['is_favorite'],
+          where: 'id = ?',
+          whereArgs: [recordingId],
+        );
+        
+        if (verifyResult.isNotEmpty) {
+          final verifiedStatus = (verifyResult.first['is_favorite'] as int? ?? 0) == 1;
+          print('✅ REPO DEBUG: Verified database status: $verifiedStatus');
+          
+          if (verifiedStatus == newFavoriteStatus) {
+            print('✅ REPO DEBUG: Successfully toggled favorite status for recording: $recordingId -> $newFavoriteStatus');
+            return true;
+          } else {
+            print('❌ REPO DEBUG: Database verification failed - expected: $newFavoriteStatus, actual: $verifiedStatus');
+            return false;
+          }
+        } else {
+          print('❌ REPO DEBUG: Could not verify database update');
+          return false;
+        }
       } else {
-        print('❌ Failed to toggle favorite status for recording: $recordingId');
+        print('❌ REPO DEBUG: No rows affected - update failed for recording: $recordingId');
         return false;
       }
     } catch (e) {
-      print('❌ Error toggling favorite status: $e');
+      print('❌ REPO DEBUG: Exception in toggleFavorite: $e');
+      print('❌ REPO DEBUG: Stack trace: ${StackTrace.current}');
       return false;
     }
   }

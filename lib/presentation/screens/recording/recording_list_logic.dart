@@ -9,6 +9,7 @@ import '../../bloc/folder/folder_bloc.dart';
 import '../../bloc/settings/settings_bloc.dart';
 import '../../../services/permission/permission_service.dart';
 import '../../../services/audio/audio_player_service.dart';
+import '../../widgets/dialogs/folder_selection_dialog.dart';
 
 /// Mixin containing all business logic for RecordingListScreen
 mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
@@ -20,7 +21,7 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   int? _previousRecordingCount;
   Map<String, String> _folderNames = {};
   String _searchQuery = '';
-
+  
   String get searchQuery => _searchQuery;
 
   void initializeRecordingList() {
@@ -33,16 +34,26 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
       audioPlayerService.initialize().then((_) {
         // Then set the expansion callback
         audioPlayerService.setExpansionCallback(() {
-          print('🔄 CALLBACK: _onExpansionChanged triggered, calling setState');
-          setState(() {});
+          print('🔄 CALLBACK: _onExpansionChanged triggered, checking if mounted');
+          if (mounted) {
+            print('🔄 CALLBACK: Widget is mounted, calling setState');
+            setState(() {});
+          } else {
+            print('⚠️ CALLBACK: Widget is not mounted, skipping setState');
+          }
         });
       });
     } else {
       print('✅ INIT: Service already ready, just setting expansion callback');
       // Service is already initialized, just set the callback
       audioPlayerService.setExpansionCallback(() {
-        print('🔄 CALLBACK: _onExpansionChanged triggered, calling setState');
-        setState(() {});
+        print('🔄 CALLBACK: _onExpansionChanged triggered, checking if mounted');
+        if (mounted) {
+          print('🔄 CALLBACK: Widget is mounted, calling setState');
+          setState(() {});
+        } else {
+          print('⚠️ CALLBACK: Widget is not mounted, skipping setState');
+        }
       });
     }
     
@@ -58,9 +69,17 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     // ULTIMATE OPTIMIZATION: Load data immediately with duplicate prevention
     final recordingBloc = context.read<RecordingBloc>();
     
-    // Check if already loaded or loading to prevent duplicates
-    if (recordingBloc.state is RecordingLoaded || recordingBloc.state is RecordingLoading) {
-      print('✅ OPTIMIZATION: Data already loaded/loading, skipping duplicate');
+    // Check if we're loading recordings for the same folder to prevent duplicates
+    final currentState = recordingBloc.state;
+    if (currentState is RecordingLoaded) {
+      // Check if the loaded recordings are for the current folder
+      if (currentState.recordings.isNotEmpty && 
+          _isRecordingsForCurrentFolder(currentState.recordings)) {
+        print('✅ OPTIMIZATION: Recordings already loaded for folder ${folder.id}, skipping duplicate');
+        return;
+      }
+    } else if (currentState is RecordingLoading) {
+      print('✅ OPTIMIZATION: Recordings currently loading, skipping duplicate');
       return;
     }
     
@@ -70,6 +89,22 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     
     // Handle permissions asynchronously but don't wait for them
     _ensurePermissionsAsync();
+  }
+
+  /// Check if the loaded recordings are for the current folder
+  bool _isRecordingsForCurrentFolder(List<RecordingEntity> recordings) {
+    if (recordings.isEmpty) return false;
+    
+    // For special folders like "all_recordings" and "favourites", we can't check by folderId
+    // since recordings might be from different folders
+    if (folder.id == 'all_recordings' || folder.id == 'favourites') {
+      // For these special folders, we assume they need to be reloaded each time
+      // to ensure we get the latest state
+      return false;
+    }
+    
+    // For regular folders, check if all recordings belong to the current folder
+    return recordings.every((recording) => recording.folderId == folder.id);
   }
 
   /// Handle permissions asynchronously without blocking the UI
@@ -146,9 +181,11 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
         names[folder.id] = folder.name;
       }
       
-      setState(() {
-        _folderNames = names;
-      });
+      if (mounted) {
+        setState(() {
+          _folderNames = names;
+        });
+      }
       
       print('📋 Loaded ${names.length} folder names for tags');
     }
@@ -158,9 +195,11 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
 
   // Search functionality
   void updateSearchQuery(String query) {
-    setState(() {
-      _searchQuery = query.toLowerCase().trim();
-    });
+    if (mounted) {
+      setState(() {
+        _searchQuery = query.toLowerCase().trim();
+      });
+    }
   }
 
   List<RecordingEntity> filterRecordings(List<RecordingEntity> recordings) {
@@ -254,7 +293,9 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   Future<void> deleteRecording(RecordingEntity recording) async {
     if (audioPlayerService.expandedRecordingId == recording.id) {
       await audioPlayerService.stopPlaying();
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
 
     if (folder.id == 'recently_deleted') {
@@ -266,10 +307,90 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
 
   void moveRecordingToFolder(RecordingEntity recording) {
     print('📁 Move to folder tapped for: ${recording.name}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Move to folder - ${recording.name}'),
-        backgroundColor: Colors.blue,
+    _showFolderSelectionDialog(recording);
+  }
+
+  void _showFolderSelectionDialog(RecordingEntity recording) {
+    print('📁 Opening folder selection dialog for recording "${recording.name}"');
+    print('📁 Recording is currently in folder: ${recording.folderId}');
+    print('📁 User is viewing folder: ${folder.id}');
+    
+    // Check if folders are loaded
+    final folderBloc = context.read<FolderBloc>();
+    final folderState = folderBloc.state;
+    
+    if (folderState is! FolderLoaded) {
+      print('⚠️ Folders not loaded yet, loading folders first');
+      folderBloc.add(const LoadFolders());
+      // Show loading indicator or return early
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading folders...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+    
+    print('📁 Found ${folderState.allFolders.length} total folders');
+    
+    showDialog(
+      context: context,
+      builder: (context) => FolderSelectionDialog(
+        currentFolderId: recording.folderId,
+        title: 'Move Recording',
+        subtitle: 'Select a folder for "${recording.name}"',
+        isRecordingAlreadyFavorite: recording.isFavorite,
+        onFolderSelected: (folderId) {
+          print('📁 Moving recording ${recording.id} to folder $folderId');
+          
+          // Handle special folders differently
+          if (folderId == 'favourites') {
+            // For Favorites, we want to ADD to favorites (not toggle)
+            print('💖 Adding recording to favorites instead of moving folder');
+            
+            // Only add to favorites if not already a favorite
+            if (!recording.isFavorite) {
+              // Pure BLoC: Just trigger the database toggle
+              context.read<RecordingBloc>().add(
+                ToggleFavoriteRecording(recordingId: recording.id),
+              );
+            }
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Added "${recording.name}" to Favorites'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            // For regular folders, do the actual move
+            context.read<RecordingBloc>().add(
+              MoveRecordingToFolder(
+                recordingId: recording.id,
+                targetFolderId: folderId,
+                currentFolderId: folder.id,
+              ),
+            );
+            
+            // Reload the current folder to reflect the change
+            print('🔄 Reloading folder ${folder.id} after regular move');
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
+              }
+            });
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Moved "${recording.name}" to ${_folderNames[folderId] ?? 'selected folder'}'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
       ),
     );
   }
@@ -289,7 +410,9 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     
     if (audioPlayerService.expandedRecordingId == recording.id) {
       audioPlayerService.stopPlaying();
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
 
     context.read<RecordingBloc>().add(RestoreRecording(recording.id));
@@ -310,11 +433,17 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   }
 
   void toggleFavoriteRecording(RecordingEntity recording) {
-    print('❤️ Toggle favorite for: ${recording.name}');
+    print('❤️ UI LOGIC: Toggle favorite for: ${recording.name}');
+    print('🔍 UI LOGIC: Current favorite status: ${recording.isFavorite}');
+    print('🔍 UI LOGIC: Recording ID: ${recording.id}');
     
-    context.read<RecordingBloc>().add(ToggleFavoriteRecording(recordingId: recording.id));
+    // Pure BLoC: Just trigger the database toggle, let BLoC handle UI update
+    context.read<RecordingBloc>().add(
+      ToggleFavoriteRecording(recordingId: recording.id),
+    );
     
     final isFavorite = recording.isFavorite;
+    print('🔍 UI LOGIC: Showing snackbar based on current status: $isFavorite');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -423,6 +552,124 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void moveSelectedRecordings() {
+    final recordingBloc = context.read<RecordingBloc>();
+    final state = recordingBloc.state;
+    
+    if (state is! RecordingLoaded) return;
+    
+    final selectedCount = state.selectedRecordings.length;
+    if (selectedCount == 0) return;
+
+    _showBulkFolderSelectionDialog(selectedCount);
+  }
+
+  void _showBulkFolderSelectionDialog(int selectedCount) {
+    print('📁 Opening bulk folder selection dialog for $selectedCount recordings');
+    print('📁 User is viewing folder: ${folder.id}');
+    
+    // Check if folders are loaded
+    final folderBloc = context.read<FolderBloc>();
+    final folderState = folderBloc.state;
+    
+    if (folderState is! FolderLoaded) {
+      print('⚠️ Folders not loaded yet, loading folders first');
+      folderBloc.add(const LoadFolders());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading folders...'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+    
+    // Check if all selected recordings are already favorites
+    final recordingBloc = context.read<RecordingBloc>();
+    final recordingState = recordingBloc.state;
+    bool allSelectedAreFavorites = false;
+    
+    if (recordingState is RecordingLoaded) {
+      final selectedRecordings = recordingState.recordings
+          .where((r) => recordingState.selectedRecordings.contains(r.id))
+          .toList();
+      allSelectedAreFavorites = selectedRecordings.isNotEmpty && 
+          selectedRecordings.every((r) => r.isFavorite);
+      print('📁 All selected recordings are favorites: $allSelectedAreFavorites');
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => FolderSelectionDialog(
+        currentFolderId: folder.id,
+        title: 'Move Recordings',
+        subtitle: 'Select a folder for $selectedCount recording${selectedCount > 1 ? 's' : ''}',
+        isRecordingAlreadyFavorite: allSelectedAreFavorites,
+        onFolderSelected: (folderId) {
+          print('📁 Moving $selectedCount selected recordings to folder $folderId');
+          
+          // Handle special folders differently
+          if (folderId == 'favourites') {
+            // For Favorites, we need to toggle favorite for all selected recordings
+            print('💖 Adding $selectedCount recordings to favorites instead of moving folder');
+            
+            // Get selected recording IDs
+            final recordingBloc = context.read<RecordingBloc>();
+            final state = recordingBloc.state;
+            
+            if (state is RecordingLoaded) {
+              // Filter to only recordings that are not already favorites
+              final recordingsToFavorite = state.recordings.where((r) => 
+                state.selectedRecordings.contains(r.id) && !r.isFavorite
+              ).map((r) => r.id).toList();
+              
+              if (recordingsToFavorite.isNotEmpty) {
+                // Pure BLoC: Just trigger the database updates
+                for (final recordingId in recordingsToFavorite) {
+                  recordingBloc.add(
+                    ToggleFavoriteRecording(recordingId: recordingId),
+                  );
+                }
+              }
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Added $selectedCount recording${selectedCount > 1 ? 's' : ''} to Favorites'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            // For regular folders, do the actual move
+            context.read<RecordingBloc>().add(
+              MoveSelectedRecordingsToFolder(
+                targetFolderId: folderId,
+                currentFolderId: folder.id,
+              ),
+            );
+            
+            // Reload the current folder to reflect the changes
+            print('🔄 Reloading folder ${folder.id} after bulk move');
+            Future.delayed(const Duration(milliseconds: 200), () {
+              if (mounted) {
+                context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
+              }
+            });
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Moved $selectedCount recording${selectedCount > 1 ? 's' : ''} to ${_folderNames[folderId] ?? 'selected folder'}'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
       ),
     );
   }

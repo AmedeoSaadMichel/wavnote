@@ -53,6 +53,14 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
 
   @override
   void dispose() {
+    // Clear any callbacks to prevent setState after dispose
+    try {
+      audioPlayerService.setExpansionCallback(null);
+      print('🔧 Cleared audio service expansion callback');
+    } catch (e) {
+      print('⚠️ Error clearing audio service callback: $e');
+    }
+    
     // AudioPlayerService is a singleton, don't dispose it here
     super.dispose();
   }
@@ -124,6 +132,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                         print('📁 RecordingListScreen: Navigation to main completed');
                       },
                       onShowFormatDialog: _showAudioFormatDialog,
+                      onMoveSelected: moveSelectedRecordings,
                     ),
                     Expanded(
                       child: _buildRecordingsList(context),
@@ -147,18 +156,51 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
   /// Build recordings list
   Widget _buildRecordingsList(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
-      // Clean architecture: Only rebuild for meaningful data changes
       buildWhen: (previous, current) {
-        final shouldRebuild = previous.runtimeType != current.runtimeType ||
-            (previous is RecordingLoaded && current is RecordingLoaded && 
-             (previous.recordings != current.recordings ||
-              previous.isEditMode != current.isEditMode ||
-              previous.selectedRecordings != current.selectedRecordings));
-        print('🔍 BUILD_WHEN: ${previous.runtimeType} → ${current.runtimeType}, shouldRebuild: $shouldRebuild');
-        return shouldRebuild;
+        // Always rebuild when state type changes
+        if (previous.runtimeType != current.runtimeType) {
+          print('🔍 BUILD_WHEN: State type changed: ${previous.runtimeType} → ${current.runtimeType}');
+          return true;
+        }
+        
+        // Always rebuild for RecordingLoaded states to ensure UI reflects all changes
+        // This prevents issues with list equality comparison not detecting entity changes
+        if (current is RecordingLoaded) {
+          print('🔍 BUILD_WHEN: RecordingLoaded state - forcing rebuild to ensure UI sync');
+          
+          // Debug favorite status changes
+          if (previous is RecordingLoaded) {
+            print('🔍 DEBUG: Comparing RecordingLoaded states...');
+            print('🔍 DEBUG: Previous recordings count: ${previous.recordings.length}');
+            print('🔍 DEBUG: Current recordings count: ${current.recordings.length}');
+            
+            // Check for favorite status changes
+            for (int i = 0; i < current.recordings.length && i < previous.recordings.length; i++) {
+              final prev = previous.recordings[i];
+              final curr = current.recordings[i];
+              if (prev.id == curr.id && prev.isFavorite != curr.isFavorite) {
+                print('🔍 DEBUG: Favorite status changed for ${curr.name}: ${prev.isFavorite} → ${curr.isFavorite}');
+              }
+            }
+          }
+          
+          return true;
+        }
+        
+        print('🔍 BUILD_WHEN: No rebuild needed for ${current.runtimeType}');
+        return false;
       },
       builder: (context, state) {
-        print('🔍 BREAKPOINT: RecordingListScreen state changed to: ${state.runtimeType}');
+        print('🔍 BUILDER: RecordingListScreen builder called with state: ${state.runtimeType}');
+        
+        if (state is RecordingLoaded) {
+          print('🔍 BUILDER: RecordingLoaded with ${state.recordings.length} recordings');
+          // Debug favorite statuses in current build
+          for (final recording in state.recordings) {
+            print('🔍 BUILDER: Recording ${recording.name} - favorite: ${recording.isFavorite}');
+          }
+        }
+        
         PerformanceLogger.logRebuild('_buildRecordingsList');
         
         // OPTIMIZATION: Eliminate skeleton for RecordingInitial state completely
@@ -238,6 +280,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
               final recording = filteredRecordings[index];
               final isExpanded = audioPlayerService.expandedRecordingId == recording.id;
               print('🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded');
+              print('🔍 UI: Card favorite status: ${recording.isFavorite}');
               return RecordingCard(
                     recording: recording,
                     isExpanded: isExpanded,
@@ -383,6 +426,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
         final recording = filteredRecordings[index];
         final isExpanded = audioPlayerService.expandedRecordingId == recording.id;
         print('🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded');
+        print('🔍 UI: Card favorite status: ${recording.isFavorite}');
         return RecordingCard(
           recording: recording,
           isExpanded: isExpanded,
@@ -422,11 +466,13 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
   final FolderEntity folder;
   final VoidCallback onBack;
   final VoidCallback onShowFormatDialog;
+  final VoidCallback onMoveSelected;
 
   const _RecordingListHeaderWrapper({
     required this.folder,
     required this.onBack,
     required this.onShowFormatDialog,
+    required this.onMoveSelected,
   });
 
   @override
@@ -436,6 +482,7 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
       folderName: folder.name,
       onBack: onBack,
       onShowFormatDialog: onShowFormatDialog,
+      onMoveSelected: onMoveSelected,
     );
   }
 }

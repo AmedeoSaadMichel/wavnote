@@ -8,10 +8,12 @@ import '../../bloc/recording/recording_bloc.dart';
 /// Edit mode toolbar for recording list
 class RecordingEditToolbar extends StatelessWidget {
   final VoidCallback onDeleteSelected;
+  final VoidCallback onMoveSelected;
 
   const RecordingEditToolbar({
     Key? key,
     required this.onDeleteSelected,
+    required this.onMoveSelected,
   }) : super(key: key);
 
   @override
@@ -63,12 +65,23 @@ class RecordingEditToolbar extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               IconButton(
+                onPressed: selectedCount > 0 ? onMoveSelected : null,
+                icon: Icon(
+                  Icons.folder_open,
+                  color: selectedCount > 0 ? Colors.blue : Colors.grey[600],
+                  size: 24,
+                ),
+                tooltip: 'Move to folder',
+              ),
+              const SizedBox(width: 8),
+              IconButton(
                 onPressed: selectedCount > 0 ? onDeleteSelected : null,
                 icon: FaIcon(
                   FontAwesomeIcons.skull,
                   color: selectedCount > 0 ? Colors.red : Colors.grey[600],
                   size: 20,
                 ),
+                tooltip: 'Delete',
               ),
             ],
           ),

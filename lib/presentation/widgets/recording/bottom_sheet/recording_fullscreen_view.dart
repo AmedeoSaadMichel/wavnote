@@ -38,49 +38,28 @@ class RecordingFullscreenView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: [
-        // Top spacer - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 10)),
-
-        // Handle - flexible
+        // Handle - drag indicator (flex: 1)
         Flexible(flex: 1, child: _buildHandle()),
-
-        // Spacing after handle - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 20)),
-
-        // Title section (iOS style) - flexible
+        
+        // Title section - recording name (flex: 2)
         Flexible(flex: 2, child: _buildFullscreenTitle()),
-
-        // Date and duration info - flexible
+        
+        // Date and duration info - timestamp and elapsed time (flex: 1)
         Flexible(flex: 1, child: _buildFullscreenSubtitle()),
-
-        // Spacing before waveform - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 30)),
-
-        // Large waveform visualization (iOS style) - flexible
-        Flexible(flex: 8, child: _buildFullscreenWaveform(context)),
-
-        // Spacing after waveform - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 20)),
-
-        // Large time display (iOS style) - flexible
+        
+        // Large waveform visualization - main visual element (flex: 6)
+        Flexible(flex: 6, child: _buildFullscreenWaveform(context)),
+        
+        // Large time display - prominent elapsed time (flex: 2)
         Flexible(flex: 2, child: _buildFullscreenTimeDisplay()),
-
-        // Spacing before controls - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 20)),
-
-        // Playback controls (iOS style) - flexible
+        
+        // Playback controls - play/pause buttons (flex: 2)
         Flexible(flex: 2, child: _buildFullscreenPlaybackControls()),
-
-        // Spacing before action button - flexible
-        const Flexible(flex: 2, child: SizedBox(height: 40)),
-
-        // Main action button (Pause/Replace) - flexible
+        
+        // Main action button - pause/done controls (flex: 2)
         Flexible(flex: 2, child: _buildFullscreenActionButton()),
-
-        // Bottom spacing - flexible
-        const Flexible(flex: 1, child: SizedBox(height: 40)),
       ],
     );
   }

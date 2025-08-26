@@ -230,11 +230,13 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
         
         // RecordingBloc: Manages recording operations (record, play, save, delete)
         // Injected with global services for audio, data, and location
+        // Also gets FolderBloc reference for automatic folder count updates
         BlocProvider(
           create: (context) => RecordingBloc(
             audioService: globalAudioService,          // Audio recording and playback
             recordingRepository: globalRecordingRepository, // Data persistence
             geolocationService: globalGeolocationService,   // Location-based naming
+            folderBloc: context.read<FolderBloc>(),         // Folder count updates
           ),
         ),
         

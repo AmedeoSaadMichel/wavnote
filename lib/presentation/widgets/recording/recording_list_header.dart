@@ -12,12 +12,14 @@ class RecordingListHeader extends StatelessWidget {
   final String folderName;
   final VoidCallback onBack;
   final VoidCallback? onShowFormatDialog;
+  final VoidCallback? onMoveSelected;
 
   const RecordingListHeader({
     Key? key,
     required this.folderName,
     required this.onBack,
     this.onShowFormatDialog,
+    this.onMoveSelected,
   }) : super(key: key);
 
   /// Show confirmation dialog for deleting selected recordings
@@ -93,57 +95,98 @@ class RecordingListHeader extends StatelessWidget {
                       size: 24,
                     ),
                   ),
-                  // Folder title (centered, flexible)
+                  // Folder title with format button (left-aligned like main screen)
                   Expanded(
                     flex: 4,
-                    child: Text(
-                      folderName,
-                      style: const TextStyle(
-                        color: AppConstants.accentYellow,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          folderName,
+                          style: const TextStyle(
+                            color: AppConstants.accentYellow,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        // Format button right next to title (like main screen)
+                        if (!isEditMode && onShowFormatDialog != null) ...[
+                          const SizedBox(width: 8),
+                          BlocBuilder<SettingsBloc, SettingsState>(
+                            builder: (context, settingsState) {
+                              AudioFormat currentFormat = AudioFormat.m4a;
+                              if (settingsState is SettingsLoaded) {
+                                currentFormat = settingsState.settings.audioFormat;
+                              }
+                              
+                              return GestureDetector(
+                                onTap: onShowFormatDialog,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        currentFormat.icon,
+                                        color: currentFormat.color,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        currentFormat.name,
+                                        style: TextStyle(
+                                          color: currentFormat.color,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  // Format button (only when not in edit mode and callback provided)
-                  if (!isEditMode && onShowFormatDialog != null)
-                    BlocBuilder<SettingsBloc, SettingsState>(
-                      builder: (context, settingsState) {
-                        AudioFormat currentFormat = AudioFormat.m4a;
-                        if (settingsState is SettingsLoaded) {
-                          currentFormat = settingsState.settings.audioFormat;
-                        }
-                        
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: GestureDetector(
-                            onTap: onShowFormatDialog,
+                  // Action buttons (right-aligned)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isEditMode && recordingState is RecordingLoaded && recordingState.selectedRecordings.isNotEmpty) ...[
+                        // Move to folder button
+                        if (folderName != 'Recently Deleted' && onMoveSelected != null) ...[
+                          GestureDetector(
+                            onTap: onMoveSelected,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.blue.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.1),
+                                  color: Colors.blue.withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                              child: const Row(
                                 children: [
-                                  Icon(
-                                    currentFormat.icon,
-                                    color: currentFormat.color,
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 3),
+                                  Icon(Icons.folder_open, color: Colors.white, size: 14),
+                                  SizedBox(width: 4),
                                   Text(
-                                    currentFormat.name,
+                                    'Move',
                                     style: TextStyle(
-                                      color: currentFormat.color,
-                                      fontSize: 11,
+                                      color: Colors.white,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -151,14 +194,8 @@ class RecordingListHeader extends StatelessWidget {
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  // Action buttons (right-aligned)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isEditMode && recordingState is RecordingLoaded && recordingState.selectedRecordings.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                        ],
                         // Delete selected recordings button with skull icon
                         GestureDetector(
                           onTap: () {

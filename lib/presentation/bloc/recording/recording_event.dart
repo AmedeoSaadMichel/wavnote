@@ -215,3 +215,34 @@ class ToggleFavoriteRecording extends RecordingEvent {
   @override
   List<Object> get props => [recordingId];
 }
+
+/// Event to move a single recording to a different folder
+class MoveRecordingToFolder extends RecordingEvent {
+  final String recordingId;
+  final String targetFolderId;
+  final String currentFolderId; // Context for UI refresh
+  
+  const MoveRecordingToFolder({
+    required this.recordingId,
+    required this.targetFolderId,
+    required this.currentFolderId,
+  });
+  
+  @override
+  List<Object> get props => [recordingId, targetFolderId, currentFolderId];
+}
+
+/// Event to move selected recordings to a different folder
+class MoveSelectedRecordingsToFolder extends RecordingEvent {
+  final String targetFolderId;
+  final String currentFolderId; // Context for UI refresh
+  
+  const MoveSelectedRecordingsToFolder({
+    required this.targetFolderId,
+    required this.currentFolderId,
+  });
+  
+  @override
+  List<Object> get props => [targetFolderId, currentFolderId];
+}
+

@@ -57,6 +57,9 @@ import '../../../domain/usecases/recording/pause_recording_usecase.dart'; // Rec
 // Service imports
 import '../../../services/location/geolocation_service.dart'; // Location-based recording naming
 
+// BLoC imports for folder count updates
+import '../folder/folder_bloc.dart'; // Folder BLoC for count updates
+
 // BLoC parts
 part 'recording_event.dart'; // Recording events (user actions)
 part 'recording_state.dart'; // Recording states (app states)
@@ -98,6 +101,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final StartRecordingUseCase _startRecordingUseCase;
   final StopRecordingUseCase _stopRecordingUseCase;
   final PauseRecordingUseCase _pauseRecordingUseCase;
+  final FolderBloc? _folderBloc; // Optional folder BLoC for count updates
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
@@ -107,11 +111,13 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
     required GeolocationService geolocationService,
+    FolderBloc? folderBloc,
     StartRecordingUseCase? startRecordingUseCase,
     StopRecordingUseCase? stopRecordingUseCase,
     PauseRecordingUseCase? pauseRecordingUseCase,
   }) : _audioService = audioService,
         _recordingRepository = recordingRepository,
+        _folderBloc = folderBloc,
         _startRecordingUseCase = startRecordingUseCase ?? StartRecordingUseCase(
           audioService: audioService,
           geolocationService: geolocationService,
@@ -150,6 +156,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<DeselectAllRecordings>(_onDeselectAllRecordings);
     on<DeleteSelectedRecordings>(_onDeleteSelectedRecordings);
     on<ToggleFavoriteRecording>(_onToggleFavoriteRecording);
+    on<MoveRecordingToFolder>(_onMoveRecordingToFolder);
+    on<MoveSelectedRecordingsToFolder>(_onMoveSelectedRecordingsToFolder);
     on<DebugLoadAllRecordings>(_onDebugLoadAllRecordings);
     on<DebugCreateTestRecording>(_onDebugCreateTestRecording);
 
@@ -289,6 +297,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       if (result.isSuccess) {
         emit(RecordingCompleted(recording: result.recording!));
         print('✅ Recording completed and saved: ${result.recording!.name}');
+        
+        // Refresh folder counts after recording is saved
+        _refreshFolderCounts();
       } else {
         print('❌ Failed to stop recording: ${result.errorMessage}');
         final errorType = _mapStopRecordingErrorType(result.errorType!);
@@ -509,6 +520,14 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   // ==== PRIVATE HELPER METHODS ====
 
+  /// Refresh folder counts after recording operations
+  void _refreshFolderCounts() {
+    if (_folderBloc != null && !isClosed) {
+      _folderBloc!.add(const RefreshFolders());
+      print('🔄 Triggered folder count refresh');
+    }
+  }
+
   /// Start amplitude updates for visualization
   void _startAmplitudeUpdates() {
     _amplitudeSubscription?.cancel();
@@ -661,6 +680,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         
         print('✅ Successfully deleted ${selectedIds.length} recordings');
         
+        // Refresh folder counts after bulk deletion
+        _refreshFolderCounts();
+        
       } catch (e) {
         print('❌ Error deleting selected recordings: $e');
         emit(RecordingError(
@@ -677,38 +699,81 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       final currentState = state as RecordingLoaded;
       
       try {
-        print('❤️ Toggling favorite for recording: ${event.recordingId}');
+        print('❤️ DEBUG: Starting toggle favorite for recording: ${event.recordingId}');
+        print('🔍 DEBUG: Current state has ${currentState.recordings.length} recordings');
         
-        // Find the recording
-        final recording = currentState.recordings.firstWhere(
+        // Find the recording to toggle
+        final targetRecording = currentState.recordings.firstWhere(
           (r) => r.id == event.recordingId,
+          orElse: () => throw Exception('Recording not found in current state'),
         );
         
-        // Toggle favorite status
-        final success = await _recordingRepository.toggleFavorite(event.recordingId);
+        print('🔍 DEBUG: Found target recording: ${targetRecording.name}');
+        print('🔍 DEBUG: Current favorite status: ${targetRecording.isFavorite}');
         
-        if (success) {
-          // Update the recording in the list
+        // Toggle favorite status in database
+        print('🔄 DEBUG: Calling repository.toggleFavorite...');
+        final success = await _recordingRepository.toggleFavorite(event.recordingId);
+        print('🔄 DEBUG: Repository toggle result: $success');
+        
+        if (success && !isClosed) {
+          print('🔄 DEBUG: Creating updated recordings list...');
+          
+          // Update the recording in the list (simple toggle)
           final updatedRecordings = currentState.recordings.map((r) {
             if (r.id == event.recordingId) {
-              return r.toggleFavorite();
+              final toggled = r.toggleFavorite();
+              print('🔄 DEBUG: Toggled ${r.name} from ${r.isFavorite} to ${toggled.isFavorite}');
+              return toggled;
             }
             return r;
           }).toList();
           
-          emit(currentState.copyWith(recordings: updatedRecordings));
-          print('✅ Successfully toggled favorite status');
+          print('🔄 DEBUG: Updated recordings list created with ${updatedRecordings.length} recordings');
+          
+          // Verify the change was applied
+          final updatedTargetRecording = updatedRecordings.firstWhere((r) => r.id == event.recordingId);
+          print('🔍 DEBUG: Verified updated recording favorite status: ${updatedTargetRecording.isFavorite}');
+          
+          // Create a completely new state with current timestamp to force equality check
+          final newState = RecordingLoaded(
+          updatedRecordings,
+            isEditMode: currentState.isEditMode,
+            selectedRecordings: currentState.selectedRecordings,
+            timestamp: DateTime.now(), // Force new timestamp
+          );
+          
+          print('🔄 DEBUG: About to emit new state...');
+          print('🔄 DEBUG: New state type: ${newState.runtimeType}');
+          print('🔄 DEBUG: New state recordings count: ${newState.recordings.length}');
+          
+          emit(newState);
+          
+          print('✅ DEBUG: State emitted successfully');
+          print('✅ DEBUG: Current state after emit: ${state.runtimeType}');
+          if (state is RecordingLoaded) {
+            final verifyState = state as RecordingLoaded;
+            final verifyRecording = verifyState.recordings.firstWhere((r) => r.id == event.recordingId);
+            print('✅ DEBUG: Final verification - favorite status: ${verifyRecording.isFavorite}');
+          }
+          
+          // Refresh folder counts after favorite status is toggled
+          _refreshFolderCounts();
         } else {
+          print('❌ DEBUG: Repository toggle failed or BLoC closed');
           throw Exception('Failed to toggle favorite status');
         }
         
       } catch (e) {
-        print('❌ Error toggling favorite: $e');
+        print('❌ ERROR: Exception in toggle favorite: $e');
+        print('❌ ERROR: Stack trace: ${StackTrace.current}');
         emit(RecordingError(
           'Failed to toggle favorite: ${e.toString()}',
           errorType: RecordingErrorType.unknown,
         ));
       }
+    } else {
+      print('❌ DEBUG: Cannot toggle favorite - state is not RecordingLoaded: ${state.runtimeType}');
     }
   }
 
@@ -738,6 +803,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         
         emit(currentState.copyWith(recordings: updatedRecordings));
         print('✅ Recording deleted successfully and list updated');
+        
+        // Refresh folder counts after recording is deleted
+        _refreshFolderCounts();
       }
       
     } catch (e) {
@@ -767,6 +835,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           
           emit(currentState.copyWith(recordings: updatedRecordings));
           print('✅ Recording soft deleted successfully and list updated');
+          
+          // Refresh folder counts after recording is soft deleted
+          _refreshFolderCounts();
         }
       } else {
         throw Exception('Failed to soft delete recording');
@@ -799,6 +870,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           
           emit(currentState.copyWith(recordings: updatedRecordings));
           print('✅ Recording permanently deleted successfully and list updated');
+          
+          // Refresh folder counts after recording is permanently deleted
+          _refreshFolderCounts();
         }
       } else {
         throw Exception('Failed to permanently delete recording');
@@ -831,6 +905,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           
           emit(currentState.copyWith(recordings: updatedRecordings));
           print('✅ Recording restored successfully and removed from Recently Deleted list');
+          
+          // Refresh folder counts after recording is restored
+          _refreshFolderCounts();
         }
       } else {
         throw Exception('Failed to restore recording');
@@ -916,6 +993,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       
       emit(RecordingCompleted(recording: savedRecording));
       print('🧪 DEBUG: Test recording created and saved: ${savedRecording.name}');
+      
+      // Refresh folder counts after test recording is created
+      _refreshFolderCounts();
 
     } catch (e) {
       print('❌ DEBUG: Error creating test recording: $e');
@@ -924,6 +1004,96 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         errorType: RecordingErrorType.unknown,
       ));
     }
+  }
+
+  /// Move a single recording to a different folder
+  Future<void> _onMoveRecordingToFolder(MoveRecordingToFolder event, Emitter<RecordingState> emit) async {
+    try {
+      print('📁 Moving recording ${event.recordingId} from ${event.currentFolderId} to folder ${event.targetFolderId}');
+      
+      // Move the recording using repository method
+      await _recordingRepository.moveRecordingsToFolder([event.recordingId], event.targetFolderId);
+      
+      // Refresh the current folder's recordings to reflect the move
+      final currentState = state;
+      if (currentState is RecordingLoaded && !isClosed) {
+        final updatedRecordings = await _recordingRepository.getRecordingsByFolder(event.currentFolderId);
+        if (!isClosed) {
+          emit(currentState.copyWith(recordings: updatedRecordings));
+        }
+      }
+      
+      // Refresh folder counts after move
+      _refreshFolderCounts();
+      
+      print('✅ Recording moved successfully');
+      
+    } catch (e) {
+      print('❌ Error moving recording: $e');
+      emit(RecordingError(
+        'Failed to move recording: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+  /// Move selected recordings to a different folder
+  Future<void> _onMoveSelectedRecordingsToFolder(MoveSelectedRecordingsToFolder event, Emitter<RecordingState> emit) async {
+    try {
+      final currentState = state;
+      if (currentState is! RecordingLoaded) {
+        return;
+      }
+
+      final selectedIds = currentState.selectedRecordings.toList();
+      if (selectedIds.isEmpty) {
+        print('⚠️ No recordings selected for move operation');
+        return;
+      }
+
+      print('📁 Moving ${selectedIds.length} selected recordings from ${event.currentFolderId} to folder ${event.targetFolderId}');
+      
+      // Move the recordings using repository method
+      await _recordingRepository.moveRecordingsToFolder(selectedIds, event.targetFolderId);
+      
+      // Refresh the current folder's recordings to reflect the move
+      if (!isClosed) {
+        final updatedRecordings = await _recordingRepository.getRecordingsByFolder(event.currentFolderId);
+        
+        // Clear selection and exit edit mode with updated recordings
+        if (!isClosed) {
+          emit(currentState.copyWith(
+            recordings: updatedRecordings,
+            selectedRecordings: const {},
+            isEditMode: false,
+          ));
+        }
+      }
+      
+      // Refresh folder counts after move
+      _refreshFolderCounts();
+      
+      print('✅ ${selectedIds.length} recordings moved successfully');
+      
+    } catch (e) {
+      print('❌ Error moving selected recordings: $e');
+      emit(RecordingError(
+        'Failed to move recordings: ${e.toString()}',
+        errorType: RecordingErrorType.unknown,
+      ));
+    }
+  }
+
+
+  /// Check if we need to reload recordings after a favorite toggle
+  /// This is needed for special views like "Favorites" that show recordings based on database queries
+  bool _needsReloadAfterFavoriteToggle(List<RecordingEntity> recordings) {
+    if (recordings.isEmpty) return false;
+    
+    // If we have recordings from different folders, we're probably in a special view
+    // like "All Recordings" or "Favorites" that needs database reload
+    final folderIds = recordings.map((r) => r.folderId).toSet();
+    return folderIds.length > 1;
   }
 
 }
