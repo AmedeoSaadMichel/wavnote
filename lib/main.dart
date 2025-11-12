@@ -119,7 +119,7 @@ void main() async {
       print('❌ Failed to initialize audio service - recording may not work');
     } else {
       print('✅ Audio service initialized successfully');
-    }
+    }  
 
   } catch (e) {
     // Log initialization errors but continue app startup

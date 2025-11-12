@@ -753,36 +753,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Build folder item in normal mode (with dismissible delete)
+  /// Build folder item in normal mode (with swipe delete)
   Widget _buildNormalFolderItem(FolderEntity folder) {
-    return Dismissible(
-      key: Key(folder.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const FaIcon(
-          FontAwesomeIcons.skull,
-          color: Colors.white,
-          size: 24,
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        _onFolderDelete(folder);
-        return false; // Don't auto-dismiss, let the Bloc handle it
-      },
-      child: GestureDetector(
-        onTap: () => _onFolderTap(folder),
-        onLongPress: () => setState(() => _selectedFolder = folder),
-        child: FolderItem(
-          folder: folder,
-          onTap: () => _onFolderTap(folder),
-        ),
-      ),
+    return FolderItem(
+      folder: folder,
+      onTap: () => _onFolderTap(folder),
+      onLongPress: () => setState(() => _selectedFolder = folder),
+      onDelete: folder.canBeDeleted ? () => _onFolderDelete(folder) : null,
     );
   }
 

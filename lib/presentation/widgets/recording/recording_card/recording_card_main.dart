@@ -161,13 +161,14 @@ class RecordingCard extends StatefulWidget {
 class _RecordingCardState extends State<RecordingCard> with TickerProviderStateMixin {
   double _sliderPosition = 0.0;
   bool _wasPlayingLastUpdate = false;
-  
+  bool _isUserDragging = false;  // Track if user is dragging the slider
+
   // Swipe animation controllers
   late AnimationController _swipeController;
   late Animation<double> _swipeAnimation;
   double _swipeOffset = 0.0;
   bool _isSwipeActionsVisible = false;
-  
+
   // Favorite action animation controller
   late AnimationController _favoriteController;
   late Animation<double> _favoriteAnimation;
@@ -228,47 +229,56 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
   @override
   void didUpdateWidget(RecordingCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.recording.id != widget.recording.id) {
       _sliderPosition = 0.0;
+      _isUserDragging = false; // Reset dragging flag when recording changes
     }
-    
+
     // Detect when audio stops playing (end of recording)
     if (widget.isExpanded && _wasPlayingLastUpdate && !widget.isPlaying) {
       final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
       final totalDurationMs = effectiveDuration.inMilliseconds;
       final currentPositionMs = widget.currentPosition.inMilliseconds;
       final isNearEnd = (totalDurationMs - currentPositionMs) <= 500; // Within 500ms of end
-      
+
       print('🔚 Audio stopped - Position: ${currentPositionMs}ms/${totalDurationMs}ms (effective), Near end: $isNearEnd');
-      
+
       if (isNearEnd) {
         print('🔚 Recording finished, resetting slider to beginning');
         // Reset slider to beginning when recording finishes
         setState(() {
           _sliderPosition = 0.0;
+          _isUserDragging = false; // Also reset dragging flag
         });
         // Note: Audio player position will be reset by the audio player manager
       }
     }
-    
+
     _wasPlayingLastUpdate = widget.isPlaying;
     _syncSliderWithAudio();
   }
   
   void _syncSliderWithAudio() {
+    // Don't update slider position while user is dragging
+    if (_isUserDragging) {
+      print('🛑 DRAG: Blocking slider sync - user is dragging');
+      return;
+    }
+
     // Always prioritize actual audio player duration when available
     final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
     final totalDurationMs = effectiveDuration.inMilliseconds;
     final currentPositionMs = widget.currentPosition.inMilliseconds;
-    
+
     if (totalDurationMs > 0 && widget.isExpanded) {
       // Precise millisecond-based calculation using actual audio duration
       final audioProgress = currentPositionMs / totalDurationMs;
       final clampedProgress = audioProgress.clamp(0.0, 1.0);
-      
+
       // Always update slider position to match audio precisely
       if ((clampedProgress - _sliderPosition).abs() > 0.001) {
+        print('🔄 SYNC: Updating slider from ${_sliderPosition.toStringAsFixed(3)} to ${clampedProgress.toStringAsFixed(3)}');
         setState(() {
           _sliderPosition = clampedProgress;
         });
@@ -276,10 +286,27 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     }
   }
 
+  void _handleSliderChangeStart(double position) {
+    print('👆 DRAG START: Setting drag flag to true at position ${position.toStringAsFixed(3)}');
+    setState(() {
+      _isUserDragging = true;
+    });
+  }
+
   void _handleSliderChanged(double position) {
+    print('👆 DRAGGING: Moving slider to ${position.toStringAsFixed(3)}');
     setState(() {
       _sliderPosition = position;
     });
+  }
+
+  void _handleSliderChangeEnd(double position) {
+    print('👆 DRAG END: Releasing at ${position.toStringAsFixed(3)}, seeking...');
+    setState(() {
+      _isUserDragging = false;
+    });
+
+    // Seek to the final position when user releases the slider
     widget.onSeek(position);
   }
 
@@ -648,17 +675,20 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          // Progress slider - OPTIMIZED
+          // Progress slider - OPTIMIZED with drag handling
           ValueListenableBuilder<Duration>(
             valueListenable: widget.audioStateManager!.positionNotifier,
             builder: (context, position, child) {
               return ValueListenableBuilder<Duration>(
                 valueListenable: widget.audioStateManager!.durationNotifier,
                 builder: (context, duration, child) {
-                  final progress = duration.inMilliseconds > 0 
-                      ? position.inMilliseconds / duration.inMilliseconds 
-                      : 0.0;
-                  
+                  // Don't update from audio stream while user is dragging
+                  final progress = _isUserDragging
+                      ? _sliderPosition  // Use frozen slider position during drag
+                      : (duration.inMilliseconds > 0
+                          ? position.inMilliseconds / duration.inMilliseconds
+                          : 0.0);
+
                   return SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 6.0,
@@ -673,7 +703,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                       value: progress.clamp(0.0, 1.0),
                       min: 0.0,
                       max: 1.0,
-                      onChanged: widget.isLoading ? null : (value) => widget.onSeek(value),
+                      onChangeStart: widget.isLoading ? null : _handleSliderChangeStart,
+                      onChanged: widget.isLoading ? null : _handleSliderChanged,
+                      onChangeEnd: widget.isLoading ? null : _handleSliderChangeEnd,
                     ),
                   );
                 },
@@ -740,7 +772,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
               value: _sliderPosition,
               min: 0.0,
               max: 1.0,
+              onChangeStart: widget.isLoading ? null : _handleSliderChangeStart,
               onChanged: widget.isLoading ? null : _handleSliderChanged,
+              onChangeEnd: widget.isLoading ? null : _handleSliderChangeEnd,
             ),
           ),
           
