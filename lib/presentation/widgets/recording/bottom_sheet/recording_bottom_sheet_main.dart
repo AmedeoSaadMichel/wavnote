@@ -19,6 +19,7 @@ class RecordingBottomSheet extends StatefulWidget {
   final String? title; // Recording title to display
   final String? filePath; // Path to the file being recorded
   final bool isRecording; // Whether a recording is currently in progress
+  final bool isPaused; // Whether the recording is paused
   final VoidCallback onToggle; // Callback to start/stop recording
   final Duration elapsed; // Time elapsed since the recording started
   final double width; // Available screen width
@@ -26,12 +27,17 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onPause; // Callback for pause action
   final VoidCallback? onDone; // Callback for done action
   final VoidCallback? onChat; // Callback for chat/transcript action
+  final VoidCallback? onPlay; // Callback for play action
+  final VoidCallback? onRewind; // Callback for rewind action
+  final VoidCallback? onForward; // Callback for forward action
+  final Function(double)? onSeek; // Callback for seek action
 
   const RecordingBottomSheet({
     super.key,
     required this.title,
     required this.filePath,
     required this.isRecording,
+    this.isPaused = false,
     required this.onToggle,
     required this.elapsed,
     required this.width,
@@ -39,6 +45,10 @@ class RecordingBottomSheet extends StatefulWidget {
     this.onPause,
     this.onDone,
     this.onChat,
+    this.onPlay,
+    this.onRewind,
+    this.onForward,
+    this.onSeek,
   });
 
   @override
@@ -118,7 +128,27 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _pulseController.stop();
         _pulseController.reset();
         _stopWaveformRecording();
+
+        // AUTO-COLLAPSE: Only collapse when NOT paused (i.e., recording actually stopped)
+        if (!widget.isPaused) {
+          print('🔽 AUTO-COLLAPSE: Recording stopped, collapsing bottom sheet');
+          setState(() {
+            _sheetOffset = 0;
+          });
+          _sheetAnimationController.animateTo(0);
+        } else {
+          print('⏸️ PAUSED: Keeping bottom sheet open');
+        }
       }
+    }
+
+    // AUTO-COLLAPSE: When paused changes to false and not recording, collapse
+    if (widget.isPaused != oldWidget.isPaused && !widget.isPaused && !widget.isRecording) {
+      print('🔽 AUTO-COLLAPSE: Done clicked, collapsing bottom sheet');
+      setState(() {
+        _sheetOffset = 0;
+      });
+      _sheetAnimationController.animateTo(0);
     }
   }
 
@@ -288,9 +318,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   Widget build(BuildContext context) {
     maxHeight = MediaQuery.of(context).size.height * 0.9;
 
-    // When not recording, sheet is fixed height and not draggable
-    // Add safe area bottom padding to ensure it reaches the screen bottom
-    final double currentHeight = widget.isRecording
+    // When recording or paused, sheet is draggable and can be expanded
+    // When not recording and not paused, sheet is fixed height
+    final bool canExpand = widget.isRecording || widget.isPaused;
+
+    final double currentHeight = canExpand
         ? minHeight + (maxHeight - minHeight) * _sheetOffset + MediaQuery.of(context).padding.bottom
         : 180 + MediaQuery.of(context).padding.bottom;
 
@@ -303,9 +335,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         curve: Curves.easeInOutCubic,
         height: currentHeight,
         child: GestureDetector(
-          onVerticalDragStart: widget.isRecording ? _onVerticalDragStart : null,
-          onVerticalDragUpdate: widget.isRecording ? _onVerticalDragUpdate : null,
-          onVerticalDragEnd: widget.isRecording ? _onVerticalDragEnd : null,
+          onVerticalDragStart: canExpand ? _onVerticalDragStart : null,
+          onVerticalDragUpdate: canExpand ? _onVerticalDragUpdate : null,
+          onVerticalDragEnd: canExpand ? _onVerticalDragEnd : null,
           child: _buildContainer(),
         ),
       ),
@@ -353,12 +385,18 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                 title: widget.title,
                 elapsed: widget.elapsed,
                 isRecording: widget.isRecording,
+                isPaused: widget.isPaused,
                 filePath: widget.filePath,
                 recorderController: _recorderController,
                 getCapturedWaveformData: getCapturedWaveformData,
+                onToggle: widget.onToggle, // Same as compact view
                 onPause: widget.onPause,
                 onDone: widget.onDone,
                 onChat: widget.onChat,
+                onPlay: widget.onPlay,
+                onRewind: widget.onRewind,
+                onForward: widget.onForward,
+                onSeek: widget.onSeek,
               )
             : RecordingCompactView(
                 key: const ValueKey('compact'),

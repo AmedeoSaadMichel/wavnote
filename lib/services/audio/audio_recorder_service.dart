@@ -31,6 +31,7 @@ class AudioRecorderService implements IAudioServiceRepository {
   DateTime? _recordingStartTime;
   Duration _pausedDuration = Duration.zero;
   DateTime? _pauseStartTime;
+  Timer? _durationMonitoringTimer;
 
   // Recording settings
   int _currentSampleRate = 44100;
@@ -87,7 +88,7 @@ class AudioRecorderService implements IAudioServiceRepository {
   @override
   Future<void> dispose() async {
     debugPrint('$_tag: Disposing real audio service...');
-    
+
     try {
       // Stop any ongoing operations
       if (_isRecording) {
@@ -96,6 +97,9 @@ class AudioRecorderService implements IAudioServiceRepository {
       if (_isPlaying) {
         await stopPlaying();
       }
+
+      // Cancel any active timers
+      _durationMonitoringTimer?.cancel();
     } catch (e) {
       debugPrint('$_tag: ⚠️ Error stopping operations during disposal: $e');
     }
@@ -417,7 +421,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
     try {
       await _recorder!.resumeRecorder();
-      
+
       // Add paused time to total paused duration
       if (_pauseStartTime != null) {
         _pausedDuration += DateTime.now().difference(_pauseStartTime!);
@@ -426,6 +430,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
       _isRecordingPaused = false;
       _startRealAmplitudeMonitoring();
+      _startDurationMonitoring();
 
       debugPrint('$_tag: ▶️ Real recording resumed');
       return true;
@@ -834,12 +839,16 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   /// Start duration monitoring
   void _startDurationMonitoring() {
-    Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (_isRecording) {
+    // Cancel any existing timer
+    _durationMonitoringTimer?.cancel();
+
+    _durationMonitoringTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (_isRecording && !_isRecordingPaused) {
         final duration = _calculateTotalRecordingDuration();
         _positionController?.add(duration);
-      } else {
+      } else if (!_isRecording) {
         timer.cancel();
+        _durationMonitoringTimer = null;
       }
     });
     debugPrint('$_tag: Duration monitoring started');
@@ -847,6 +856,8 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   /// Stop duration monitoring
   void _stopDurationMonitoring() {
+    _durationMonitoringTimer?.cancel();
+    _durationMonitoringTimer = null;
     debugPrint('$_tag: Duration monitoring stopped');
   }
 

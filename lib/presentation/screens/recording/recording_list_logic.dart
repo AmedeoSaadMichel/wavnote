@@ -496,20 +496,55 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
 
   void pauseRecording() {
     final recordingBloc = context.read<RecordingBloc>();
+    print('⏸️ Pause button clicked - Current state: ${recordingBloc.state.runtimeType}');
+    print('   canPauseRecording: ${recordingBloc.state.canPauseRecording}');
+    print('   canResumeRecording: ${recordingBloc.state.canResumeRecording}');
+
     if (recordingBloc.state.canPauseRecording) {
+      print('   ✅ Calling PauseRecording event');
       recordingBloc.add(const PauseRecording());
     } else if (recordingBloc.state.canResumeRecording) {
+      print('   ✅ Calling ResumeRecording event');
       recordingBloc.add(const ResumeRecording());
+    } else {
+      print('   ❌ Cannot pause or resume - invalid state');
     }
   }
 
   void finishRecording() {
-    print('🎵 Finishing recording - waveform will be extracted from file...');
+    final recordingBloc = context.read<RecordingBloc>();
+    print('🎵 Finishing recording - Current state: ${recordingBloc.state.runtimeType}');
+    print('   isRecording: ${recordingBloc.state.isRecording}');
+    print('   canStopRecording: ${recordingBloc.state is RecordingInProgress || recordingBloc.state is RecordingPaused}');
+
     context.read<RecordingBloc>().add(const StopRecording()); // No synthetic waveform data
   }
 
   void showTranscriptOptions() {
     print('🎤 Transcript options tapped');
+  }
+
+  void playRecording() {
+    print('▶️ Play recording tapped - resuming recording');
+    final recordingBloc = context.read<RecordingBloc>();
+    if (recordingBloc.state.canResumeRecording) {
+      recordingBloc.add(const ResumeRecording());
+    }
+  }
+
+  void rewindRecording() {
+    print('⏪ Rewind 10 seconds tapped');
+    // TODO: Implement rewind 10 seconds
+  }
+
+  void forwardRecording() {
+    print('⏩ Forward 10 seconds tapped');
+    // TODO: Implement forward 10 seconds
+  }
+
+  void seekRecording(double position) {
+    print('🎯 Seek to position: ${(position * 100).toStringAsFixed(1)}%');
+    // TODO: Implement seek to position (0.0-1.0)
   }
 
   void deleteSelectedRecordings() {

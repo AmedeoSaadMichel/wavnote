@@ -333,17 +333,21 @@ class AudioPlayerService implements IAudioServiceRepository {
         
         // Handle natural completion
         if (state.processingState == ProcessingState.completed && !_hasCompletedCurrentPlayback) {
-          debugPrint('🔚 Audio completed naturally at 100%');
+          debugPrint('🔚 Audio completed naturally, resetting slider to zero');
           _audioStateManager!.updatePlaybackState(isPlaying: false);
-          _audioStateManager!.updatePosition(_audioStateManager!.duration); // Set to full duration for 100% completion
+
+          // CRITICAL: Reset position to zero immediately when playback completes
+          // This makes the slider return to 0% ready for next playback
+          _audioStateManager!.updatePosition(Duration.zero);
+          _playbackPosition = Duration.zero;
+
           _hasCompletedCurrentPlayback = true;
+          debugPrint('🔚 FLAG SET: _hasCompletedCurrentPlayback = true');
+          debugPrint('🔚 Slider reset to 0% - ready for next play');
+
           _playbackActive = false;
           _playbackPaused = false;
           _completionStreamController?.add(null);
-          
-          // DON'T auto-reset - let the user decide when to restart
-          // Position will be reset when user clicks play again via togglePlayback()
-          debugPrint('🔚 Audio completed, staying at end position - no auto-restart');
         }
         
         // Debug all state changes
@@ -558,17 +562,30 @@ class AudioPlayerService implements IAudioServiceRepository {
   /// Toggle playback (from AudioPlayerManager)
   Future<void> togglePlayback() async {
     try {
-      if (_audioPlayer!.playing) {
+      // CRITICAL: Check completion flag FIRST, before checking playing state
+      // When playback completes naturally, _audioPlayer!.playing might still be true
+      debugPrint('🔍 togglePlayback: _hasCompletedCurrentPlayback=$_hasCompletedCurrentPlayback, playing=${_audioPlayer!.playing}');
+
+      if (_hasCompletedCurrentPlayback) {
+        debugPrint('🔄 Playback already completed - restarting from zero');
+
+        // Position is already at zero (set when playback completed)
+        // Just need to seek and play
+        await seekTo(Duration.zero);
+        _hasCompletedCurrentPlayback = false;
+
+        // Start playback from beginning
+        await _audioPlayer!.play();
+        _playbackActive = true;
+        _playbackPaused = false;
+        _audioStateManager?.updatePlaybackState(isPlaying: true);
+        debugPrint('▶️ Restarted playback from beginning');
+      } else if (_audioPlayer!.playing) {
+        debugPrint('⏸️ togglePlayback: Pausing playback');
         await pausePlaying();
       } else {
-        // Reset completion flag when starting new playback
-        _hasCompletedCurrentPlayback = false;
-        
-        // Handle completed state
-        if ((_audioStateManager?.position ?? Duration.zero) >= (_audioStateManager?.duration ?? Duration.zero) && 
-            (_audioStateManager?.duration ?? Duration.zero) > Duration.zero) {
-          await seekTo(Duration.zero);
-        }
+        debugPrint('▶️ togglePlayback: Resuming playback');
+        // Normal resume
         await resumePlaying();
       }
     } catch (e) {

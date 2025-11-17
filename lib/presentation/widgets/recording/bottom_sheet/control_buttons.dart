@@ -5,10 +5,16 @@ import 'dart:math' as math;
 /// Fullscreen playback controls (iOS style)
 class FullscreenPlaybackControls extends StatelessWidget {
   final bool isRecording;
+  final VoidCallback? onPlay;
+  final VoidCallback? onRewind;
+  final VoidCallback? onForward;
 
   const FullscreenPlaybackControls({
     super.key,
     required this.isRecording,
+    this.onPlay,
+    this.onRewind,
+    this.onForward,
   });
 
   @override
@@ -21,37 +27,37 @@ class FullscreenPlaybackControls extends StatelessWidget {
           flex: 2,
           child: _buildFullscreenControlButton(
             icon: Icons.replay_10,
-            onPressed: isRecording ? null : () {},
-            enabled: !isRecording,
+            onPressed: onRewind ?? () {},
+            enabled: true,
             title: 'Rewind',
           ),
         ),
 
         // Spacing
-        const Flexible(flex: 1, child: SizedBox(width: 40)),
+        const SizedBox(width: 10),
 
         // Play/Pause button (larger)
         Flexible(
           flex: 3,
           child: _buildFullscreenControlButton(
             icon: Icons.play_arrow,
-            onPressed: isRecording ? null : () {},
-            enabled: !isRecording,
+            onPressed: onPlay ?? () {},
+            enabled: true,
             isLarge: true,
             title: 'Play',
           ),
         ),
 
         // Spacing
-        const Flexible(flex: 1, child: SizedBox(width: 40)),
+        const SizedBox(width: 10),
 
         // 10 second forward
         Flexible(
           flex: 2,
           child: _buildFullscreenControlButton(
             icon: Icons.forward_10,
-            onPressed: isRecording ? null : () {},
-            enabled: !isRecording,
+            onPressed: onForward ?? () {},
+            enabled: true,
             title: 'Forward',
           ),
         ),
@@ -67,70 +73,78 @@ class FullscreenPlaybackControls extends StatelessWidget {
     bool isLarge = false,
     String? title,
   }) {
-    final size = isLarge ? 80.0 : 60.0;
-    final iconSize = isLarge ? 40.0 : 28.0;
-    
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: enabled
-                ? const LinearGradient(
-                    colors: [
-                      Color(0xFF2E1065), // Deep midnight purple
-                      Color(0xFF4C1D95), // Cosmic purple
-                      Color(0xFF8B5CF6), // Ethereal purple
-                    ],
-                  )
-                : const LinearGradient(
-                    colors: [
-                      Color(0xFF1E1B4B), // Dark mystical blue
-                      Color(0xFF2E1065), // Deep midnight purple
-                    ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate button size based on available height
+        final availableHeight = constraints.maxHeight;
+        final baseSize = (availableHeight * 0.5).clamp(50.0, 90.0);
+        final buttonSize = isLarge ? baseSize : baseSize * 0.75; // Small buttons are 75% of large
+        final iconSize = buttonSize * (isLarge ? 0.5 : 0.45);
+
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: enabled
+                      ? const LinearGradient(
+                          colors: [
+                            Color(0xFFFFA500), // Orange
+                            Color(0xFFFFC107), // Amber/Golden yellow
+                          ],
+                        )
+                      : const LinearGradient(
+                          colors: [
+                            Color(0xFF5A4A2A), // Dark brown
+                            Color(0xFF3A3A3A), // Dark gray
+                          ],
+                        ),
+                  border: Border.all(
+                    color: enabled
+                        ? Colors.cyan
+                        : Colors.white.withValues(alpha: 0.1),
+                    width: 2,
                   ),
-            border: Border.all(
-              color: enabled
-                  ? const Color(0xFFA855F7).withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.1),
-              width: 2,
-            ),
-            boxShadow: enabled ? [
-              BoxShadow(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                  boxShadow: enabled ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ] : [],
+                ),
+                child: IconButton(
+                  onPressed: onPressed,
+                  icon: Icon(
+                    icon,
+                    color: enabled
+                        ? const Color(0xFF2E1065) // Deep midnight purple
+                        : Colors.grey.withValues(alpha: 0.5),
+                    size: iconSize,
+                  ),
+                ),
               ),
-            ] : [],
+              if (title != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: enabled
+                        ? Colors.white
+                        : Colors.grey.withValues(alpha: 0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
           ),
-          child: IconButton(
-            onPressed: onPressed,
-            icon: Icon(
-              icon,
-              color: enabled 
-                  ? const Color(0xFFF3E8FF) // Light cosmic purple
-                  : Colors.grey.withValues(alpha: 0.5),
-              size: iconSize,
-            ),
-          ),
-        ),
-        if (title != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: enabled 
-                  ? const Color(0xFFF3E8FF) // Light cosmic purple
-                  : Colors.grey.withValues(alpha: 0.5),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
+        );
+      },
     );
   }
 }

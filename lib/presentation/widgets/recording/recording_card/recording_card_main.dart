@@ -235,25 +235,8 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       _isUserDragging = false; // Reset dragging flag when recording changes
     }
 
-    // Detect when audio stops playing (end of recording)
-    if (widget.isExpanded && _wasPlayingLastUpdate && !widget.isPlaying) {
-      final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
-      final totalDurationMs = effectiveDuration.inMilliseconds;
-      final currentPositionMs = widget.currentPosition.inMilliseconds;
-      final isNearEnd = (totalDurationMs - currentPositionMs) <= 500; // Within 500ms of end
-
-      print('🔚 Audio stopped - Position: ${currentPositionMs}ms/${totalDurationMs}ms (effective), Near end: $isNearEnd');
-
-      if (isNearEnd) {
-        print('🔚 Recording finished, resetting slider to beginning');
-        // Reset slider to beginning when recording finishes
-        setState(() {
-          _sliderPosition = 0.0;
-          _isUserDragging = false; // Also reset dragging flag
-        });
-        // Note: Audio player position will be reset by the audio player manager
-      }
-    }
+    // No automatic reset when audio stops - slider stays at end position
+    // Position will be reset by audio service when user presses play again
 
     _wasPlayingLastUpdate = widget.isPlaying;
     _syncSliderWithAudio();
@@ -688,6 +671,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                       : (duration.inMilliseconds > 0
                           ? position.inMilliseconds / duration.inMilliseconds
                           : 0.0);
+
+                  // Debug logging to track slider updates
+                  print('🎚️ SLIDER: position=${position.inMilliseconds}ms, duration=${duration.inMilliseconds}ms, progress=${progress.toStringAsFixed(3)}, isDragging=$_isUserDragging');
 
                   return SliderTheme(
                     data: SliderTheme.of(context).copyWith(

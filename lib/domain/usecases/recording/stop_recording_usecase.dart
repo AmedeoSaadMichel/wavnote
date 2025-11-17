@@ -38,15 +38,19 @@ class StopRecordingUseCase {
     try {
       debugPrint('🛑 StopRecordingUseCase: Stopping recording process...');
 
-      // Step 1: Validate there's an active recording
+      // Step 1: Validate there's an active recording (including paused recordings)
       final isRecording = await _audioService.isRecording();
-      if (!isRecording) {
-        debugPrint('❌ StopRecordingUseCase: No active recording to stop');
+      final isPaused = await _audioService.isRecordingPaused();
+
+      if (!isRecording && !isPaused) {
+        debugPrint('❌ StopRecordingUseCase: No active recording to stop (isRecording: $isRecording, isPaused: $isPaused)');
         return StopRecordingResult.failure(
           'No active recording to stop',
           StopRecordingErrorType.noActiveRecording,
         );
       }
+
+      debugPrint('🛑 StopRecordingUseCase: Active recording found (isRecording: $isRecording, isPaused: $isPaused)');
 
       // Step 2: Stop the audio recording service
       final recordingEntity = await _audioService.stopRecording();

@@ -314,10 +314,11 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           );
         }
 
-        // Handle other states (RecordingInProgress, RecordingError, etc.)
-        // Hide content while recording is in progress instead of showing "No recordings yet"
-        if (state is RecordingInProgress || state is RecordingStarting) {
-          return const SizedBox.shrink(); // Hide content when recording
+        // Handle other states (RecordingInProgress, RecordingPaused, RecordingError, etc.)
+        // Hide content while recording is in progress or paused instead of showing "No recordings yet"
+        if (state is RecordingInProgress || state is RecordingStarting || state is RecordingPaused) {
+          print('🎙️ VERBOSE: Recording active (${state.runtimeType}) - hiding recordings list');
+          return const SizedBox.shrink(); // Hide content when recording/paused
         }
         
         if (state is RecordingError) {
@@ -349,6 +350,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
     return BlocBuilder<RecordingBloc, RecordingState>(
       builder: (context, recordingState) {
         final isRecording = recordingState.isRecording;
+        final isPaused = recordingState is RecordingPaused;
         final currentTitle = recordingState is RecordingInProgress
             ? recordingState.title ?? 'New Recording'
             : 'New Recording';
@@ -358,6 +360,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           title: currentTitle,
           filePath: isRecording ? '/temp/current_recording.m4a' : null,
           isRecording: isRecording,
+          isPaused: isPaused,
           onToggle: toggleRecording,
           elapsed: elapsed,
           width: MediaQuery.of(context).size.width,
@@ -369,6 +372,10 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           onPause: pauseRecording,
           onDone: finishRecording,
           onChat: showTranscriptOptions,
+          onPlay: playRecording,
+          onRewind: rewindRecording,
+          onForward: forwardRecording,
+          onSeek: seekRecording,
         );
       },
     );

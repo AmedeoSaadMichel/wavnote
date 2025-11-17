@@ -326,6 +326,10 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is! RecordingInProgress) return;
 
     try {
+      // Stop real-time updates when pausing
+      _stopAmplitudeUpdates();
+      _stopDurationUpdates();
+
       final result = await _pauseRecordingUseCase.executePause();
       if (result.isSuccess) {
         final currentState = state as RecordingInProgress;
@@ -339,7 +343,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
           duration: result.duration ?? currentState.duration,
           startTime: currentState.startTime,
         ));
-        print('⏸️ Recording paused');
+        print('⏸️ Recording paused - timers stopped');
       } else {
         print('❌ Failed to pause recording: ${result.errorMessage}');
       }
