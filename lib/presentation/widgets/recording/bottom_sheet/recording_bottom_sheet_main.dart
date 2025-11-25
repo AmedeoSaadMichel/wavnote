@@ -121,13 +121,31 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
     // Control pulse animation based on recording state
     if (widget.isRecording != oldWidget.isRecording) {
+      print('📝 Recording state changed: ${oldWidget.isRecording} → ${widget.isRecording}, isPaused: ${widget.isPaused}, oldPaused: ${oldWidget.isPaused}');
+
       if (widget.isRecording) {
         _pulseController.repeat(reverse: true);
-        _startWaveformRecording();
+
+        // Check if we're resuming from pause
+        if (oldWidget.isPaused) {
+          print('▶️ RESUMING: Resuming waveform recording from pause');
+          _resumeWaveformRecording();
+        } else {
+          print('🔴 STARTING: Starting new waveform recording');
+          _startWaveformRecording();
+        }
       } else {
         _pulseController.stop();
         _pulseController.reset();
-        _stopWaveformRecording();
+
+        // Pause waveform recording instead of stopping (keeps the waveform visible but frozen)
+        if (widget.isPaused) {
+          print('⏸️ PAUSED: Pausing waveform recording to freeze visualization');
+          _pauseWaveformRecording();
+        } else {
+          print('⏹️ STOPPED: Stopping waveform recording');
+          _stopWaveformRecording();
+        }
 
         // AUTO-COLLAPSE: Only collapse when NOT paused (i.e., recording actually stopped)
         if (!widget.isPaused) {
@@ -145,6 +163,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     // AUTO-COLLAPSE: When paused changes to false and not recording, collapse
     if (widget.isPaused != oldWidget.isPaused && !widget.isPaused && !widget.isRecording) {
       print('🔽 AUTO-COLLAPSE: Done clicked, collapsing bottom sheet');
+      _stopWaveformRecording();
       setState(() {
         _sheetOffset = 0;
       });
@@ -167,11 +186,42 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
+  /// Pause waveform recording (freezes the waveform)
+  void _pauseWaveformRecording() async {
+    try {
+      // Use pause() to freeze the waveform visualization
+      await _recorderController.pause();
+      print('✅ Waveform recording paused - visualization frozen');
+    } catch (e) {
+      print('⚠️ Error pausing waveform recording: $e');
+      // Fallback to stop if pause fails
+      try {
+        await _recorderController.stop();
+      } catch (e2) {
+        print('❌ Failed to stop waveform recording: $e2');
+      }
+    }
+  }
+
+  /// Resume waveform recording (restart animation)
+  void _resumeWaveformRecording() async {
+    try {
+      // Use record() to resume (RecorderController doesn't have resume() method)
+      await _recorderController.record();
+      print('✅ Waveform recording resumed - visualization restarted');
+
+      // Restart capturing waveform data
+      _startWaveformCapture();
+    } catch (e) {
+      print('❌ Failed to resume waveform recording: $e');
+    }
+  }
+
   /// Stop waveform recording
   void _stopWaveformRecording() async {
     try {
       await _recorderController.stop();
-      
+
       // Stop capturing waveform data
       _stopWaveformCapture();
     } catch (e) {
@@ -181,59 +231,57 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   /// Start capturing real-time waveform data from AudioWaveforms widget
   void _startWaveformCapture() {
+    print('🎬 STARTING waveform capture - clearing previous data');
     _realTimeWaveformData.clear();
-    
-    // Capture real waveform data by monitoring the AudioWaveforms widget
-    // The audio_waveforms package provides real-time amplitude visualization
+
+    // Use a seed based on current timestamp to ensure each recording is unique
+    final recordingSeed = DateTime.now().millisecondsSinceEpoch;
+
+    // Capture waveform data with improved realistic variation
+    // Note: getAmplitude() is not supported on iOS, so we generate realistic patterns
+    // that vary uniquely for each recording
     _waveformCaptureTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (_recorderController.isRecording) {
         try {
-          // The AudioWaveforms widget displays real amplitude from microphone
-          // We can't directly access its internal data, but we can sample
-          // the recording progression which correlates with real audio activity
-          
-          // Use elapsed time from widget instead of controller
-          final seconds = widget.elapsed.inMilliseconds / 1000.0;
-          
-          // Create realistic variation that changes with actual recording time
-          // This ensures each recording has unique waveform tied to its actual duration
-          final timeBasedSeed = (seconds * 1000).toInt();
-          final pseudoRandom = ((timeBasedSeed * 9301 + 49297) % 233280) / 233280.0;
-          
-          // Multiple frequency components for realistic speech-like patterns
-          final lowFreq = (seconds * 1.5) % 1.0; // Word-like patterns
-          final midFreq = (seconds * 8.0) % 1.0; // Syllable-like patterns
-          final highFreq = pseudoRandom; // Random variation
-          
-          // Combine components with different weights and ensure more variation
-          var amplitude = (lowFreq * 0.3 + midFreq * 0.4 + highFreq * 0.3);
-          
-          // Add more dramatic variation
-          amplitude = amplitude * 0.8 + 0.1; // Scale to 0.1-0.9 range
-          
-          // Add occasional spikes for more realistic speech patterns
-          if (pseudoRandom > 0.9) {
-            amplitude *= 1.5;
-          } else if (pseudoRandom < 0.1) {
-            amplitude *= 0.3;
-          }
-          
-          amplitude = amplitude.clamp(0.05, 0.95); // Ensure some minimum variation
-          
-          // Store real-time progression data
+          // Use recording start time + elapsed time for unique variation per recording
+          final totalMs = recordingSeed + widget.elapsed.inMilliseconds;
+          final seconds = totalMs / 1000.0;
+
+          // Create multiple overlapping frequencies for speech-like patterns
+          final seed1 = (seconds * 1.7).floor();
+          final seed2 = (seconds * 4.3).floor();
+          final seed3 = (seconds * 11.8).floor();
+
+          // Generate pseudo-random but reproducible values
+          final rand1 = ((seed1 * 9301 + 49297) % 233280) / 233280.0;
+          final rand2 = ((seed2 * 1103515245 + 12345) % 2147483648) / 2147483648.0;
+          final rand3 = ((seed3 * 69069 + 1) % 4294967296) / 4294967296.0;
+
+          // Combine for natural speech-like variation
+          var amplitude = (rand1 * 0.4 + rand2 * 0.3 + rand3 * 0.3);
+
+          // Add periodic envelope (breathing/speech rhythm)
+          final envelope = (0.5 + 0.5 * (seconds * 0.5).remainder(1.0));
+          amplitude *= envelope;
+
+          // Ensure good dynamic range (20% to 95% of max)
+          amplitude = amplitude * 0.75 + 0.2;
+          amplitude = amplitude.clamp(0.15, 0.95);
+
+          // Store waveform data
           _realTimeWaveformData.add(amplitude);
-          
+
           // Keep only the most recent data (prevent memory issues)
           if (_realTimeWaveformData.length > 10000) {
             final removeCount = _realTimeWaveformData.length - 10000;
             _realTimeWaveformData.removeRange(0, removeCount);
           }
-          
+
           if (_realTimeWaveformData.length % 50 == 0) {
-            print('🎵 Captured ${_realTimeWaveformData.length} time-based waveform points, latest: ${amplitude.toStringAsFixed(3)}');
+            print('🎵 Captured ${_realTimeWaveformData.length} waveform points, latest: ${amplitude.toStringAsFixed(3)}');
           }
         } catch (e) {
-          print('Error capturing waveform data: $e');
+          print('⚠️ Error capturing waveform data: $e');
         }
       }
     });
@@ -241,16 +289,22 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   
   /// Stop capturing waveform data
   void _stopWaveformCapture() {
+    print('🛑 STOPPING waveform capture - captured ${_realTimeWaveformData.length} points so far');
     _waveformCaptureTimer?.cancel();
     _waveformCaptureTimer = null;
+    print('🛑 Waveform capture stopped - data PRESERVED (not cleared)');
   }
   
   /// Get captured waveform data for storage
   List<double> getCapturedWaveformData() {
+    print('🎵 getCapturedWaveformData() called - isPaused: ${widget.isPaused}, isRecording: ${widget.isRecording}');
+    print('🎵 _realTimeWaveformData length: ${_realTimeWaveformData.length}');
+
     if (_realTimeWaveformData.isEmpty) {
+      print('⚠️ WARNING: _realTimeWaveformData is EMPTY! Returning empty list');
       return [];
     }
-    
+
     print('📊 Processing ${_realTimeWaveformData.length} captured points for storage');
     
     // Downsample to ~200 points for storage

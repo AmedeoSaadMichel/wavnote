@@ -151,19 +151,20 @@ class RecordingFullscreenView extends StatelessWidget {
         child: Container(
           width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: isRecording ?
-            // Show real-time waveform when recording (red)
-            FullscreenAudioWaveform(
-              recorderController: recorderController,
-              isRecording: isRecording,
-            ) :
-            // Show static waveform when not recording (white/grey)
-            StaticWaveformDisplay(
-              waveformData: getCapturedWaveformData(),
-              color: Colors.white,
-            ),
+          child: _buildWaveformWidget(),
         ),
       ),
+    );
+  }
+
+  /// Build the appropriate waveform widget based on state
+  Widget _buildWaveformWidget() {
+    print('🎨 Building waveform widget - isRecording: $isRecording, isPaused: $isPaused');
+
+    // Always show AudioWaveforms - it will freeze when paused
+    return FullscreenAudioWaveform(
+      recorderController: recorderController,
+      isRecording: isRecording,
     );
   }
 
