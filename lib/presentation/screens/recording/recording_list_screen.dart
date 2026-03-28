@@ -16,7 +16,7 @@ import '../../../services/audio/audio_player_service.dart';
 import 'recording_list_logic.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_router.dart';
-import '../../../data/database/database_pool.dart';
+import '../../../data/database/database_helper.dart';
 import '../../../core/utils/performance_logger.dart';
 
 /// Recording List Screen with Single AudioPlayer Architecture
@@ -126,7 +126,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                       onBack: () {
                         // Save "main" folder ID using ultra-fast database pool
                         print('📁 RecordingListScreen: User tapped back button - saving main folder state with pool');
-                        DatabasePool.saveLastFolderId('main'); // Ultra-fast save
+                        DatabaseHelper.saveLastFolderId('main');
                         context.read<SettingsBloc>().add(const UpdateLastOpenedFolder('main')); // Also update BLoC
                         context.goToMain();
                         print('📁 RecordingListScreen: Navigation to main completed');
@@ -291,9 +291,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                     onMoreActions: () => showMoreActions(recording),
                     onRestore: () => restoreRecording(recording),
                     onToggleFavorite: () => toggleFavoriteRecording(recording),
-                    // OPTIMIZED: Always pass audio state manager (only used when expanded)
-                    audioStateManager: audioPlayerService.audioState,
-                    // Legacy parameters for backward compatibility
+                    audioStateManager: isExpanded ? audioPlayerService.audioState : null,
                     isPlaying: isExpanded ? audioPlayerService.isCurrentlyPlaying : false,
                     isLoading: isExpanded ? audioPlayerService.isLoading : false,
                     currentPosition: isExpanded ? audioPlayerService.position : Duration.zero,
@@ -355,6 +353,9 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
             ? recordingState.title ?? 'New Recording'
             : 'New Recording';
         final elapsed = recordingState.currentDuration ?? Duration.zero;
+        final amplitude = recordingState is RecordingInProgress
+            ? recordingState.amplitude
+            : 0.0;
 
         return RecordingBottomSheet(
           title: currentTitle,
@@ -363,6 +364,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           isPaused: isPaused,
           onToggle: toggleRecording,
           elapsed: elapsed,
+          amplitude: amplitude,
           width: MediaQuery.of(context).size.width,
           onTitleChanged: (newTitle) {
             context.read<RecordingBloc>().add(
@@ -444,9 +446,7 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           onMoreActions: () => showMoreActions(recording),
           onRestore: () => restoreRecording(recording),
           onToggleFavorite: () => toggleFavoriteRecording(recording),
-          // OPTIMIZED: Always pass audio state manager (only used when expanded)
-          audioStateManager: audioPlayerService.audioState,
-          // Legacy parameters for backward compatibility
+          audioStateManager: isExpanded ? audioPlayerService.audioState : null,
           isPlaying: isExpanded ? audioPlayerService.isCurrentlyPlaying : false,
           isLoading: isExpanded ? audioPlayerService.isLoading : false,
           currentPosition: isExpanded ? audioPlayerService.position : Duration.zero,

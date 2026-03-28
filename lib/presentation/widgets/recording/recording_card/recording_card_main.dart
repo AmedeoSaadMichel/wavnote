@@ -72,11 +72,9 @@ class RecordingCard extends StatefulWidget {
   final VoidCallback onMoreActions;
   final VoidCallback? onRestore; // Callback for restore action
   final VoidCallback? onToggleFavorite; // Callback for toggle favorite
-  
-  // OPTIMIZED: Audio state manager instead of individual parameters
+
   final AudioStateManager? audioStateManager;
-  
-  // Legacy parameters for backward compatibility
+
   final bool isPlaying;
   final bool isLoading;
   final Duration currentPosition;
@@ -136,9 +134,7 @@ class RecordingCard extends StatefulWidget {
     required this.onMoreActions,
     this.onRestore,
     this.onToggleFavorite,
-    // OPTIMIZED: Audio state manager (preferred)
     this.audioStateManager,
-    // Legacy parameters for backward compatibility
     required this.isPlaying,
     required this.isLoading,
     required this.currentPosition,
@@ -641,52 +637,46 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
 
 
 
-  /// Build audio progress slider - OPTIMIZED with ValueListenableBuilder
+  SliderThemeData get _sliderTheme => SliderTheme.of(context).copyWith(
+    trackHeight: 6.0,
+    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12.0),
+    overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
+    activeTrackColor: const Color(0xFF8B5CF6),
+    inactiveTrackColor: const Color(0xFF2E1065).withValues(alpha: 0.4),
+    thumbColor: const Color(0xFFA855F7),
+    overlayColor: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+  );
+
+  /// Build audio progress slider.
+  /// Uses ValueListenableBuilder (via AudioStateManager) for real-time updates
+  /// without requiring a full widget rebuild on every position tick.
   Widget _buildAudioSlider() {
-    // Use optimized ValueListenableBuilder if audioStateManager is available
     if (widget.audioStateManager != null) {
       return _buildOptimizedAudioSlider();
     }
-    
-    // Fallback to legacy approach for backward compatibility
     return _buildLegacyAudioSlider();
   }
-  
-  /// OPTIMIZED: Audio slider with ValueListenableBuilder (no setState)
+
   Widget _buildOptimizedAudioSlider() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          // Progress slider - OPTIMIZED with drag handling
           ValueListenableBuilder<Duration>(
             valueListenable: widget.audioStateManager!.positionNotifier,
-            builder: (context, position, child) {
+            builder: (context, position, _) {
               return ValueListenableBuilder<Duration>(
                 valueListenable: widget.audioStateManager!.durationNotifier,
-                builder: (context, duration, child) {
-                  // Don't update from audio stream while user is dragging
+                builder: (context, duration, _) {
                   final progress = _isUserDragging
-                      ? _sliderPosition  // Use frozen slider position during drag
+                      ? _sliderPosition
                       : (duration.inMilliseconds > 0
-                          ? position.inMilliseconds / duration.inMilliseconds
+                          ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
                           : 0.0);
-
-                  // Debug logging to track slider updates
-                  print('🎚️ SLIDER: position=${position.inMilliseconds}ms, duration=${duration.inMilliseconds}ms, progress=${progress.toStringAsFixed(3)}, isDragging=$_isUserDragging');
-
                   return SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 6.0,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12.0),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
-                      activeTrackColor: const Color(0xFF8B5CF6), // Cosmic purple
-                      inactiveTrackColor: const Color(0xFF2E1065).withValues(alpha: 0.4), // Midnight purple
-                      thumbColor: const Color(0xFFA855F7), // Ethereal purple
-                      overlayColor: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-                    ),
+                    data: _sliderTheme,
                     child: Slider(
-                      value: progress.clamp(0.0, 1.0),
+                      value: progress,
                       min: 0.0,
                       max: 1.0,
                       onChangeStart: widget.isLoading ? null : _handleSliderChangeStart,
@@ -698,33 +688,19 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
               );
             },
           ),
-          
-          // Time labels - OPTIMIZED
           ValueListenableBuilder<Duration>(
             valueListenable: widget.audioStateManager!.positionNotifier,
-            builder: (context, position, child) {
+            builder: (context, position, _) {
               return ValueListenableBuilder<Duration>(
                 valueListenable: widget.audioStateManager!.durationNotifier,
-                builder: (context, duration, child) {
+                builder: (context, duration, _) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _formatTime(position),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          _formatTime(duration),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
+                        Text(_formatTime(position), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
+                        Text(_formatTime(duration), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
                       ],
                     ),
                   );
@@ -736,24 +712,14 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       ),
     );
   }
-  
-  /// LEGACY: Original audio slider approach (for backward compatibility)
+
   Widget _buildLegacyAudioSlider() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          // Progress slider
           SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 6.0,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12.0),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
-              activeTrackColor: const Color(0xFF8B5CF6), // Cosmic purple
-              inactiveTrackColor: const Color(0xFF2E1065).withValues(alpha: 0.4), // Midnight purple
-              thumbColor: const Color(0xFFA855F7), // Ethereal purple
-              overlayColor: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-            ),
+            data: _sliderTheme,
             child: Slider(
               value: _sliderPosition,
               min: 0.0,
@@ -763,27 +729,13 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
               onChangeEnd: widget.isLoading ? null : _handleSliderChangeEnd,
             ),
           ),
-          
-          // Time labels
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _formatTime(widget.currentPosition),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
-                Text(
-                  _formatTime(widget.actualDuration ?? widget.recording.duration),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
+                Text(_formatTime(widget.currentPosition), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
+                Text(_formatTime(widget.actualDuration ?? widget.recording.duration), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
               ],
             ),
           ),

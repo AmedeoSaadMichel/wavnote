@@ -1,11 +1,19 @@
 // File: domain/usecases/recording/stop_recording_usecase.dart
+//
+// Stop Recording Use Case - Domain Layer
+// ========================================
+//
+// Returns Either<Failure, RecordingEntity> following the canonical Either pattern
+// (CLAUDE.md). The BLoC consumes via result.fold(left, right).
 import 'dart:async';
+import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/enums/audio_format.dart';
+import '../../../core/errors/failures.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../services/location/geolocation_service.dart';
-import 'package:flutter/foundation.dart';
 
 /// Use case for stopping an active audio recording
 ///
@@ -28,73 +36,51 @@ class StopRecordingUseCase {
         _recordingRepository = recordingRepository,
         _geolocationService = geolocationService;
 
-  /// Execute the stop recording process
+  /// Execute the stop recording process.
   ///
-  /// Returns [StopRecordingResult] containing either the saved recording or error info
-  Future<StopRecordingResult> execute({
+  /// Returns [Either<Failure, RecordingEntity>]:
+  /// - [Left]  — a [Failure] on error
+  /// - [Right] — the saved [RecordingEntity] on success
+  Future<Either<Failure, RecordingEntity>> execute({
     List<double>? waveformData,
     Duration? overrideDuration,
   }) async {
     try {
-      debugPrint('🛑 StopRecordingUseCase: Stopping recording process...');
-
-      // Step 1: Validate there's an active recording (including paused recordings)
+      // 1. Validate active recording
       final isRecording = await _audioService.isRecording();
       final isPaused = await _audioService.isRecordingPaused();
-
       if (!isRecording && !isPaused) {
-        debugPrint('❌ StopRecordingUseCase: No active recording to stop (isRecording: $isRecording, isPaused: $isPaused)');
-        return StopRecordingResult.failure(
-          'No active recording to stop',
-          StopRecordingErrorType.noActiveRecording,
-        );
+        return Left(AudioRecordingFailure.stopFailed('No active recording to stop'));
       }
 
-      debugPrint('🛑 StopRecordingUseCase: Active recording found (isRecording: $isRecording, isPaused: $isPaused)');
-
-      // Step 2: Stop the audio recording service
+      // 2. Stop audio service
       final recordingEntity = await _audioService.stopRecording();
       if (recordingEntity == null) {
-        debugPrint('❌ StopRecordingUseCase: Audio service failed to provide recording');
-        return StopRecordingResult.failure(
-          'Failed to complete recording',
-          StopRecordingErrorType.audioServiceError,
-        );
+        return Left(AudioRecordingFailure.stopFailed('Audio service returned null'));
       }
 
-      debugPrint('📁 StopRecordingUseCase: Recording stopped, file: ${recordingEntity.filePath}');
-
-      // Step 3: Generate location-based name with incremental numbering
+      // 3. Generate location-based name
       final namedRecording = await _generateLocationBasedRecording(recordingEntity);
-      debugPrint('📍 StopRecordingUseCase: Generated name: ${namedRecording.name}');
 
-      // Step 4: Add waveform data if provided
+      // 4. Apply waveform data and duration override
       final finalRecording = _addWaveformData(namedRecording, waveformData, overrideDuration);
-      debugPrint('🎵 StopRecordingUseCase: Waveform data points: ${finalRecording.waveformData?.length ?? 0}');
 
-      // Step 5: Validate recording before saving
+      // 5. Validate
       final validationError = _validateRecording(finalRecording);
       if (validationError != null) {
-        debugPrint('❌ StopRecordingUseCase: Validation error: $validationError');
-        return StopRecordingResult.failure(
-          validationError,
-          StopRecordingErrorType.invalidRecording,
-        );
+        return Left(AudioRecordingFailure.stopFailed(validationError));
       }
 
-      // Step 6: Save recording to repository
-      final savedRecording = await _recordingRepository.createRecording(finalRecording);
-      debugPrint('✅ StopRecordingUseCase: Recording saved with ID: ${savedRecording.id}');
+      // 6. Persist
+      final saved = await _recordingRepository.createRecording(finalRecording);
+      return Right(saved);
 
-      return StopRecordingResult.success(recording: savedRecording);
-
-    } catch (e, stackTrace) {
-      debugPrint('❌ StopRecordingUseCase: Unexpected error: $e');
-      debugPrint('📍 StopRecordingUseCase: Stack trace: $stackTrace');
-      return StopRecordingResult.failure(
-        'Unexpected error during recording stop: $e',
-        StopRecordingErrorType.unknown,
-      );
+    } catch (e, st) {
+      debugPrint('❌ StopRecordingUseCase: $e\n$st');
+      return Left(UnexpectedFailure(
+        message: 'Unexpected error stopping recording: $e',
+        code: 'STOP_RECORDING_UNEXPECTED',
+      ));
     }
   }
 
@@ -235,51 +221,7 @@ class StopRecordingUseCase {
   }
 }
 
-/// Result class for stop recording operation
-class StopRecordingResult {
-  final bool isSuccess;
-  final RecordingEntity? recording;
-  final String? errorMessage;
-  final StopRecordingErrorType? errorType;
-
-  const StopRecordingResult._({
-    required this.isSuccess,
-    this.recording,
-    this.errorMessage,
-    this.errorType,
-  });
-
-  /// Create a successful result
-  factory StopRecordingResult.success({
-    required RecordingEntity recording,
-  }) =>
-      StopRecordingResult._(
-        isSuccess: true,
-        recording: recording,
-      );
-
-  /// Create a failure result
-  factory StopRecordingResult.failure(
-    String message,
-    StopRecordingErrorType errorType,
-  ) =>
-      StopRecordingResult._(
-        isSuccess: false,
-        errorMessage: message,
-        errorType: errorType,
-      );
-
-  @override
-  String toString() {
-    if (isSuccess) {
-      return 'StopRecordingResult.success(recording: ${recording?.name})';
-    } else {
-      return 'StopRecordingResult.failure(error: $errorMessage, type: $errorType)';
-    }
-  }
-}
-
-/// Types of errors that can occur during recording stop
+// Error type enum kept for BLoC mapping in recording_bloc.dart
 enum StopRecordingErrorType {
   noActiveRecording,
   audioServiceError,

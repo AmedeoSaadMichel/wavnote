@@ -1,7 +1,15 @@
 // File: domain/usecases/recording/pause_recording_usecase.dart
+//
+// Pause/Resume Recording Use Case - Domain Layer
+// ================================================
+// Returns Either<Failure, Duration> following the canonical Either pattern
+// (CLAUDE.md). Duration is the current recording duration at pause/resume time.
 import 'dart:async';
-import '../../../domain/repositories/i_audio_service_repository.dart';
+import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/errors/failures.dart';
+import '../../../core/errors/exceptions.dart';
+import '../../../domain/repositories/i_audio_service_repository.dart';
 
 /// Use case for pausing and resuming active audio recording
 ///
@@ -17,117 +25,80 @@ class PauseRecordingUseCase {
     required IAudioServiceRepository audioService,
   }) : _audioService = audioService;
 
-  /// Execute the pause recording process
+  /// Pause the active recording.
   ///
-  /// Returns [PauseRecordingResult] containing success status or error info
-  Future<PauseRecordingResult> executePause() async {
+  /// Returns [Either<Failure, Duration>]:
+  /// - [Left]  — a [Failure] on error
+  /// - [Right] — the current duration at the moment of pausing
+  Future<Either<Failure, Duration>> executePause() async {
     try {
-      debugPrint('⏸️ PauseRecordingUseCase: Pausing recording...');
-
-      // Step 1: Validate there's an active recording
-      final isRecording = await _audioService.isRecording();
-      if (!isRecording) {
-        debugPrint('❌ PauseRecordingUseCase: No active recording to pause');
-        return PauseRecordingResult.failure(
-          'No active recording to pause',
-          PauseRecordingErrorType.noActiveRecording,
-        );
+      if (!await _audioService.isRecording()) {
+        return Left(AudioRecordingFailure(
+          message: 'No active recording to pause',
+          errorType: AudioRecordingErrorType.recordingStartFailed,
+          code: 'NO_ACTIVE_RECORDING',
+        ));
+      }
+      if (await _audioService.isRecordingPaused()) {
+        return Left(AudioRecordingFailure(
+          message: 'Recording is already paused',
+          errorType: AudioRecordingErrorType.recordingStartFailed,
+          code: 'ALREADY_PAUSED',
+        ));
       }
 
-      // Step 2: Check if recording is already paused
-      final isPaused = await _audioService.isRecordingPaused();
-      if (isPaused) {
-        debugPrint('⚠️ PauseRecordingUseCase: Recording is already paused');
-        return PauseRecordingResult.failure(
-          'Recording is already paused',
-          PauseRecordingErrorType.alreadyPaused,
-        );
-      }
-
-      // Step 3: Get current duration before pausing
-      final currentDuration = await _audioService.getCurrentRecordingDuration();
-      debugPrint('⏱️ PauseRecordingUseCase: Current duration before pause: ${currentDuration.inMilliseconds}ms');
-
-      // Step 4: Pause the recording
+      final duration = await _audioService.getCurrentRecordingDuration();
       final success = await _audioService.pauseRecording();
-      
-      if (success) {
-        debugPrint('✅ PauseRecordingUseCase: Recording paused successfully');
-        return PauseRecordingResult.successPause(
-          pausedDuration: currentDuration,
-        );
-      } else {
-        debugPrint('❌ PauseRecordingUseCase: Audio service failed to pause recording');
-        return PauseRecordingResult.failure(
-          'Failed to pause recording',
-          PauseRecordingErrorType.audioServiceError,
-        );
-      }
 
-    } catch (e, stackTrace) {
-      debugPrint('❌ PauseRecordingUseCase: Unexpected error during pause: $e');
-      debugPrint('📍 PauseRecordingUseCase: Stack trace: $stackTrace');
-      return PauseRecordingResult.failure(
-        'Unexpected error during recording pause: $e',
-        PauseRecordingErrorType.unknown,
-      );
+      if (!success) {
+        return Left(AudioRecordingFailure(
+          message: 'Failed to pause recording',
+          errorType: AudioRecordingErrorType.recordingInterrupted,
+          code: 'PAUSE_FAILED',
+        ));
+      }
+      return Right(duration);
+    } catch (e, st) {
+      debugPrint('❌ PauseRecordingUseCase.executePause: $e\n$st');
+      return Left(UnexpectedFailure(
+        message: 'Unexpected error pausing recording: $e',
+        code: 'PAUSE_UNEXPECTED',
+      ));
     }
   }
 
-  /// Execute the resume recording process
+  /// Resume the paused recording.
   ///
-  /// Returns [PauseRecordingResult] containing success status or error info
-  Future<PauseRecordingResult> executeResume() async {
+  /// Returns [Either<Failure, Duration>]:
+  /// - [Left]  — a [Failure] on error
+  /// - [Right] — the current duration at the moment of resuming
+  Future<Either<Failure, Duration>> executeResume() async {
     try {
-      debugPrint('▶️ PauseRecordingUseCase: Resuming recording...');
-
-      // Step 1: Validate there's an active recording session
-      final isRecording = await _audioService.isRecording();
-      if (!isRecording) {
-        debugPrint('❌ PauseRecordingUseCase: No recording session to resume');
-        return PauseRecordingResult.failure(
-          'No recording session to resume',
-          PauseRecordingErrorType.noActiveRecording,
-        );
+      if (!await _audioService.isRecordingPaused()) {
+        return Left(AudioRecordingFailure(
+          message: 'Recording is not currently paused',
+          errorType: AudioRecordingErrorType.recordingStartFailed,
+          code: 'NOT_PAUSED',
+        ));
       }
 
-      // Step 2: Check if recording is actually paused
-      final isPaused = await _audioService.isRecordingPaused();
-      if (!isPaused) {
-        debugPrint('⚠️ PauseRecordingUseCase: Recording is not paused');
-        return PauseRecordingResult.failure(
-          'Recording is not currently paused',
-          PauseRecordingErrorType.notPaused,
-        );
-      }
-
-      // Step 3: Get current duration before resuming
-      final currentDuration = await _audioService.getCurrentRecordingDuration();
-      debugPrint('⏱️ PauseRecordingUseCase: Duration before resume: ${currentDuration.inMilliseconds}ms');
-
-      // Step 4: Resume the recording
+      final duration = await _audioService.getCurrentRecordingDuration();
       final success = await _audioService.resumeRecording();
-      
-      if (success) {
-        debugPrint('✅ PauseRecordingUseCase: Recording resumed successfully');
-        return PauseRecordingResult.successResume(
-          resumedDuration: currentDuration,
-        );
-      } else {
-        debugPrint('❌ PauseRecordingUseCase: Audio service failed to resume recording');
-        return PauseRecordingResult.failure(
-          'Failed to resume recording',
-          PauseRecordingErrorType.audioServiceError,
-        );
-      }
 
-    } catch (e, stackTrace) {
-      debugPrint('❌ PauseRecordingUseCase: Unexpected error during resume: $e');
-      debugPrint('📍 PauseRecordingUseCase: Stack trace: $stackTrace');
-      return PauseRecordingResult.failure(
-        'Unexpected error during recording resume: $e',
-        PauseRecordingErrorType.unknown,
-      );
+      if (!success) {
+        return Left(AudioRecordingFailure(
+          message: 'Failed to resume recording',
+          errorType: AudioRecordingErrorType.recordingInterrupted,
+          code: 'RESUME_FAILED',
+        ));
+      }
+      return Right(duration);
+    } catch (e, st) {
+      debugPrint('❌ PauseRecordingUseCase.executeResume: $e\n$st');
+      return Left(UnexpectedFailure(
+        message: 'Unexpected error resuming recording: $e',
+        code: 'RESUME_UNEXPECTED',
+      ));
     }
   }
 
@@ -161,62 +132,6 @@ class PauseRecordingUseCase {
   }
 }
 
-/// Result class for pause recording operation
-class PauseRecordingResult {
-  final bool isSuccess;
-  final PauseRecordingOperation? operation;
-  final Duration? duration;
-  final String? errorMessage;
-  final PauseRecordingErrorType? errorType;
-
-  const PauseRecordingResult._({
-    required this.isSuccess,
-    this.operation,
-    this.duration,
-    this.errorMessage,
-    this.errorType,
-  });
-
-  /// Create a successful pause result
-  factory PauseRecordingResult.successPause({
-    required Duration pausedDuration,
-  }) =>
-      PauseRecordingResult._(
-        isSuccess: true,
-        operation: PauseRecordingOperation.pause,
-        duration: pausedDuration,
-      );
-
-  /// Create a successful resume result
-  factory PauseRecordingResult.successResume({
-    required Duration resumedDuration,
-  }) =>
-      PauseRecordingResult._(
-        isSuccess: true,
-        operation: PauseRecordingOperation.resume,
-        duration: resumedDuration,
-      );
-
-  /// Create a failure result
-  factory PauseRecordingResult.failure(
-    String message,
-    PauseRecordingErrorType errorType,
-  ) =>
-      PauseRecordingResult._(
-        isSuccess: false,
-        errorMessage: message,
-        errorType: errorType,
-      );
-
-  @override
-  String toString() {
-    if (isSuccess) {
-      return 'PauseRecordingResult.success(operation: $operation, duration: ${duration?.inMilliseconds}ms)';
-    } else {
-      return 'PauseRecordingResult.failure(error: $errorMessage, type: $errorType)';
-    }
-  }
-}
 
 /// Result class for recording state query
 class RecordingStateResult {

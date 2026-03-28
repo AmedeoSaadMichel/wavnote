@@ -1,9 +1,8 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
 import 'package:flutter/material.dart';
-import 'package:audio_waveforms/audio_waveforms.dart';
 import '../../../../core/extensions/duration_extensions.dart';
-import 'waveform_components.dart';
 import 'control_buttons.dart';
+import '../custom_waveform/flutter_sound_waveform.dart';
 
 /// Fullscreen view for expanded recording bottom sheet (iOS Voice Memos style)
 class RecordingFullscreenView extends StatelessWidget {
@@ -12,8 +11,8 @@ class RecordingFullscreenView extends StatelessWidget {
   final bool isRecording;
   final bool isPaused;
   final String? filePath;
-  final RecorderController recorderController;
-  final List<double> Function() getCapturedWaveformData;
+  final double amplitude;
+  final List<double> waveData;
   final VoidCallback onToggle; // Same as compact view - start/stop recording
   final VoidCallback? onPause;
   final VoidCallback? onDone;
@@ -30,8 +29,8 @@ class RecordingFullscreenView extends StatelessWidget {
     required this.isRecording,
     this.isPaused = false,
     required this.filePath,
-    required this.recorderController,
-    required this.getCapturedWaveformData,
+    required this.amplitude,
+    required this.waveData,
     required this.onToggle, // Required now
     this.onPause,
     this.onDone,
@@ -136,22 +135,26 @@ class RecordingFullscreenView extends StatelessWidget {
 
   /// Build fullscreen waveform (iOS style)
   Widget _buildFullscreenWaveform(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onHorizontalDragUpdate: (details) {
-          if (!isRecording && onSeek != null) {
-            // Calculate position based on drag
-            final RenderBox box = context.findRenderObject() as RenderBox;
-            final localPosition = box.globalToLocal(details.globalPosition);
-            final width = box.size.width;
-            final position = (localPosition.dx / width).clamp(0.0, 1.0);
-            onSeek!(position);
-          }
-        },
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: _buildWaveformWidget(),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: FractionallySizedBox(
+        heightFactor: 0.65,
+        widthFactor: 1.0,
+        child: GestureDetector(
+          onHorizontalDragUpdate: (details) {
+            if (!isRecording && onSeek != null) {
+              final RenderBox box = context.findRenderObject() as RenderBox;
+              final localPosition = box.globalToLocal(details.globalPosition);
+              final width = box.size.width;
+              final position = (localPosition.dx / width).clamp(0.0, 1.0);
+              onSeek!(position);
+            }
+          },
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildWaveformWidget(),
+          ),
         ),
       ),
     );
@@ -159,12 +162,19 @@ class RecordingFullscreenView extends StatelessWidget {
 
   /// Build the appropriate waveform widget based on state
   Widget _buildWaveformWidget() {
-    print('🎨 Building waveform widget - isRecording: $isRecording, isPaused: $isPaused');
-
-    // Always show AudioWaveforms - it will freeze when paused
-    return FullscreenAudioWaveform(
-      recorderController: recorderController,
-      isRecording: isRecording,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return RecordingWaveform(
+          amplitude: amplitude,
+          waveData: waveData,
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          waveColor: Colors.cyan,
+          spacing: 2.0,  // Reduced from 4.0 for smoother scroll
+          waveThickness: 2.5,  // Reduced from 3.5 to match smaller spacing
+          scaleFactor: 80.0,
+          currentDuration: elapsed,
+        );
+      },
     );
   }
 

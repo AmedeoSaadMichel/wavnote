@@ -1,9 +1,8 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_compact_view.dart
 import 'package:flutter/material.dart';
-import 'package:audio_waveforms/audio_waveforms.dart';
 import 'dart:math' as math;
 import '../../../../core/extensions/duration_extensions.dart';
-import 'waveform_components.dart';
+import '../custom_waveform/flutter_sound_waveform.dart';
 
 /// Compact view for collapsed recording bottom sheet
 class RecordingCompactView extends StatelessWidget {
@@ -11,7 +10,8 @@ class RecordingCompactView extends StatelessWidget {
   final Duration elapsed;
   final bool isRecording;
   final String? filePath;
-  final RecorderController recorderController;
+  final double amplitude;
+  final List<double> waveData;
   final Animation<double> pulseAnimation;
   final VoidCallback onToggle;
 
@@ -21,7 +21,8 @@ class RecordingCompactView extends StatelessWidget {
     required this.elapsed,
     required this.isRecording,
     required this.filePath,
-    required this.recorderController,
+    required this.amplitude,
+    required this.waveData,
     required this.pulseAnimation,
     required this.onToggle,
   });
@@ -113,21 +114,31 @@ class RecordingCompactView extends StatelessWidget {
           ),
         ),
         const Spacer(flex: 2),
-        if (filePath != null) 
-          Flexible(
-            flex: 10,
-            child: Center(
-              child: Container(
-                height: 120,
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.center,
-                child: CompactAudioWaveform(
-                  recorderController: recorderController,
-                ),
+        Flexible(
+          flex: 10,
+          child: Center(
+            child: Container(
+              height: 120,
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return RecordingWaveform(
+                    amplitude: amplitude,
+                    waveData: waveData,
+                    size: Size(constraints.maxWidth, 120),
+                    waveColor: Colors.cyan,
+                    spacing: 1.5,  // Reduced from 3.0 for smoother scroll
+                    waveThickness: 2.0,  // Slightly thinner to match smaller spacing
+                    scaleFactor: 50.0,
+                    currentDuration: elapsed,
+                  );
+                },
               ),
             ),
           ),
+        ),
       ],
     );
   }

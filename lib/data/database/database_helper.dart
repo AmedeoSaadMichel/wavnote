@@ -169,9 +169,58 @@ class DatabaseHelper {
     }
   }
 
-  /// Called when database is opened
+  /// Called when database is opened — applies performance optimizations
   static Future<void> _onOpen(Database db) async {
-    print('📖 Database opened successfully');
+    // PRAGMA journal_mode returns a result row ("wal") — use rawQuery, not execute,
+    // otherwise sqflite on iOS throws a spurious "not an error" DatabaseException.
+    await db.rawQuery('PRAGMA journal_mode = WAL');
+    // Balanced safety/speed
+    await db.execute('PRAGMA synchronous = NORMAL');
+    // Enable foreign key constraints
+    await db.execute('PRAGMA foreign_keys = ON');
+    // 2MB cache
+    await db.execute('PRAGMA cache_size = -2000');
+    // Keep temp tables in memory
+    await db.execute('PRAGMA temp_store = MEMORY');
+  }
+
+  // ===========================================================
+  // SETTINGS HELPERS (previously in DatabasePool)
+  // ===========================================================
+
+  /// Returns the last opened folder ID, defaulting to 'main'
+  static Future<String> getLastFolderId() async {
+    try {
+      final db = await database;
+      final result = await db.query(
+        settingsTable,
+        columns: [settingValueColumn],
+        where: '$settingKeyColumn = ?',
+        whereArgs: ['lastOpenedFolderId'],
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        final raw = result.first[settingValueColumn] as String?;
+        return (raw == null || raw.isEmpty) ? 'main' : raw;
+      }
+      return 'main';
+    } catch (e) {
+      return 'main'; // Safe fallback
+    }
+  }
+
+  /// Persists the last opened folder ID
+  static Future<void> saveLastFolderId(String folderId) async {
+    try {
+      final db = await database;
+      final now = DateTime.now().toIso8601String();
+      await db.execute(
+        'INSERT OR REPLACE INTO $settingsTable ($settingKeyColumn, $settingValueColumn, $settingUpdatedAtColumn) VALUES (?, ?, ?)',
+        ['lastOpenedFolderId', folderId, now],
+      );
+    } catch (_) {
+      // Non-critical — don't propagate
+    }
   }
 
   /// Reset database instance (forces reconnection and migration check)

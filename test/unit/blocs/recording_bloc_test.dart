@@ -19,6 +19,8 @@ import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart';
+import 'package:wavnote/core/errors/failures.dart';
+import 'package:dartz/dartz.dart';
 
 // Use aliased import to avoid conflicts
 import 'package:wavnote/presentation/bloc/recording/recording_bloc.dart' as recording_bloc;
@@ -90,7 +92,7 @@ void main() {
             format: any(named: 'format'),
             sampleRate: any(named: 'sampleRate'),
             bitRate: any(named: 'bitRate'),
-          )).thenAnswer((_) async => StartRecordingResult.success(
+          )).thenAnswer((_) async => Right(StartRecordingSuccess(
             filePath: '/test/path.m4a',
             title: 'Test Recording',
             folderId: 'test_folder',
@@ -98,8 +100,8 @@ void main() {
             sampleRate: 44100,
             bitRate: 128000,
             startTime: DateTime.now(),
-          ));
-          
+          )));
+
           return recordingBloc;
         },
         act: (testBloc) => testBloc.add(const StartRecording(
@@ -118,7 +120,7 @@ void main() {
           final testRecording = TestHelpers.createTestRecording();
           
           when(() => mockStopRecordingUseCase.execute())
-              .thenAnswer((_) async => StopRecordingResult.success(recording: testRecording));
+              .thenAnswer((_) async => Right(testRecording));
           
           return recordingBloc;
         },
@@ -142,8 +144,8 @@ void main() {
       blocTest<RecordingBloc, recording_bloc.RecordingState>(
         'emits [Paused] when recording pauses successfully',
         build: () {
-          when(() => mockPauseRecordingUseCase.executePause()).thenAnswer((_) async => 
-            PauseRecordingResult.successPause(pausedDuration: const Duration(seconds: 30)));
+          when(() => mockPauseRecordingUseCase.executePause()).thenAnswer(
+              (_) async => const Right(Duration(seconds: 30)));
           return recordingBloc;
         },
         seed: () => recording_bloc.RecordingInProgress(
@@ -165,8 +167,8 @@ void main() {
       blocTest<RecordingBloc, recording_bloc.RecordingState>(
         'emits [InProgress] when recording resumes successfully',
         build: () {
-          when(() => mockPauseRecordingUseCase.executeResume()).thenAnswer((_) async => 
-            PauseRecordingResult.successResume(resumedDuration: const Duration(seconds: 30)));
+          when(() => mockPauseRecordingUseCase.executeResume()).thenAnswer(
+              (_) async => const Right(Duration(seconds: 30)));
           return recordingBloc;
         },
         seed: () => recording_bloc.RecordingPaused(
@@ -230,7 +232,7 @@ void main() {
             format: any(named: 'format'),
             sampleRate: any(named: 'sampleRate'),
             bitRate: any(named: 'bitRate'),
-          )).thenAnswer((_) async => StartRecordingResult.success(
+          )).thenAnswer((_) async => Right(StartRecordingSuccess(
             filePath: '/test/path.m4a',
             title: 'Test Recording',
             folderId: 'test_folder',
@@ -238,7 +240,7 @@ void main() {
             sampleRate: 44100,
             bitRate: 128000,
             startTime: DateTime.now(),
-          ));
+          )));
           return recordingBloc;
         },
         act: (testBloc) => testBloc.add(const StartRecording(

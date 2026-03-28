@@ -76,6 +76,41 @@
 - Follow Flutter best practices for state management and widget organisation
 - Consider thematic elements when naming variables, classes, and UI components
 
+## CRITICAL: Single Source of Truth
+
+- Each service must be initialized in ONE place only (`dependency_injection.dart`)
+- NEVER initialize a service in both `main.dart` and a BLoC constructor
+- NEVER have two parallel systems for the same responsibility (e.g., two database helpers)
+- All global singletons must be registered via GetIt, not as `late final` variables in `main.dart`
+
+## CRITICAL: Error Handling Pattern
+
+- ALWAYS use `Either<Failure, Success>` from dartz in repositories and use cases
+- NEVER mix boolean returns, thrown exceptions, and Result objects in the same layer
+- Repositories return `Either`, BLoCs consume `.fold()` — no exceptions should bubble up to the UI
+- Define all Failure types in `core/errors/failures.dart`
+
+## CRITICAL: Dependency Management
+
+- NEVER add a dependency without using it — remove unused imports from `pubspec.yaml`
+- Check pub.dev maintenance status before adding new packages (prefer packages with recent updates)
+- For audio recording: use `record` package only
+- For audio playback: use `just_audio` only
+- NEVER add a package that duplicates functionality already covered by an existing dependency
+
+## CRITICAL: Idempotent Initialization
+
+- ALL `initialize()` methods must be idempotent (safe to call multiple times)
+- Add an `_isInitialized` guard to every service that has an `initialize()` method
+- Document the expected call order if initialization order matters
+
+## SECONDARY: Testing Requirements
+
+- Every new Use Case must have a corresponding unit test
+- Every new Repository method must have a corresponding unit test
+- BLoC tests required for any new event handler added
+- Run existing tests before marking a feature as complete
+
 ## WORKFLOW: Before Every Code Change
 
 1. Check idea_project_structure.txt for correct file placement

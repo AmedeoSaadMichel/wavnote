@@ -28,36 +28,24 @@ import 'presentation/bloc/folder/folder_bloc.dart';      // Manages folder opera
 import 'presentation/bloc/recording/recording_bloc.dart'; // Manages recording operations
 import 'presentation/bloc/settings/settings_bloc.dart';   // Manages app settings
 
-// Database and repository imports
-import 'data/database/database_helper.dart';    // SQLite database helper
-import 'data/database/database_pool.dart';      // High-performance database connection pool
-import 'data/repositories/recording_repository.dart'; // Recording data access layer
+// Database imports
+import 'data/database/database_helper.dart'; // SQLite database helper
 
-// Service imports
-import 'services/audio/audio_service_coordinator.dart'; // Audio recording and playback coordination
-import 'services/location/geolocation_service.dart';    // GPS location services for recording naming
+// Dependency injection
+import 'config/dependency_injection.dart';                    // GetIt service locator setup
+import 'data/repositories/recording_repository.dart';        // Needed for sl<> type resolution
+import 'services/audio/audio_service_coordinator.dart';      // Needed for sl<> type resolution
+import 'services/location/geolocation_service.dart';         // Needed for sl<> type resolution
 
 // Core imports
 import 'core/routing/app_router.dart';                   // GoRouter configuration
 import 'presentation/widgets/common/skeleton_screen.dart'; // Loading screen while app initializes
 
 // ============================================
-// GLOBAL SERVICE INSTANCES
+// SERVICE LOCATOR
 // ============================================
-// These are singleton instances shared across the entire app
-// for optimal performance and resource management
-
-/// Global audio service coordinator for managing recording and playback
-/// Handles coordination between recording and playback services
-late final AudioServiceCoordinator globalAudioService;
-
-/// Global recording repository for database operations
-/// Provides CRUD operations for recordings and folders
-late final RecordingRepository globalRecordingRepository;
-
-/// Global geolocation service for location-based features
-/// Used to generate location-based recording names
-late final GeolocationService globalGeolocationService;
+// All services and repositories are accessed via GetIt (sl).
+// See config/dependency_injection.dart for registrations.
 
 // ============================================
 // MAIN APPLICATION ENTRY POINT
@@ -84,47 +72,19 @@ void main() async {
     // ========================================
     // DATABASE INITIALIZATION
     // ========================================
-    
-    // Initialize ultra-fast database connection pool FIRST
-    // This provides the fastest possible data access throughout the app
-    await DatabasePool.initialize();
-    print('✅ Database pool initialized successfully');
-
-    // Initialize regular database helper for compatibility with existing code
-    // TODO: Migrate all database access to use the pool for better performance
+    // Single call — DatabaseHelper is idempotent and applies all PRAGMA optimizations in onOpen
     await DatabaseHelper.database;
-    print('✅ Database helper initialized successfully');
-
-    // Print database information for debugging and monitoring
-    final dbInfo = await DatabaseHelper.getDatabaseInfo();
-    print('📊 Database Info: $dbInfo');
-    
-    // Print database pool statistics for performance monitoring
-    print('🏊‍♂️ Database Pool Stats: ${DatabasePool.stats}');
 
     // ========================================
-    // SERVICE INITIALIZATION
+    // DEPENDENCY INJECTION SETUP
     // ========================================
-    
-    // Create global service instances
-    // These singletons ensure consistent state across the app
-    globalAudioService = AudioServiceCoordinator();
-    globalRecordingRepository = RecordingRepository();
-    globalGeolocationService = GeolocationService();
-
-    // Initialize audio service for recording and playback capabilities
-    // This sets up the audio engine and checks for required permissions
-    final audioInitialized = await globalAudioService.initialize();
-    if (!audioInitialized) {
-      print('❌ Failed to initialize audio service - recording may not work');
-    } else {
-      print('✅ Audio service initialized successfully');
-    }  
+    // Register all services and repositories via GetIt
+    await setupDependencies();
 
   } catch (e) {
     // Log initialization errors but continue app startup
     // The app should still be functional even if some services fail
-    print('❌ Initialization error: $e');
+    debugPrint('❌ Initialization error: $e');
   }
 
   // Launch the main application widget
@@ -176,22 +136,14 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.paused:
-        // App going to background - keep database pool alive for fast resume
-        // This ensures instant data access when user returns to the app
-        print('🏊‍♂️ App paused - keeping database pool alive for fast resume');
         break;
-        
+
       case AppLifecycleState.resumed:
-        // App resumed from background - verify pool is still ready
-        // Log pool status for debugging performance issues
-        print('🏊‍♂️ App resumed - database pool ready: ${DatabasePool.isReady}');
         break;
-        
+
       case AppLifecycleState.detached:
-        // App is being terminated by the system - clean up resources
-        // Properly dispose of database connections to prevent memory leaks
-        print('🏊‍♂️ App terminating - disposing database pool');
-        DatabasePool.dispose();
+        // Close database connection on app termination
+        DatabaseHelper.closeDatabase();
         break;
         
       default:
@@ -202,9 +154,7 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
   
   @override
   void dispose() {
-    // Clean up when the widget is destroyed
     WidgetsBinding.instance.removeObserver(this);
-    DatabasePool.dispose();
     super.dispose();
   }
 
@@ -229,14 +179,13 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
         ),
         
         // RecordingBloc: Manages recording operations (record, play, save, delete)
-        // Injected with global services for audio, data, and location
-        // Also gets FolderBloc reference for automatic folder count updates
+        // Dependencies resolved via GetIt service locator
         BlocProvider(
           create: (context) => RecordingBloc(
-            audioService: globalAudioService,          // Audio recording and playback
-            recordingRepository: globalRecordingRepository, // Data persistence
-            geolocationService: globalGeolocationService,   // Location-based naming
-            folderBloc: context.read<FolderBloc>(),         // Folder count updates
+            audioService: sl<AudioServiceCoordinator>(),
+            recordingRepository: sl<RecordingRepository>(),
+            geolocationService: sl<GeolocationService>(),
+            folderBloc: context.read<FolderBloc>(),
           ),
         ),
         

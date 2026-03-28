@@ -17,7 +17,7 @@
 // Architecture:
 // - Uses GoRouter for modern Flutter navigation
 // - Integrates with BLoC pattern for state management
-// - Leverages DatabasePool for instant state persistence
+// - Leverages DatabaseHelper for instant state persistence
 // - Provides extension methods for convenient navigation
 // - Handles async route creation with proper loading states
 //
@@ -61,7 +61,7 @@ import '../../core/enums/folder_type.dart'; // Folder type enum
 import '../../presentation/bloc/folder/folder_bloc.dart'; // Folder state management
 
 // Data layer imports
-import '../../data/database/database_pool.dart'; // High-performance database access
+import '../../data/database/database_helper.dart'; // Database access
 
 // Widget imports
 import '../../presentation/widgets/common/skeleton_screen.dart'; // Loading screen
@@ -88,18 +88,12 @@ class AppRouter {
   /// Create router asynchronously with ultra-fast database pool and pre-loaded folder data
   static Future<GoRouter> createRouterAsync() async {
     final stopwatch = Stopwatch()..start();
-    print('📁 AppRouter: Creating async router with pre-loading optimization');
-    print('🏊‍♂️ AppRouter: Database pool ready: ${DatabasePool.isReady}');
-    
-    // CRITICAL: Wait for database pool to be fully initialized
-    if (!DatabasePool.isReady) {
-      print('⏳ AppRouter: Waiting for database pool initialization...');
-      await DatabasePool.waitForInitialization();
-      print('✅ AppRouter: Database pool initialization complete');
-    }
-    
-    // Use ultra-fast database pool instead of slow settings loading
-    final lastFolderId = await DatabasePool.getLastFolderId();
+
+    // Ensure database is ready (idempotent — returns immediately if already open)
+    await DatabaseHelper.database;
+
+    // Load last opened folder from unified DatabaseHelper
+    final lastFolderId = await DatabaseHelper.getLastFolderId();
     
     // OPTIMIZATION: Pre-load folder data to eliminate all router skeletons
     print('🚀 PRE-LOAD: Loading folder data in advance to eliminate skeletons');
