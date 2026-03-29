@@ -136,12 +136,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       });
     }
 
-    // Update waveform data ALWAYS when recording (even if amplitude doesn't change)
-    // This ensures continuous waveform scroll every 150ms
-    if (widget.isRecording) {
+    // Aggiunge un punto alla waveform solo se l'ampiezza è > 0.
+    // Le barre a 0.0 sono invisibili e creano gap visivi (es. subito dopo
+    // seek-and-resume, prima che l'audio service produca campioni reali).
+    if (widget.isRecording && widget.amplitude > 0.0) {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final changed = widget.amplitude != oldWidget.amplitude;
-      print('⏱️ [$timestamp] didUpdateWidget: Amplitude ${oldWidget.amplitude.toStringAsFixed(3)} → ${widget.amplitude.toStringAsFixed(3)} (changed: $changed)');
       _addWavePoint(widget.amplitude, timestamp);
     }
 
