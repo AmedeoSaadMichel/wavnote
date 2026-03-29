@@ -14,6 +14,7 @@
 //   recording_bloc_management.dart — load, delete, move, favorite, debug handlers
 
 import 'dart:async';
+import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
@@ -28,9 +29,11 @@ import '../../../core/enums/audio_format.dart';
 import '../../../domain/usecases/recording/start_recording_usecase.dart';
 import '../../../domain/usecases/recording/stop_recording_usecase.dart';
 import '../../../domain/usecases/recording/pause_recording_usecase.dart';
+import '../../../domain/usecases/recording/seek_and_resume_usecase.dart';
 
 // Service imports
 import '../../../services/location/geolocation_service.dart';
+import '../../../services/audio/audio_trimmer_service.dart';
 import '../folder/folder_bloc.dart';
 
 // BLoC parts
@@ -49,6 +52,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final StartRecordingUseCase _startRecordingUseCase;
   final StopRecordingUseCase _stopRecordingUseCase;
   final PauseRecordingUseCase _pauseRecordingUseCase;
+  final SeekAndResumeUseCase _seekAndResumeUseCase;
+  final AudioTrimmerService _trimmerService;
   final FolderBloc? _folderBloc;
 
   StreamSubscription<double>? _amplitudeSubscription;
@@ -63,9 +68,12 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     StartRecordingUseCase? startRecordingUseCase,
     StopRecordingUseCase? stopRecordingUseCase,
     PauseRecordingUseCase? pauseRecordingUseCase,
+    SeekAndResumeUseCase? seekAndResumeUseCase,
+    AudioTrimmerService? trimmerService,
   })  : _audioService = audioService,
         _recordingRepository = recordingRepository,
         _folderBloc = folderBloc,
+        _trimmerService = trimmerService ?? AudioTrimmerService(),
         _startRecordingUseCase = startRecordingUseCase ??
             StartRecordingUseCase(
               audioService: audioService,
@@ -79,6 +87,11 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
             ),
         _pauseRecordingUseCase = pauseRecordingUseCase ??
             PauseRecordingUseCase(audioService: audioService),
+        _seekAndResumeUseCase = seekAndResumeUseCase ??
+            SeekAndResumeUseCase(
+              audioService: audioService,
+              trimmerService: trimmerService ?? AudioTrimmerService(),
+            ),
         super(const RecordingInitial()) {
     // Lifecycle handlers (recording_bloc_lifecycle.dart)
     on<StartRecording>(_onStartRecording);
@@ -86,6 +99,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<PauseRecording>(_onPauseRecording);
     on<ResumeRecording>(_onResumeRecording);
     on<CancelRecording>(_onCancelRecording);
+    on<SeekAndResumeRecording>(_onSeekAndResumeRecording);
 
     // Real-time update handlers
     on<UpdateRecordingAmplitude>(_onUpdateRecordingAmplitude);

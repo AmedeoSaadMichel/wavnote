@@ -56,6 +56,12 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       return;
     }
 
+    // Recupera seekBasePath prima dell'emit di RecordingStopping
+    String? seekBasePath;
+    if (state is RecordingInProgress) {
+      seekBasePath = (state as RecordingInProgress).seekBasePath;
+    }
+
     emit(const RecordingStopping());
     _stopAmplitudeUpdates();
     _stopDurationUpdates();
@@ -72,10 +78,25 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       overrideDuration: currentDuration,
     );
 
-    result.fold(
-      (failure) => emit(RecordingError(failure.message,
+    await result.fold(
+      (failure) async => emit(RecordingError(failure.message,
           errorType: RecordingErrorType.recording)),
-      (recording) {
+      (recording) async {
+        // Se seek-and-resume è stato usato, concatena base + continuazione
+        if (seekBasePath != null) {
+          try {
+            await _trimmerService.concatenateAudio(
+              basePath: seekBasePath,
+              appendPath: recording.filePath,
+              outputPath: recording.filePath,
+              format: recording.format.name.toLowerCase(),
+            );
+            final baseFile = File(seekBasePath);
+            if (await baseFile.exists()) await baseFile.delete();
+          } catch (e) {
+            print('⚠️ Concatenazione fallita, mantengo solo la continuazione: $e');
+          }
+        }
         emit(RecordingCompleted(recording: recording));
         _refreshFolderCounts();
       },
@@ -130,6 +151,49 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           duration: duration,
           amplitude: 0.0,
           startTime: s.startTime,
+        ));
+        _startAmplitudeUpdates();
+        _startDurationUpdates();
+      },
+    );
+  }
+
+  // ==== SEEK-AND-RESUME ====
+
+  Future<void> _onSeekAndResumeRecording(
+      SeekAndResumeRecording event, Emitter<RecordingState> emit) async {
+    if (state is! RecordingPaused) return;
+
+    final s = state as RecordingPaused;
+    emit(const RecordingStarting());
+    _stopAmplitudeUpdates();
+    _stopDurationUpdates();
+
+    final result = await _seekAndResumeUseCase.execute(
+      filePath: s.filePath,
+      seekBarIndex: event.seekBarIndex,
+      format: s.format,
+      sampleRate: s.sampleRate,
+      bitRate: s.bitRate,
+      waveData: event.waveData,
+    );
+
+    result.fold(
+      (failure) => emit(RecordingError(failure.message,
+          errorType: RecordingErrorType.recording)),
+      (data) {
+        final seekTimeMs = event.seekBarIndex * 50;
+        emit(RecordingInProgress(
+          filePath: s.filePath,
+          folderId: s.folderId,
+          folderName: s.folderName,
+          format: s.format,
+          sampleRate: s.sampleRate,
+          bitRate: s.bitRate,
+          duration: Duration(milliseconds: seekTimeMs),
+          amplitude: 0.0,
+          startTime: s.startTime,
+          seekBasePath: data.seekBasePath,
         ));
         _startAmplitudeUpdates();
         _startDurationUpdates();

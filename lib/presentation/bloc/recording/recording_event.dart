@@ -236,13 +236,36 @@ class MoveRecordingToFolder extends RecordingEvent {
 class MoveSelectedRecordingsToFolder extends RecordingEvent {
   final String targetFolderId;
   final String currentFolderId; // Context for UI refresh
-  
+
   const MoveSelectedRecordingsToFolder({
     required this.targetFolderId,
     required this.currentFolderId,
   });
-  
+
   @override
   List<Object> get props => [targetFolderId, currentFolderId];
 }
 
+/// Event per cercare una posizione nella waveform e riprendere la registrazione da lì.
+/// Triggera il trim audio al punto di seek, poi riavvia il recorder.
+class SeekAndResumeRecording extends RecordingEvent {
+  final int seekBarIndex;
+  final String filePath;
+  final AudioFormat format;
+  final int sampleRate;
+  final int bitRate;
+  final List<double> waveData;
+
+  const SeekAndResumeRecording({
+    required this.seekBarIndex,
+    required this.filePath,
+    required this.format,
+    required this.sampleRate,
+    required this.bitRate,
+    required this.waveData,
+  });
+
+  @override
+  List<Object?> get props =>
+      [seekBarIndex, filePath, format, sampleRate, bitRate, waveData];
+}

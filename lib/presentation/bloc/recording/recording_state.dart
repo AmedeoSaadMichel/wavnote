@@ -88,6 +88,7 @@ class RecordingInProgress extends RecordingState {
   final double amplitude;
   final DateTime startTime;
   final String? title;
+  final String? seekBasePath; // path del file base tagliato se è avvenuto un seek-trim
 
   const RecordingInProgress({
     required this.filePath,
@@ -100,12 +101,13 @@ class RecordingInProgress extends RecordingState {
     required this.amplitude,
     required this.startTime,
     this.title,
+    this.seekBasePath,
   });
 
   @override
   List<Object?> get props => [
     filePath, folderId, folderName, format, sampleRate, bitRate,
-    duration, amplitude, startTime, title
+    duration, amplitude, startTime, title, seekBasePath,
   ];
 
   RecordingInProgress copyWith({
@@ -119,6 +121,7 @@ class RecordingInProgress extends RecordingState {
     double? amplitude,
     DateTime? startTime,
     String? title,
+    String? seekBasePath,
   }) {
     return RecordingInProgress(
       filePath: filePath ?? this.filePath,
@@ -131,6 +134,7 @@ class RecordingInProgress extends RecordingState {
       amplitude: amplitude ?? this.amplitude,
       startTime: startTime ?? this.startTime,
       title: title ?? this.title,
+      seekBasePath: seekBasePath ?? this.seekBasePath,
     );
   }
 }
