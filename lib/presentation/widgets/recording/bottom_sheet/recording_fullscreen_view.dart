@@ -20,9 +20,11 @@ class RecordingFullscreenView extends StatelessWidget {
   final VoidCallback? onPlay;
   final VoidCallback? onRewind;
   final VoidCallback? onForward;
-  // ── Seek (sostituisce onSeek) ──
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
   final int seekBarIndex;
+  /// Versione del seek: incrementata ad ogni seek-and-resume per segnalare a
+  /// RecordingWaveform di riposizionare la waveform sulla bacchetta.
+  final int seekVersion;
 
   const RecordingFullscreenView({
     super.key,
@@ -42,6 +44,7 @@ class RecordingFullscreenView extends StatelessWidget {
     this.onForward,
     this.onSeekBarIndexChanged,
     this.seekBarIndex = 0,
+    this.seekVersion = 0,
   });
 
   String get _formattedTime => elapsed.formatted;
@@ -161,7 +164,9 @@ class RecordingFullscreenView extends StatelessWidget {
           scaleFactor: 80.0,
           currentDuration: elapsed,
           isPaused: isPaused,
+          showPlayhead: true,
           onSeekBarIndexChanged: onSeekBarIndexChanged,
+          seekVersion: seekVersion,
         );
       },
     );
