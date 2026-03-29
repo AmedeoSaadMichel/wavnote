@@ -6,8 +6,9 @@
 // Returns Either<Failure, StartRecordingSuccess> following the canonical
 // Either pattern (CLAUDE.md). The BLoC consumes via result.fold(left, right).
 //
-// Steps: validate permissions → generate title → build file path
+// Steps: validate permissions → build file path (titolo temporaneo)
 //        → validate config → start audio service
+//        La risoluzione del titolo geolocalizzato avviene in background nel BLoC.
 
 import 'dart:async';
 import 'package:dartz/dartz.dart';
@@ -23,10 +24,13 @@ import '../../../services/location/geolocation_service.dart';
 ///
 /// Returns [Either<Failure, StartRecordingSuccess>]:
 /// - [Left]  — a [Failure] (permission, config, audio service error)
-/// - [Right] — [StartRecordingSuccess] with all data the BLoC needs to
-///             emit [RecordingInProgress]
+/// - [Right] — [StartRecordingSuccess] con titolo temporaneo (timestamp).
+///             Il BLoC risolve il titolo geolocalizzato in background e
+///             aggiorna lo stato via [UpdateRecordingTitle].
 class StartRecordingUseCase {
   final IAudioServiceRepository _audioService;
+  // Mantenuto per retrocompatibilità; non più usato nell'avvio.
+  // ignore: unused_field
   final GeolocationService _geolocationService;
 
   StartRecordingUseCase({
@@ -47,8 +51,9 @@ class StartRecordingUseCase {
         return Left(AudioRecordingFailure.permissionDenied());
       }
 
-      // 2. Generate location-based title
-      final title = await _generateTitle();
+      // 2. Titolo temporaneo sincrono — la registrazione parte subito,
+      //    il titolo geolocalizzato verrà aggiornato in background dal BLoC.
+      final title = _generateTempTitle();
 
       // 3. Create unique file path
       final filePath = _buildFilePath(folderId, title, format);
@@ -104,11 +109,9 @@ class StartRecordingUseCase {
     }
   }
 
-  Future<String> _generateTitle() async {
-    try {
-      final loc = await _geolocationService.getRecordingLocationName();
-      if (loc.isNotEmpty) return loc;
-    } catch (_) {}
+  /// Titolo temporaneo basato sul timestamp — restituito sincronamente
+  /// per non bloccare l'avvio della registrazione.
+  String _generateTempTitle() {
     final now = DateTime.now();
     return 'Recording '
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '

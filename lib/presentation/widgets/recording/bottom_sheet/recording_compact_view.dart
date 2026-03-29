@@ -1,15 +1,18 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_compact_view.dart
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import '../../../../core/extensions/duration_extensions.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 
-/// Compact view for collapsed recording bottom sheet
+/// Vista compatta del bottom sheet di registrazione.
+///
+/// Layout (dall'alto verso il basso):
+///   handle bar          — fissa
+///   [Expanded]          — vuoto se non in registrazione, contenuto altrimenti
+///   bottone record      — fisso 110px
 class RecordingCompactView extends StatelessWidget {
   final String? title;
   final Duration elapsed;
   final bool isRecording;
-  final String? filePath;
   final double amplitude;
   final List<double> waveData;
   final Animation<double> pulseAnimation;
@@ -20,122 +23,125 @@ class RecordingCompactView extends StatelessWidget {
     required this.title,
     required this.elapsed,
     required this.isRecording,
-    required this.filePath,
     required this.amplitude,
     required this.waveData,
     required this.pulseAnimation,
     required this.onToggle,
   });
 
-  /// Converts the elapsed recording time into formatted string
-  String get _formattedTime {
-    return elapsed.formatted;
-  }
+  String get _formattedTime => elapsed.formatted;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      // stretch → tutti i figli ricevono larghezza tight = larghezza colonna
+      // (evita vincoli loose che rompono Expanded/LayoutBuilder annidati)
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top spacer
-        const Spacer(),
-        
-        // Handle at top
-        Flexible(
-          flex: 1,
+        // ── Handle bar ──────────────────────────────────────────────
+        const SizedBox(height: 12),
+        Center(
           child: Container(
             width: 40,
             height: 4,
-            margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
         ),
+        const SizedBox(height: 12),
 
-        // Compact animated content
-        Flexible(
-          flex: 8,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 100),
-            transitionBuilder: (child, animation) => SizeTransition(
-              sizeFactor: animation,
-              axisAlignment: -1.0,
-              child: FadeTransition(opacity: animation, child: child),
-            ),
-            child: isRecording
-                ? _buildRecordingContent()
-                : const SizedBox(key: ValueKey(false)),
+        // ── Area centrale ────────────────────────────────────────────
+        // LayoutBuilder con soglia minima: evita il RenderFlex overflow
+        // durante i ~300ms in cui AnimatedContainer anima da height=180
+        // a minHeight. In quel lasso isRecording è già true ma lo spazio
+        // disponibile è ancora < 80px → mostriamo SizedBox.shrink() finché
+        // non c'è abbastanza spazio per il contenuto.
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (!isRecording || constraints.maxHeight < 80) {
+                return const SizedBox.shrink();
+              }
+              return _buildRecordingContent();
+            },
           ),
         ),
 
-        // Main record toggle button - centered
-        Flexible(
-          flex: 8,
-          child: Center(
-            child: _buildRecordButton(),
-          ),
+        // ── Bottone record ───────────────────────────────────────────
+        SizedBox(
+          height: 110,
+          child: Center(child: _buildRecordButton()),
         ),
-
-        // Bottom spacer
-        const Spacer(),
+        const SizedBox(height: 8),
       ],
     );
   }
 
-  /// Build recording content when recording is active
+  /// Titolo + timer + waveform.
+  ///
+  /// Riceve vincoli tight (W × H) dall'Expanded esterno.
+  /// La waveform riempie tutto lo spazio rimanente tramite
+  /// Expanded → Padding → LayoutBuilder, senza intermediari che
+  /// rilassino i vincoli.
   Widget _buildRecordingContent() {
     return Column(
-      key: const ValueKey(true),
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const SizedBox(height: 8),
+
+        // Titolo
         if (title != null)
-          Flexible(
-            flex: 4,
-            child: Text(
-              title!, 
-              style: const TextStyle(
-                color: Colors.white, 
-                fontSize: 22, 
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        const Spacer(flex: 1),
-        Flexible(
-          flex: 4,
-          child: Text(
-            _formattedTime, 
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7), 
+          Text(
+            title!,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
+
+        const SizedBox(height: 4),
+
+        // Timer
+        Text(
+          _formattedTime,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.75),
+            fontSize: 15,
+          ),
+          textAlign: TextAlign.center,
         ),
-        const Spacer(flex: 2),
-        Flexible(
-          flex: 10,
-          child: Center(
-            child: Container(
-              height: 120,
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return RecordingWaveform(
-                    amplitude: amplitude,
-                    waveData: waveData,
-                    size: Size(constraints.maxWidth, 120),
-                    waveColor: Colors.cyan,
-                    spacing: 1.5,  // Reduced from 3.0 for smoother scroll
-                    waveThickness: 2.0,  // Slightly thinner to match smaller spacing
-                    scaleFactor: 50.0,
-                    currentDuration: elapsed,
-                  );
-                },
-              ),
+
+        const SizedBox(height: 8),
+
+        // Waveform: riempie tutto lo spazio rimanente.
+        // LayoutBuilder figlio diretto di Expanded → maxWidth e maxHeight
+        // sono i valori reali disponibili → Size passata a RecordingWaveform
+        // corrisponde esattamente allo spazio occupato.
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return RecordingWaveform(
+                  amplitude: amplitude,
+                  waveData: waveData,
+                  size: Size(constraints.maxWidth, constraints.maxHeight),
+                  waveColor: Colors.cyan,
+                  spacing: 1.5,
+                  waveThickness: 2.5,
+                  scaleFactor: constraints.maxHeight * 0.40,
+                  currentDuration: elapsed,
+                  centerBars: true,
+                );
+              },
             ),
           ),
         ),
@@ -143,41 +149,43 @@ class RecordingCompactView extends StatelessWidget {
     );
   }
 
-  /// Build record button with pulse animation
+  /// Bottone record con animazione pulse.
   Widget _buildRecordButton() {
     return GestureDetector(
       onTap: onToggle,
       child: AnimatedBuilder(
         animation: pulseAnimation,
         builder: (context, child) {
-          return Container(
+          return Transform.scale(
+            scale: pulseAnimation.value,
+            child: Container(
             width: 80,
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: isRecording 
+              gradient: isRecording
                   ? const LinearGradient(
                       colors: [
-                        Color(0xFFDC143C), // Crimson red
-                        Color(0xFFB22222), // Fire brick red
-                        Color(0xFF8B0000), // Dark red
+                        Color(0xFFDC143C),
+                        Color(0xFFB22222),
+                        Color(0xFF8B0000),
                       ],
                     )
                   : const LinearGradient(
                       colors: [
-                        Color(0xFFFFA500), // Orange
-                        Color(0xFFFFC107), // Amber/Golden yellow
+                        Color(0xFFFFA500),
+                        Color(0xFFFFC107),
                       ],
                     ),
               border: Border.all(
-                color: isRecording 
+                color: isRecording
                     ? const Color(0xFFFF6B6B).withValues(alpha: 0.8)
                     : Colors.cyan,
-                width: isRecording ? 3 : 2, // Smaller cyan border when not recording
+                width: isRecording ? 3 : 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: isRecording 
+                  color: isRecording
                       ? const Color(0xFFDC143C).withValues(alpha: 0.4)
                       : Colors.black.withValues(alpha: 0.2),
                   blurRadius: isRecording ? 16 : 8,
@@ -187,112 +195,26 @@ class RecordingCompactView extends StatelessWidget {
             ),
             child: Center(
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 1000),
+                duration: const Duration(milliseconds: 300),
                 child: isRecording
                     ? const Icon(
-                        Icons.stop, 
-                        key: ValueKey('stop'), 
-                        color: Colors.white, // White stop icon
+                        Icons.stop,
+                        key: ValueKey('stop'),
+                        color: Colors.white,
                         size: 32,
                       )
                     : const Icon(
-                        Icons.fiber_manual_record, 
-                        key: ValueKey('rec'), 
-                        color: Color(0xFF2E1065), // Deep midnight purple for contrast
+                        Icons.fiber_manual_record,
+                        key: ValueKey('rec'),
+                        color: Color(0xFF2E1065),
                         size: 30,
                       ),
               ),
             ),
-          );
+          ),
+        );
         },
       ),
     );
-  }
-}
-
-/// Custom painter for compact frog eye pause button
-class CompactEyePausePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    // Outer eye border (cyan blue ring)
-    final outerPaint = Paint()
-      ..color = const Color(0xFF4ECDC4) // Cyan blue border
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawCircle(center, radius - 1, outerPaint);
-
-    // Eye background (sclera) - off-white
-    final scleraPaint = Paint()
-      ..color = const Color(0xFFF8F8F6);
-    canvas.drawCircle(center, radius - 3, scleraPaint);
-
-    // Iris gradient (frog eye - red tones)
-    final irisRadius = (radius - 5) * 0.7;
-    final irisGradient = RadialGradient(
-      colors: const [
-        Color(0xFFFF6B6B), // Light red center
-        Color(0xFFE74C3C), // Red
-        Color(0xFFDC143C), // Crimson
-        Color(0xFFB22222), // Fire brick
-        Color(0xFF8B0000), // Dark red edge
-      ],
-      stops: const [0.0, 0.3, 0.6, 0.8, 1.0],
-    );
-    
-    final irisPaint = Paint()
-      ..shader = irisGradient.createShader(
-        Rect.fromCircle(center: center, radius: irisRadius),
-      );
-    canvas.drawCircle(center, irisRadius, irisPaint);
-
-    // Iris fiber lines (radial pattern like frog eye)
-    final fiberPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.1)
-      ..strokeWidth = 0.2;
-    
-    for (int i = 0; i < 32; i++) {
-      final angle = (i * 11.25) * (3.14159 / 180); // Convert to radians
-      final startRadius = irisRadius * 0.3;
-      final endRadius = irisRadius * 0.9;
-      
-      final startX = center.dx + startRadius * math.cos(angle);
-      final startY = center.dy + startRadius * math.sin(angle);
-      final endX = center.dx + endRadius * math.cos(angle);
-      final endY = center.dy + endRadius * math.sin(angle);
-      
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        fiberPaint,
-      );
-    }
-
-    // Stop icon in center (instead of pupil)
-    final stopPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    
-    final stopSize = irisRadius * 0.4; // Larger stop icon
-    
-    // Draw stop square 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: center,
-          width: stopSize,
-          height: stopSize,
-        ),
-        const Radius.circular(2),
-      ),
-      stopPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
   }
 }

@@ -42,6 +42,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           startTime: data.startTime,
           title: data.title,
         ));
+        // Risolve il titolo geolocalizzato in background; la registrazione
+        // è già partita e l'UI è aggiornata con il titolo temporaneo.
+        _refreshTitleInBackground();
       },
     );
   }
@@ -152,6 +155,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           duration: duration,
           amplitude: 0.0,
           startTime: s.startTime,
+          title: s.title,
         ));
         _startAmplitudeUpdates();
         _startDurationUpdates();

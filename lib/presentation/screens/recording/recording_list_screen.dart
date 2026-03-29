@@ -137,7 +137,9 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
                     Expanded(
                       child: _buildRecordingsList(context),
                     ),
-                    const SizedBox(height: 200),
+                    // Spazio pari all'altezza del bottom sheet in idle (180px)
+                    // così l'ultima card non viene coperta dal bottone record.
+                    const SizedBox(height: 180),
                   ],
                 ),
               ),
@@ -157,23 +159,32 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
   Widget _buildRecordingsList(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
       buildWhen: (previous, current) {
+        // Non ricostruire durante gli stati di registrazione: la lista rimane
+        // visibile sotto il bottom sheet con le registrazioni precedenti.
+        if (current is RecordingInProgress ||
+            current is RecordingStarting ||
+            current is RecordingPaused) {
+          print('🔍 BUILD_WHEN: Recording state (${current.runtimeType}) - skipping rebuild, keeping previous list');
+          return false;
+        }
+
         // Always rebuild when state type changes
         if (previous.runtimeType != current.runtimeType) {
           print('🔍 BUILD_WHEN: State type changed: ${previous.runtimeType} → ${current.runtimeType}');
           return true;
         }
-        
+
         // Always rebuild for RecordingLoaded states to ensure UI reflects all changes
         // This prevents issues with list equality comparison not detecting entity changes
         if (current is RecordingLoaded) {
           print('🔍 BUILD_WHEN: RecordingLoaded state - forcing rebuild to ensure UI sync');
-          
+
           // Debug favorite status changes
           if (previous is RecordingLoaded) {
             print('🔍 DEBUG: Comparing RecordingLoaded states...');
             print('🔍 DEBUG: Previous recordings count: ${previous.recordings.length}');
             print('🔍 DEBUG: Current recordings count: ${current.recordings.length}');
-            
+
             // Check for favorite status changes
             for (int i = 0; i < current.recordings.length && i < previous.recordings.length; i++) {
               final prev = previous.recordings[i];
@@ -183,10 +194,10 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
               }
             }
           }
-          
+
           return true;
         }
-        
+
         print('🔍 BUILD_WHEN: No rebuild needed for ${current.runtimeType}');
         return false;
       },
@@ -312,13 +323,6 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           );
         }
 
-        // Handle other states (RecordingInProgress, RecordingPaused, RecordingError, etc.)
-        // Hide content while recording is in progress or paused instead of showing "No recordings yet"
-        if (state is RecordingInProgress || state is RecordingStarting || state is RecordingPaused) {
-          print('🎙️ VERBOSE: Recording active (${state.runtimeType}) - hiding recordings list');
-          return const SizedBox.shrink(); // Hide content when recording/paused
-        }
-        
         if (state is RecordingError) {
           return Center(
             child: Text(

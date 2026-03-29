@@ -49,6 +49,7 @@ part 'recording_bloc_management.dart';
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
+  final GeolocationService _geolocationService;
   final StartRecordingUseCase _startRecordingUseCase;
   final StopRecordingUseCase _stopRecordingUseCase;
   final PauseRecordingUseCase _pauseRecordingUseCase;
@@ -72,6 +73,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     AudioTrimmerService? trimmerService,
   })  : _audioService = audioService,
         _recordingRepository = recordingRepository,
+        _geolocationService = geolocationService,
         _folderBloc = folderBloc,
         _trimmerService = trimmerService ?? AudioTrimmerService(),
         _startRecordingUseCase = startRecordingUseCase ??
@@ -273,6 +275,17 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   }
 
   // ==== PRIVATE HELPERS ====
+
+  /// Risolve il titolo geolocalizzato in background dopo l'avvio della
+  /// registrazione, senza bloccare l'UI. Aggiorna lo stato via [UpdateRecordingTitle].
+  Future<void> _refreshTitleInBackground() async {
+    try {
+      final loc = await _geolocationService.getRecordingLocationName();
+      if (loc.isNotEmpty && !isClosed && state is RecordingInProgress) {
+        add(UpdateRecordingTitle(title: loc));
+      }
+    } catch (_) {}
+  }
 
   void _refreshFolderCounts() {
     if (_folderBloc != null && !isClosed) {

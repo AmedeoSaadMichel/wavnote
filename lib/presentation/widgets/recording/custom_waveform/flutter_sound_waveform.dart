@@ -28,6 +28,10 @@ class RecordingWaveform extends StatefulWidget {
   /// Versione del seek: incrementata ogni volta che avviene un seek-and-resume.
   /// Quando cambia, la waveform riposiziona l'ultima barra sul playhead.
   final int seekVersion;
+  /// Se true, le barre vengono disegnate al centro verticale del canvas
+  /// (bottomPadding = size.height/2). Default false → barre in fondo (comportamento
+  /// originale usato dalla fullscreen view con Clip.none).
+  final bool centerBars;
 
   const RecordingWaveform({
     super.key,
@@ -48,6 +52,7 @@ class RecordingWaveform extends StatefulWidget {
     this.showPlayhead = false,
     this.onSeekBarIndexChanged,
     this.seekVersion = 0,
+    this.centerBars = false,
   });
 
   @override
@@ -153,6 +158,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     print('⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}');
 
     const double playheadExtension = 110.0; // px di estensione sotto la waveform (copre seek label)
+    // centerBars=true → barre al centro verticale del canvas (compact view).
+    // centerBars=false → barre in fondo (comportamento originale fullscreen).
+    final double bottomPadding = widget.centerBars ? widget.size.height / 2 : 0;
 
     return Listener(
       onPointerDown: _onPointerDown,
@@ -175,7 +183,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
               initialPosition: _initialPosition,
               showTop: true,
               showBottom: true,
-              bottomPadding: 0,
+              bottomPadding: bottomPadding,
               waveCap: StrokeCap.round,
               middleLineColor: widget.middleLineColor,
               middleLineThickness: widget.middleLineThickness,

@@ -73,7 +73,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   // Bottom sheet drag state
   late double maxHeight; // Max expanded height (set in build)
-  final double minHeight = 400; // Compact sheet height
+  late double minHeight; // Compact sheet height — set in build (50% screen)
   double _sheetOffset = 0; // 0 = collapsed, 1 = fully expanded
   double _dragStartY = 0; // Initial Y drag position
   double _startHeight = 0; // Height when drag started
@@ -109,7 +109,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
     // Sheet transition animation
     _sheetAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
@@ -290,7 +290,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   @override
   Widget build(BuildContext context) {
-    maxHeight = MediaQuery.of(context).size.height * 0.9;
+    final screenHeight = MediaQuery.of(context).size.height;
+    minHeight = screenHeight * 0.5;
+    maxHeight = screenHeight * 0.9;
 
     // Sheet espandibile durante registrazione, pausa o transizione seek-and-resume
     final bool canExpand = widget.isRecording || widget.isPaused || widget.isStarting;
@@ -304,8 +306,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       left: 0,
       right: 0,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOutCubic,
         height: currentHeight,
         child: GestureDetector(
           // In pausa il drag è disabilitato: la sheet resta in fullscreen
@@ -321,80 +323,76 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   /// Build container with clean design
   Widget _buildContainer() {
-    return Container(
-      width: double.infinity,
-      // Add bottom padding to extend beyond safe area
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF8E2DE2), // Main screen purple
-            Color(0xFFDA22FF), // Main screen magenta
-            Color(0xFFFF4E50), // Main screen coral
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 20,
-            spreadRadius: 2,
+    // ClipRRect invece di Container con gradient: il bottom sheet condivide
+    // lo stesso gradient dello schermo (recording_list_screen). Un gradient
+    // separato creava un seam visibile (origini diverse → colori diversi
+    // alla giunzione = doppio bordo). ClipRRect ritaglia solo gli angoli.
+    // ClipRRect gestisce i bordi arrotondati.
+    // Container interno porta il gradient originale (stessi colori dello schermo).
+    // Senza shadow il seam tra i due gradient è invisibile → nessun doppio bordo.
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF8E2DE2),
+              Color(0xFFDA22FF),
+              Color(0xFFFF4E50),
+            ],
           ),
-        ],
-      ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 600),
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SizeTransition(
-            sizeFactor: animation,
-            axisAlignment: -1,
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
             child: child,
           ),
+          child: _sheetOffset > 0.7
+              ? RecordingFullscreenView(
+                  key: const ValueKey('fullscreen'),
+                  title: widget.title,
+                  elapsed: widget.elapsed,
+                  isRecording: widget.isRecording,
+                  isPaused: widget.isPaused,
+                  filePath: widget.filePath,
+                  amplitude: widget.amplitude,
+                  waveData: _waveData,
+                  seekVersion: _seekVersion,
+                  onToggle: widget.onToggle,
+                  onPause: widget.onPause,
+                  onDone: widget.onDone,
+                  onChat: widget.onChat,
+                  onPlay: () {
+                    final lastBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
+                    if (widget.isPaused && _seekBarIndex < lastBarIndex) {
+                      widget.onSeekAndResume?.call(_seekBarIndex, List<double>.from(_waveData));
+                    } else {
+                      widget.onPlay?.call();
+                    }
+                  },
+                  onRewind: widget.onRewind,
+                  onForward: widget.onForward,
+                  onSeekBarIndexChanged: (index) {
+                    setState(() => _seekBarIndex = index);
+                  },
+                  seekBarIndex: _seekBarIndex,
+                )
+              : RecordingCompactView(
+                  key: const ValueKey('compact'),
+                  title: widget.title,
+                  elapsed: widget.elapsed,
+                  isRecording: widget.isRecording,
+                  amplitude: widget.amplitude,
+                  waveData: _waveData,
+                  pulseAnimation: _pulseAnimation,
+                  onToggle: widget.onToggle,
+                ),
         ),
-        child: _sheetOffset > 0.7
-            ? RecordingFullscreenView(
-                key: const ValueKey('fullscreen'),
-                title: widget.title,
-                elapsed: widget.elapsed,
-                isRecording: widget.isRecording,
-                isPaused: widget.isPaused,
-                filePath: widget.filePath,
-                amplitude: widget.amplitude,
-                waveData: _waveData,
-                seekVersion: _seekVersion,
-                onToggle: widget.onToggle,
-                onPause: widget.onPause,
-                onDone: widget.onDone,
-                onChat: widget.onChat,
-                onPlay: () {
-                  final lastBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
-                  if (widget.isPaused && _seekBarIndex < lastBarIndex) {
-                    widget.onSeekAndResume?.call(_seekBarIndex, List<double>.from(_waveData));
-                  } else {
-                    widget.onPlay?.call();
-                  }
-                },
-                onRewind: widget.onRewind,
-                onForward: widget.onForward,
-                onSeekBarIndexChanged: (index) {
-                  setState(() => _seekBarIndex = index);
-                },
-                seekBarIndex: _seekBarIndex,
-              )
-            : RecordingCompactView(
-                key: const ValueKey('compact'),
-                title: widget.title,
-                elapsed: widget.elapsed,
-                isRecording: widget.isRecording,
-                filePath: widget.filePath,
-                amplitude: widget.amplitude,
-                waveData: _waveData,
-                pulseAnimation: _pulseAnimation,
-                onToggle: widget.onToggle,
-              ),
       ),
     );
   }
