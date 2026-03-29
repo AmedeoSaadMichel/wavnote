@@ -8,11 +8,13 @@ import 'package:flutter/material.dart';
 /// FullscreenActionButton e EyePausePainter rimossi: mai usati.
 class FullscreenPlaybackControls extends StatelessWidget {
   final VoidCallback? onRewind;
+  final VoidCallback? onPlay;
   final VoidCallback? onForward;
 
   const FullscreenPlaybackControls({
     super.key,
     this.onRewind,
+    this.onPlay,
     this.onForward,
   });
 
@@ -22,14 +24,26 @@ class FullscreenPlaybackControls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Flexible(
+          flex: 2,
           child: _buildControlButton(
             icon: Icons.replay_10,
             onPressed: onRewind ?? () {},
             title: 'Rewind',
           ),
         ),
-        const SizedBox(width: 60),
+        const SizedBox(width: 10),
         Flexible(
+          flex: 3,
+          child: _buildControlButton(
+            icon: Icons.play_arrow,
+            onPressed: onPlay ?? () {},
+            title: 'Play',
+            isLarge: true,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          flex: 2,
           child: _buildControlButton(
             icon: Icons.forward_10,
             onPressed: onForward ?? () {},
@@ -44,11 +58,13 @@ class FullscreenPlaybackControls extends StatelessWidget {
     required IconData icon,
     required VoidCallback onPressed,
     String? title,
+    bool isLarge = false,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final buttonSize = (constraints.maxHeight * 0.5).clamp(50.0, 80.0);
-        final iconSize = buttonSize * 0.45;
+        final base = (constraints.maxHeight * 0.5).clamp(50.0, 80.0);
+        final buttonSize = isLarge ? base : base * 0.75;
+        final iconSize = buttonSize * (isLarge ? 0.5 : 0.45);
 
         return Center(
           child: Column(

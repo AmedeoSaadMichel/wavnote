@@ -94,13 +94,12 @@ class RecordingFullscreenView extends StatelessWidget {
             right: 16,
             child: _buildChatButton(),
           ),
-        // Done — solo quando non si registra attivamente
-        if (!isRecording || isPaused)
-          Positioned(
-            bottom: 40,
-            right: 20,
-            child: _buildDoneButton(),
-          ),
+        // Done — sempre visibile
+        Positioned(
+          bottom: 40,
+          right: 20,
+          child: _buildDoneButton(),
+        ),
       ],
     );
   }
@@ -186,6 +185,7 @@ class RecordingFullscreenView extends StatelessWidget {
   Widget _buildPlaybackControls() {
     return FullscreenPlaybackControls(
       onRewind: onRewind,
+      onPlay: onPlay,
       onForward: onForward,
     );
   }
