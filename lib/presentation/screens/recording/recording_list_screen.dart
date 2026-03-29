@@ -377,7 +377,20 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           onPlay: playRecording,
           onRewind: rewindRecording,
           onForward: forwardRecording,
-          onSeek: seekRecording,
+          onSeekAndResume: (seekBarIndex, waveData) {
+            final bloc = context.read<RecordingBloc>();
+            final blocState = bloc.state;
+            if (blocState is RecordingPaused) {
+              bloc.add(SeekAndResumeRecording(
+                seekBarIndex: seekBarIndex,
+                filePath: blocState.filePath,
+                format: blocState.format,
+                sampleRate: blocState.sampleRate,
+                bitRate: blocState.bitRate,
+                waveData: waveData,
+              ));
+            }
+          },
         );
       },
     );
