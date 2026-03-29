@@ -30,6 +30,11 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onRewind; // Callback for rewind action
   final VoidCallback? onForward; // Callback for forward action
   final Function(int seekBarIndex, List<double> waveData)? onSeekAndResume;
+  /// Dati waveform troncati dopo un seek-and-resume; non-null solo al primo
+  /// frame dopo la ripresa da un punto precedente.
+  final List<double>? truncatedWaveData;
+  /// True quando il BLoC è in stato RecordingStarting (transizione, non collassare).
+  final bool isStarting;
 
   const RecordingBottomSheet({
     super.key,
@@ -37,6 +42,7 @@ class RecordingBottomSheet extends StatefulWidget {
     required this.filePath,
     required this.isRecording,
     this.isPaused = false,
+    this.isStarting = false,
     required this.onToggle,
     required this.elapsed,
     required this.amplitude,
@@ -49,6 +55,7 @@ class RecordingBottomSheet extends StatefulWidget {
     this.onRewind,
     this.onForward,
     this.onSeekAndResume,
+    this.truncatedWaveData,
   });
 
   @override
@@ -74,6 +81,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   final List<double> _waveData = [];
   static const int _maxWavePoints = 1000;
   int _seekBarIndex = 0;
+  /// Incrementato ad ogni seek-and-resume per segnalare a RecordingWaveform
+  /// di riposizionare la waveform sulla bacchetta gialla.
+  int _seekVersion = 0;
 
   @override
   void initState() {
@@ -109,6 +119,23 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void didUpdateWidget(RecordingBottomSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    // Detecta seek-and-resume: truncatedWaveData passa da null → non-null
+    // (il RecordingStarting intermedio mantiene null, RecordingInProgress post-seek ha i dati)
+    final isSeekResume = widget.truncatedWaveData != null &&
+        oldWidget.truncatedWaveData == null;
+
+    if (isSeekResume) {
+      // Seek-and-resume: rimpiazza _waveData con i dati troncati e segnala
+      // a RecordingWaveform di riposizionare la waveform sulla bacchetta.
+      setState(() {
+        _waveData
+          ..clear()
+          ..addAll(widget.truncatedWaveData!);
+        _seekBarIndex = 0;
+        _seekVersion++;
+      });
+    }
+
     // Update waveform data ALWAYS when recording (even if amplitude doesn't change)
     // This ensures continuous waveform scroll every 150ms
     if (widget.isRecording) {
@@ -118,19 +145,22 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       _addWavePoint(widget.amplitude, timestamp);
     }
 
-    // Clear waveform data when starting a new recording
-    if (widget.isRecording && !oldWidget.isRecording && !oldWidget.isPaused) {
+    // Clear waveform data when starting a NEW recording from scratch (non seek-and-resume)
+    if (widget.isRecording && !oldWidget.isRecording && !oldWidget.isPaused && !isSeekResume) {
       setState(() {
         _waveData.clear();
         _seekBarIndex = 0;
       });
     }
 
-    // Reset seekBarIndex all'ultimo campione quando si entra in pausa
+    // Quando si entra in pausa: reset seekBarIndex + auto-espandi a fullscreen
+    // così l'utente vede subito la waveform per il seek.
     if (widget.isPaused && !oldWidget.isPaused) {
       setState(() {
         _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
+        _sheetOffset = 1.0;
       });
+      _sheetAnimationController.animateTo(1.0);
     }
 
     // Control pulse animation based on recording state
@@ -141,8 +171,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _pulseController.stop();
         _pulseController.reset();
 
-        // AUTO-COLLAPSE: Only collapse when NOT paused (i.e., recording actually stopped)
-        if (!widget.isPaused) {
+        // AUTO-COLLAPSE: solo se non in pausa e non in transizione seek-and-resume
+        if (!widget.isPaused && !widget.isStarting) {
           setState(() {
             _sheetOffset = 0;
           });
@@ -151,8 +181,12 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       }
     }
 
-    // AUTO-COLLAPSE: When paused changes to false and not recording, collapse
-    if (widget.isPaused != oldWidget.isPaused && !widget.isPaused && !widget.isRecording) {
+    // AUTO-COLLAPSE: quando la pausa finisce senza riprendere a registrare
+    // Escludi il caso di seek-and-resume (isStarting = true)
+    if (widget.isPaused != oldWidget.isPaused &&
+        !widget.isPaused &&
+        !widget.isRecording &&
+        !widget.isStarting) {
       setState(() {
         _sheetOffset = 0;
       });
@@ -221,9 +255,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   Widget build(BuildContext context) {
     maxHeight = MediaQuery.of(context).size.height * 0.9;
 
-    // When recording or paused, sheet is draggable and can be expanded
-    // When not recording and not paused, sheet is fixed height
-    final bool canExpand = widget.isRecording || widget.isPaused;
+    // Sheet espandibile durante registrazione, pausa o transizione seek-and-resume
+    final bool canExpand = widget.isRecording || widget.isPaused || widget.isStarting;
 
     final double currentHeight = canExpand
         ? minHeight + (maxHeight - minHeight) * _sheetOffset + MediaQuery.of(context).padding.bottom
@@ -238,9 +271,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         curve: Curves.easeOut,
         height: currentHeight,
         child: GestureDetector(
-          onVerticalDragStart: canExpand ? _onVerticalDragStart : null,
-          onVerticalDragUpdate: canExpand ? _onVerticalDragUpdate : null,
-          onVerticalDragEnd: canExpand ? _onVerticalDragEnd : null,
+          // In pausa il drag è disabilitato: la sheet resta in fullscreen
+          // e non può essere compattata manualmente.
+          onVerticalDragStart: (canExpand && !widget.isPaused) ? _onVerticalDragStart : null,
+          onVerticalDragUpdate: (canExpand && !widget.isPaused) ? _onVerticalDragUpdate : null,
+          onVerticalDragEnd: (canExpand && !widget.isPaused) ? _onVerticalDragEnd : null,
           child: _buildContainer(),
         ),
       ),
@@ -292,6 +327,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                 filePath: widget.filePath,
                 amplitude: widget.amplitude,
                 waveData: _waveData,
+                seekVersion: _seekVersion,
                 onToggle: widget.onToggle,
                 onPause: widget.onPause,
                 onDone: widget.onDone,
