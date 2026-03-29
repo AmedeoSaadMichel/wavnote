@@ -241,6 +241,12 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _waveData.removeAt(0);
       }
 
+      // Durante la registrazione mantieni seekBarIndex sull'ultima barra:
+      // il counter fullscreen mostra "← elapsed / elapsed →" aggiornato ogni tick.
+      if (!widget.isPaused) {
+        _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
+      }
+
       // Debug log with timing
       if (_waveData.length % 5 == 0) {
         final afterSetStateTimestamp = DateTime.now().millisecondsSinceEpoch;

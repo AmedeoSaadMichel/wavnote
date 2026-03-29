@@ -1,5 +1,4 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/extensions/duration_extensions.dart';
 import 'control_buttons.dart';
@@ -7,11 +6,16 @@ import '../custom_waveform/flutter_sound_waveform.dart';
 
 /// Vista fullscreen del bottom sheet di registrazione.
 ///
-/// Mostra waveform, controlli e pulsante principale.
-/// I controlli rewind/forward e la seek label sono visibili SOLO in pausa.
-/// Il bottone chat (trascrizione) è visibile sempre in alto a destra.
-/// L'orario corrente nella subtitle viene aggiornato ogni 30 secondi.
-class RecordingFullscreenView extends StatefulWidget {
+/// Layout:
+/// - Handle
+/// - Titolo
+/// - Counter tempo (seek label "← pos / tot →" — sempre visibile, aggiornato ogni secondo)
+/// - Waveform con playhead
+/// - Controlli rewind/forward (SOLO in pausa)
+/// - Pulsante principale (pausa/play/rec)
+/// - Bottone Done (SOLO non-recording o pausa)
+/// - Bottone chat (sempre visibile in alto a destra)
+class RecordingFullscreenView extends StatelessWidget {
   final String? title;
   final Duration elapsed;
   final bool isRecording;
@@ -49,35 +53,14 @@ class RecordingFullscreenView extends StatefulWidget {
     this.seekVersion = 0,
   });
 
-  @override
-  State<RecordingFullscreenView> createState() => _RecordingFullscreenViewState();
-}
+  String get _formattedTime => elapsed.formatted;
 
-class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
-  late DateTime _now;
-  Timer? _clockTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _now = DateTime.now();
-    // Aggiorna ogni 30 secondi — mostriamo solo HH:mm
-    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
-    });
-  }
-
-  @override
-  void dispose() {
-    _clockTimer?.cancel();
-    super.dispose();
-  }
-
-  String get _formattedTime => widget.elapsed.formatted;
-
+  /// Counter posizione: "← MM:SS / MM:SS →"
+  /// Durante registrazione: posizione = durata totale (sempre all'ultimo punto).
+  /// Durante pausa: posizione = barra di seek corrente.
   String _seekLabel(int barIndex) {
     final seekMs = barIndex * 50;
-    final totalMs = widget.waveData.length * 50;
+    final totalMs = waveData.length * 50;
     String fmt(int ms) {
       final d = Duration(milliseconds: ms);
       final m = d.inMinutes.toString().padLeft(2, '0');
@@ -96,23 +79,23 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
           children: [
             Flexible(flex: 2, child: _buildHandle()),
             Flexible(flex: 2, child: _buildTitle()),
-            Flexible(flex: 1, child: _buildSubtitle()),
+            // Counter tempo sempre visibile — aggiornato dal BLoC ogni secondo
+            Flexible(flex: 2, child: _buildTimeCounter()),
             Flexible(flex: 8, child: _buildWaveform(context)),
-            // Seek label e controlli solo in pausa
-            if (widget.isPaused) Flexible(flex: 2, child: _buildSeekLabel()),
-            if (widget.isPaused) Flexible(flex: 4, child: _buildPlaybackControls()),
+            // Controlli rewind/forward SOLO in pausa
+            if (isPaused) Flexible(flex: 4, child: _buildPlaybackControls()),
             Flexible(flex: 4, child: _buildActionButton()),
           ],
         ),
         // Bottone chat (trascrizione) — sempre visibile in alto a destra
-        if (widget.onChat != null)
+        if (onChat != null)
           Positioned(
             top: 12,
             right: 16,
             child: _buildChatButton(),
           ),
         // Done — solo quando non si registra attivamente
-        if (!widget.isRecording || widget.isPaused)
+        if (!isRecording || isPaused)
           Positioned(
             bottom: 40,
             right: 20,
@@ -139,7 +122,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Text(
-        widget.title ?? 'New Recording',
+        title ?? 'New Recording',
         style: const TextStyle(
           color: Colors.cyan,
           fontSize: 28,
@@ -150,17 +133,21 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
     );
   }
 
-  Widget _buildSubtitle() {
-    final timeString =
-        '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}';
-    return Text(
-      '$timeString  $_formattedTime',
-      style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.7),
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
+  /// Counter posizione/tempo — sempre visibile.
+  /// Durante registrazione mostra "← elapsed / elapsed →" aggiornato ogni secondo.
+  /// Durante pausa mostra la posizione di seek "← pos / tot →".
+  Widget _buildTimeCounter() {
+    return Center(
+      child: Text(
+        _seekLabel(seekBarIndex),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          letterSpacing: 0.5,
+        ),
+        textAlign: TextAlign.center,
       ),
-      textAlign: TextAlign.center,
     );
   }
 
@@ -176,18 +163,18 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               return RecordingWaveform(
-                amplitude: widget.amplitude,
-                waveData: widget.waveData,
+                amplitude: amplitude,
+                waveData: waveData,
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 waveColor: Colors.cyan,
                 spacing: 2.0,
                 waveThickness: 2.5,
                 scaleFactor: 80.0,
-                currentDuration: widget.elapsed,
-                isPaused: widget.isPaused,
+                currentDuration: elapsed,
+                isPaused: isPaused,
                 showPlayhead: true,
-                onSeekBarIndexChanged: widget.onSeekBarIndexChanged,
-                seekVersion: widget.seekVersion,
+                onSeekBarIndexChanged: onSeekBarIndexChanged,
+                seekVersion: seekVersion,
               );
             },
           ),
@@ -196,25 +183,10 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
     );
   }
 
-  Widget _buildSeekLabel() {
-    return Center(
-      child: Text(
-        _seekLabel(widget.seekBarIndex),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          letterSpacing: 0.5,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
   Widget _buildPlaybackControls() {
     return FullscreenPlaybackControls(
-      onRewind: widget.onRewind,
-      onForward: widget.onForward,
+      onRewind: onRewind,
+      onForward: onForward,
     );
   }
 
@@ -225,12 +197,12 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
           final size = (constraints.maxHeight * 0.45).clamp(70.0, 120.0);
           return GestureDetector(
             onTap: () {
-              if (widget.isRecording) {
-                widget.onPause?.call();
-              } else if (widget.isPaused) {
-                widget.onPlay?.call();
+              if (isRecording) {
+                onPause?.call();
+              } else if (isPaused) {
+                onPlay?.call();
               } else {
-                widget.onToggle();
+                onToggle();
               }
             },
             child: Container(
@@ -238,7 +210,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: widget.isRecording
+                gradient: isRecording
                     ? const LinearGradient(
                         colors: [
                           Color(0xFFDC143C),
@@ -253,17 +225,17 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                         ],
                       ),
                 border: Border.all(
-                  color: widget.isRecording
+                  color: isRecording
                       ? const Color(0xFFFF6B6B).withValues(alpha: 0.8)
                       : Colors.cyan,
-                  width: widget.isRecording ? 3 : 2,
+                  width: isRecording ? 3 : 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.isRecording
+                    color: isRecording
                         ? const Color(0xFFDC143C).withValues(alpha: 0.4)
                         : Colors.black.withValues(alpha: 0.2),
-                    blurRadius: widget.isRecording ? 16 : 8,
+                    blurRadius: isRecording ? 16 : 8,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -271,14 +243,14 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
               child: Center(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  child: widget.isRecording
+                  child: isRecording
                       ? Icon(
                           Icons.pause,
                           key: const ValueKey('pause'),
                           color: Colors.white,
                           size: size * 0.4,
                         )
-                      : widget.isPaused
+                      : isPaused
                           ? Icon(
                               Icons.play_arrow,
                               key: const ValueKey('play'),
@@ -302,7 +274,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
 
   Widget _buildChatButton() {
     return GestureDetector(
-      onTap: widget.onChat,
+      onTap: onChat,
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -320,7 +292,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
 
   Widget _buildDoneButton() {
     return GestureDetector(
-      onTap: widget.onDone,
+      onTap: onDone,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
