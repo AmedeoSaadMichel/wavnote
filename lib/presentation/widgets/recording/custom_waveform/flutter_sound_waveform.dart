@@ -144,6 +144,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
               shouldCalculateScrolledPosition: false,
               scaleFactor: widget.scaleFactor,
               currentlyRecordedDuration: widget.currentDuration,
+              isPaused: widget.isPaused,
             ),
           ),
         ),

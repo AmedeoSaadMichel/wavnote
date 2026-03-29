@@ -50,6 +50,7 @@ class CustomRecorderWavePainter extends CustomPainter {
   final bool shouldCalculateScrolledPosition;
   final double scaleFactor;
   final Duration currentlyRecordedDuration;
+  final bool isPaused;
 
   CustomRecorderWavePainter({
     required this.waveData,
@@ -84,6 +85,7 @@ class CustomRecorderWavePainter extends CustomPainter {
     required this.shouldCalculateScrolledPosition,
     required this.scaleFactor,
     required this.currentlyRecordedDuration,
+    this.isPaused = false,
   })  : _wavePaint = Paint()
           ..color = waveColor
           ..strokeWidth = waveThickness
@@ -128,6 +130,9 @@ class CustomRecorderWavePainter extends CustomPainter {
       }
     }
 
+    /// playhead line (pause seek mode)
+    if (isPaused) _drawPlayhead(canvas, size);
+
     /// middle line
     if (showMiddleLine) _drawMiddleLine(canvas, size);
 
@@ -143,7 +148,13 @@ class CustomRecorderWavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomRecorderWavePainter oldDelegate) => true;
+  bool shouldRepaint(CustomRecorderWavePainter oldDelegate) {
+    return oldDelegate.waveData.length != waveData.length ||
+        oldDelegate.totalBackDistance != totalBackDistance ||
+        oldDelegate.dragOffset != dragOffset ||
+        oldDelegate.waveColor != waveColor ||
+        oldDelegate.isPaused != isPaused;
+  }
 
   void _drawTextInRange(Canvas canvas, int i, Size size) {
     if (_labels.isNotEmpty && i < _labels.length) {
@@ -199,6 +210,18 @@ class CustomRecorderWavePainter extends CustomPainter {
     _labelPadding += spacing * updateFrequecy;
   }
 
+  void _drawPlayhead(Canvas canvas, Size size) {
+    final halfWidth = size.width / 2;
+    final paint = Paint()
+      ..color = Colors.cyanAccent
+      ..strokeWidth = 2.0;
+    canvas.drawLine(
+      Offset(halfWidth, 0),
+      Offset(halfWidth, size.height),
+      paint,
+    );
+  }
+
   void _drawMiddleLine(Canvas canvas, Size size) {
     final halfWidth = size.width * 0.5;
     canvas.drawLine(
@@ -222,7 +245,16 @@ class CustomRecorderWavePainter extends CustomPainter {
     // is less then double of half width which is max width and half width from
     // 0 is negative direction have some buffer on left side.
     if (dx > -halfWidth && dx < halfWidth * 2) {
-      canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), _wavePaint);
+      if (isPaused) {
+        final opacity = dx < halfWidth ? 1.0 : 0.3;
+        final paint = Paint()
+          ..color = waveColor.withValues(alpha: opacity)
+          ..strokeWidth = waveThickness
+          ..strokeCap = waveCap;
+        canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);
+      } else {
+        canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), _wavePaint);
+      }
     }
   }
 
