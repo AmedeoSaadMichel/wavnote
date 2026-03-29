@@ -1,147 +1,145 @@
-# FLUTTER VOICE MEMO APP PROJECT RULES
+# REGOLE DEL PROGETTO FLUTTER VOICE MEMO APP
 
-## CRITICAL: File Structure Compliance
+## CRITICO: Comportamento Agent
 
-- **Always write in English.**
-- **When I ask you to fix the errors, you can change the logic but you must ask before making any logic changes.**
-- **Always follow the exact structure defined in idea_project_structure.txt**
-- It isn't necessary to create all the files in the idea_project_structure.txt; we only need the essential ones.
-- Structure changes are allowed ONLY when it's impossible to keep files under 500 lines
-- When structure changes are made due to file size constraints:
-  - Explain why the change was necessary
-  - ALWAYS provide the complete updated idea_project_structure.txt file
-  - Ensure the new structure maintains logical organisation
+- **Non invocare mai skill o tool superpowers prima di rispondere o agire.** Rispondi e agisci direttamente senza verificare skill.
+- **Non eseguire mai `git commit` o `git push` autonomamente.** Chiedi sempre esplicitamente l'autorizzazione prima di fare qualsiasi commit o push. Esegui solo se l'utente lo conferma esplicitamente.
 
-## CRITICAL: File Size Limit
+## CRITICO: Conformità alla Struttura dei File
 
-- **Maximum 500 lines per file** - If a file exceeds 500 lines, it MUST be refactored
-- If refactoring within current structure is impossible, then and only then modify the project structure
-- Break oversized files into smaller, focused components following single responsibility principle
+- **Scrivi sempre in italiano.**
+- **Quando chiedo di correggere gli errori, puoi cambiare la logica ma devi chiedere prima di fare qualsiasi modifica logica.**
+- **Segui sempre la struttura esatta definita in idea_project_structure.txt**
+- Non è necessario creare tutti i file in idea_project_structure.txt; servono solo quelli essenziali.
+- Le modifiche alla struttura sono consentite SOLO quando è impossibile mantenere i file sotto le 500 righe
+- Quando vengono apportate modifiche alla struttura a causa dei limiti di dimensione del file:
+  - Spiega perché la modifica era necessaria
+  - Fornisci SEMPRE il file idea_project_structure.txt aggiornato completo
+  - Assicurati che la nuova struttura mantenga un'organizzazione logica
 
-## CRITICAL: Theme Guidelines
+## CRITICO: Limite di Dimensione dei File
 
-- **Maintain clean, modern UI design** with standard Material Design principles
-- Use consistent color schemes throughout the app (whites, greys, standard accent colors)
-- Avoid cosmic/mystical themes in favor of professional, user-friendly design
-- Focus on clarity, usability, and intuitive user experience
-- **NO copyrighted material** - all design elements must be original
+- **Massimo 500 righe per file** - Se un file supera le 500 righe, DEVE essere refactorizzato
+- Se il refactoring all'interno della struttura attuale è impossibile, solo allora modifica la struttura del progetto
+- Suddividi i file troppo grandi in componenti più piccoli e focalizzati seguendo il principio di responsabilità singola
 
-## CRITICAL: BLoC Architecture Preservation
+## CRITICO: Linee Guida per il Tema
 
-- **NEVER remove or modify BLoC logic** when making UI changes
-- Always preserve BlocBuilder, BlocConsumer, and BlocListener widgets
-- Maintain all callback functions that connect UI to BLoC events
-- When refactoring UI components, ensure BLoC integration remains intact
-- Separate UI styling changes from business logic - only modify visual elements
+- **Mantieni un design UI pulito e moderno** con i principi standard di Material Design
+- Usa schemi di colori coerenti in tutta l'app (bianchi, grigi, colori di accento standard)
+- Evita temi cosmici/mistici a favore di un design professionale e user-friendly
+- Concentrati su chiarezza, usabilità ed esperienza utente intuitiva
+- **NESSUN materiale protetto da copyright** - tutti gli elementi di design devono essere originali
 
-## CRITICAL: Responsive UI Development
+## CRITICO: Preservazione dell'Architettura BLoC
 
-- **ALWAYS use responsive widgets** when building UI layouts
-- Prioritize Flexible, Expanded, and FractionallySizedBox over fixed sizes
-- Use MediaQuery for screen-dependent measurements when necessary
-- Implement proper flex values in Column and Row widgets
-- Avoid hardcoded pixel values - use relative sizing and spacing
-- Ensure UI adapts gracefully to different screen sizes and orientations
-- Test layouts on various device sizes during development
+- **NON rimuovere o modificare mai la logica BLoC** quando si apportano modifiche all'UI
+- Preserva sempre i widget BlocBuilder, BlocConsumer e BlocListener
+- Mantieni tutte le funzioni di callback che collegano l'UI agli eventi BLoC
+- Quando si refactorizza i componenti UI, assicurati che l'integrazione BLoC rimanga intatta
+- Separa le modifiche allo stile UI dalla logica di business - modifica solo gli elementi visivi
 
-## MANDATORY: File Path Comments
+## CRITICO: Sviluppo UI Responsivo
 
-- **EVERY edited file MUST include a path comment at the very beginning**
-- Format: `// File: [exact/path/to/file.dart]`
-- Example: `// File: presentation/screens/recording/recording_entry_screen.dart`
-- This comment is required for ALL code files without exception
+- **USA SEMPRE widget responsivi** quando si costruiscono layout UI
+- Dai priorità a Flexible, Expanded e FractionallySizedBox rispetto alle dimensioni fisse
+- Usa MediaQuery per misurazioni dipendenti dallo schermo quando necessario
+- Implementa valori flex appropriati nei widget Column e Row
+- Evita valori in pixel hardcoded - usa dimensionamenti e spaziature relative
+- Assicurati che l'UI si adatti in modo elegante a diverse dimensioni e orientamenti dello schermo
+- Testa i layout su varie dimensioni di dispositivo durante lo sviluppo
 
-## MANDATORY: Structure File Updates
+## OBBLIGATORIO: Commenti sul Percorso del File
 
-- **EVERY time ANY file is added to the project, provide BOTH updated files:**
-  - Complete updated idea_project_structure.txt
-  - Complete updated project_structure.txt
-- **EVERY time idea_project_structure.txt is modified, provide the complete updated file**
-- No exceptions - both structure files must always be delivered when files are added
-- Clearly indicate what changes were made and why
+- **OGNI file modificato DEVE includere un commento di percorso all'inizio**
+- Formato: `// File: [percorso/esatto/del/file.dart]`
+- Esempio: `// File: presentation/screens/recording/recording_entry_screen.dart`
+- Questo commento è richiesto per TUTTI i file di codice senza eccezioni
 
-## PRIMARY: Consistency Requirements
+## OBBLIGATORIO: Aggiornamenti dei File di Struttura
 
-- Maintain consistent coding patterns throughout the project
-- Follow established naming conventions from existing files
-- Keep architectural patterns uniform across all components
-- Ensure UI/UX consistency in all screens and widgets
-- Maintain thematic coherence across all user-facing elements
+- **OGNI volta che viene aggiunto un file al progetto, fornisci ENTRAMBI i file aggiornati:**
+  - idea_project_structure.txt aggiornato completo
+  - project_structure.txt aggiornato completo
+- **OGNI volta che idea_project_structure.txt viene modificato, fornisci il file aggiornato completo**
+- Nessuna eccezione - entrambi i file di struttura devono essere sempre consegnati quando si aggiungono file
+- Indica chiaramente quali modifiche sono state apportate e perché
 
-## SECONDARY: Development Approach
+## PRIMARIO: Requisiti di Coerenza
 
-- Always reference the project structure before making changes
-- Verify file placement matches the defined architecture
-- Maintain the separation of concerns as outlined in the structure
-- Follow Flutter best practices for state management and widget organisation
-- Consider thematic elements when naming variables, classes, and UI components
+- Mantieni pattern di codice coerenti in tutto il progetto
+- Segui le convenzioni di denominazione stabilite dai file esistenti
+- Mantieni i pattern architetturali uniformi in tutti i componenti
+- Garantisci coerenza UI/UX in tutte le schermate e i widget
+- Mantieni la coerenza tematica in tutti gli elementi rivolti all'utente
 
-## CRITICAL: Single Source of Truth
+## SECONDARIO: Approccio allo Sviluppo
 
-- Each service must be initialized in ONE place only (`dependency_injection.dart`)
-- NEVER initialize a service in both `main.dart` and a BLoC constructor
-- NEVER have two parallel systems for the same responsibility (e.g., two database helpers)
-- All global singletons must be registered via GetIt, not as `late final` variables in `main.dart`
+- Fai sempre riferimento alla struttura del progetto prima di apportare modifiche
+- Verifica che il posizionamento dei file corrisponda all'architettura definita
+- Mantieni la separazione delle responsabilità come delineato nella struttura
+- Segui le best practice di Flutter per la gestione dello stato e l'organizzazione dei widget
+- Considera gli elementi tematici nella denominazione di variabili, classi e componenti UI
 
-## CRITICAL: Error Handling Pattern
+## CRITICO: Unica Fonte di Verità
 
-- ALWAYS use `Either<Failure, Success>` from dartz in repositories and use cases
-- NEVER mix boolean returns, thrown exceptions, and Result objects in the same layer
-- Repositories return `Either`, BLoCs consume `.fold()` — no exceptions should bubble up to the UI
-- Define all Failure types in `core/errors/failures.dart`
+- Ogni servizio deve essere inizializzato in UN SOLO posto (`dependency_injection.dart`)
+- NON inizializzare mai un servizio sia in `main.dart` che in un costruttore BLoC
+- NON avere mai due sistemi paralleli per la stessa responsabilità (es. due database helper)
+- Tutti i singleton globali devono essere registrati tramite GetIt, non come variabili `late final` in `main.dart`
 
-## CRITICAL: Dependency Management
+## CRITICO: Pattern di Gestione degli Errori
 
-- NEVER add a dependency without using it — remove unused imports from `pubspec.yaml`
-- Check pub.dev maintenance status before adding new packages (prefer packages with recent updates)
-- For audio recording: use `record` package only
-- For audio playback: use `just_audio` only
-- NEVER add a package that duplicates functionality already covered by an existing dependency
+- USA SEMPRE `Either<Failure, Success>` da dartz nei repository e nei use case
+- NON mischiare mai ritorni booleani, eccezioni lanciate e oggetti Result nello stesso layer
+- I repository restituiscono `Either`, i BLoC consumano `.fold()` — nessuna eccezione deve risalire fino all'UI
+- Definisci tutti i tipi di Failure in `core/errors/failures.dart`
 
-## CRITICAL: Idempotent Initialization
+## CRITICO: Gestione delle Dipendenze
 
-- ALL `initialize()` methods must be idempotent (safe to call multiple times)
-- Add an `_isInitialized` guard to every service that has an `initialize()` method
-- Document the expected call order if initialization order matters
+- NON aggiungere mai una dipendenza senza usarla — rimuovi gli import inutilizzati da `pubspec.yaml`
+- Controlla lo stato di manutenzione su pub.dev prima di aggiungere nuovi package (preferisci package con aggiornamenti recenti)
+- Per la registrazione audio: usa solo il package `record`
+- Per la riproduzione audio: usa solo `just_audio`
+- NON aggiungere mai un package che duplica funzionalità già coperte da una dipendenza esistente
 
-## SECONDARY: Testing Requirements
+## CRITICO: Inizializzazione Idempotente
 
-- Every new Use Case must have a corresponding unit test
-- Every new Repository method must have a corresponding unit test
-- BLoC tests required for any new event handler added
-- Run existing tests before marking a feature as complete
+- TUTTI i metodi `initialize()` devono essere idempotenti (sicuri da chiamare più volte)
+- Aggiungi un guard `_isInitialized` a ogni servizio che ha un metodo `initialize()`
+- Documenta l'ordine di chiamata previsto se l'ordine di inizializzazione è importante
 
-## WORKFLOW: Before Every Code Change
+## WORKFLOW: Prima di Ogni Modifica al Codice
 
-1. Check idea_project_structure.txt for correct file placement
-2. Add the mandatory file path comment
-3. Verify the file won't exceed 500 lines after changes
-4. If adding new files, prepare updated idea_project_structure.txt AND project_structure.txt
-5. If 400+ lines are unavoidable, restructure and provide updated structure files
-6. Ensure changes align with existing project patterns
-7. Verify that no copyrighted material is referenced
+1. Controlla idea_project_structure.txt per il corretto posizionamento dei file
+2. Aggiungi il commento obbligatorio sul percorso del file
+3. Verifica che il file non superi le 500 righe dopo le modifiche
+4. Se si aggiungono nuovi file, prepara idea_project_structure.txt E project_structure.txt aggiornati
+5. Se 400+ righe sono inevitabili, ristruttura e fornisci i file di struttura aggiornati
+6. Assicurati che le modifiche siano allineate con i pattern esistenti del progetto
+7. Verifica che non venga referenziato materiale protetto da copyright
 
 ---
 
-## PROJECT CONTEXT
+## CONTESTO DEL PROGETTO
 
-**WavNote** is a Flutter voice memo application. The app focuses on creating a user-friendly experience for audio recording and organization.
+**WavNote** è un'applicazione Flutter per memo vocali. L'app si concentra sulla creazione di un'esperienza user-friendly per la registrazione e l'organizzazione audio.
 
-### Architecture
-- **Clean Architecture** with clear separation of concerns
-- **BLoC Pattern** for state management
-- **Repository Pattern** for data access
-- **Use Case Pattern** for business logic
+### Architettura
+- **Clean Architecture** con chiara separazione delle responsabilità
+- **Pattern BLoC** per la gestione dello stato
+- **Pattern Repository** per l'accesso ai dati
+- **Pattern Use Case** per la logica di business
 
-### Key Features
-- Audio recording with geolocation-based naming
-- Folder-based organization
-- Advanced search and filtering
-- Clean UI with smooth animations
-- Export and sharing capabilities
+### Funzionalità Principali
+- Registrazione audio con denominazione basata sulla geolocalizzazione
+- Organizzazione basata su cartelle
+- Ricerca e filtri avanzati
+- UI pulita con animazioni fluide
+- Funzionalità di export e condivisione
 
-### Development Status
-- Core recording/playback functionality complete
-- File management services implemented
-- Geolocation-based recording naming
-- Advanced search and filtering system
+### Stato di Sviluppo
+- Funzionalità core di registrazione/riproduzione completate
+- Servizi di gestione file implementati
+- Denominazione delle registrazioni basata sulla geolocalizzazione
+- Sistema avanzato di ricerca e filtri

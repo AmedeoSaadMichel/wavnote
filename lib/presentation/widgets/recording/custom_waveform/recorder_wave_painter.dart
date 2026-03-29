@@ -130,9 +130,6 @@ class CustomRecorderWavePainter extends CustomPainter {
       }
     }
 
-    /// playhead line (pause seek mode)
-    if (isPaused) _drawPlayhead(canvas, size);
-
     /// middle line
     if (showMiddleLine) _drawMiddleLine(canvas, size);
 
@@ -149,8 +146,11 @@ class CustomRecorderWavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomRecorderWavePainter oldDelegate) {
-    return oldDelegate.waveData.length != waveData.length ||
-        oldDelegate.totalBackDistance != totalBackDistance ||
+    // Durante la registrazione attiva: ridipingi sempre (waveData cresce in-place,
+    // lo stesso oggetto lista viene mutato → il confronto sulla lunghezza non funziona).
+    if (!isPaused) return true;
+    // In pausa: ridipingi solo se posizione, colore o stato pausa cambiano.
+    return oldDelegate.totalBackDistance != totalBackDistance ||
         oldDelegate.dragOffset != dragOffset ||
         oldDelegate.waveColor != waveColor ||
         oldDelegate.isPaused != isPaused;
@@ -208,18 +208,6 @@ class CustomRecorderWavePainter extends CustomPainter {
       );
     }
     _labelPadding += spacing * updateFrequecy;
-  }
-
-  void _drawPlayhead(Canvas canvas, Size size) {
-    final halfWidth = size.width / 2;
-    final paint = Paint()
-      ..color = Colors.cyanAccent
-      ..strokeWidth = 2.0;
-    canvas.drawLine(
-      Offset(halfWidth, 0),
-      Offset(halfWidth, size.height),
-      paint,
-    );
   }
 
   void _drawMiddleLine(Canvas canvas, Size size) {

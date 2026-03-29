@@ -349,23 +349,31 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
       builder: (context, recordingState) {
         final isRecording = recordingState.isRecording;
         final isPaused = recordingState is RecordingPaused;
+        final isStarting = recordingState is RecordingStarting;
         final currentTitle = recordingState is RecordingInProgress
             ? recordingState.title ?? 'New Recording'
-            : 'New Recording';
+            : recordingState is RecordingPaused
+                ? (recordingState as RecordingPaused).title ?? 'New Recording'
+                : 'New Recording';
         final elapsed = recordingState.currentDuration ?? Duration.zero;
         final amplitude = recordingState is RecordingInProgress
             ? recordingState.amplitude
             : 0.0;
+        final truncatedWaveData = recordingState is RecordingInProgress
+            ? recordingState.truncatedWaveData
+            : null;
 
         return RecordingBottomSheet(
           title: currentTitle,
           filePath: isRecording ? '/temp/current_recording.m4a' : null,
           isRecording: isRecording,
           isPaused: isPaused,
+          isStarting: isStarting,
           onToggle: toggleRecording,
           elapsed: elapsed,
           amplitude: amplitude,
           width: MediaQuery.of(context).size.width,
+          truncatedWaveData: truncatedWaveData,
           onTitleChanged: (newTitle) {
             context.read<RecordingBloc>().add(
               UpdateRecordingTitle(title: newTitle),

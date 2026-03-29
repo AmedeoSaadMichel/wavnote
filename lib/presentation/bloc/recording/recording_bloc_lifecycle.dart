@@ -120,6 +120,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         filePath: s.filePath,
         folderId: s.folderId,
         folderName: s.folderName,
+        title: s.title,
         format: s.format,
         sampleRate: s.sampleRate,
         bitRate: s.bitRate,
@@ -193,7 +194,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           duration: Duration(milliseconds: seekTimeMs),
           amplitude: 0.0,
           startTime: s.startTime,
+          title: s.title,
           seekBasePath: data.seekBasePath,
+          truncatedWaveData: data.truncatedWaveData,
         ));
         _startAmplitudeUpdates();
         _startDurationUpdates();

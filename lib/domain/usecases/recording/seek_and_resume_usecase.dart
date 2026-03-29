@@ -49,11 +49,15 @@ class SeekAndResumeUseCase {
         return Left(AudioRecordingFailure.stopFailed('Impossibile fare flush della registrazione per il trim'));
       }
 
+      // entity.filePath è il path ASSOLUTO impostato da AudioRecorderService
+      // (il parametro filePath può essere relativo e non accessibile da iOS)
+      final absoluteFilePath = entity.filePath;
+
       // 2. Taglia e salva il contenuto pre-seek nella basePath
-      final basePath = _buildBasePath(filePath);
+      final basePath = _buildBasePath(absoluteFilePath);
       try {
         await _trimmerService.trimAudio(
-          filePath: filePath,
+          filePath: absoluteFilePath,
           durationMs: trimDurationMs,
           format: format.name.toLowerCase(),
           outputPath: basePath,

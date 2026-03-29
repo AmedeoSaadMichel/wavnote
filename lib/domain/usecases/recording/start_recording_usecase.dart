@@ -121,7 +121,8 @@ class StartRecordingUseCase {
         .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
         .replaceAll(RegExp(r'\s+'), '_');
     final name = safe.length > 50 ? safe.substring(0, 50) : safe;
-    return '$folderId/${name}_$ts.${format.fileExtension}';
+    // fileExtension include già il dot (es. ".m4a") — non aggiungere un dot extra
+    return '$folderId/${name}_$ts${format.fileExtension}';
   }
 
   String? _validateConfig(AudioFormat format, int sampleRate, int bitRate) {

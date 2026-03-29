@@ -129,9 +129,12 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
       }
     }
 
+    // AVAssetExportPresetPassthrough non funziona con AVMutableComposition —
+    // una composition virtuale richiede ri-codifica; usiamo AVAssetExportPresetAppleM4A.
+    let concatPreset = format == "wav" ? AVAssetExportPresetPassthrough : AVAssetExportPresetAppleM4A
     guard let exportSession = AVAssetExportSession(
       asset: composition,
-      presetName: AVAssetExportPresetPassthrough
+      presetName: concatPreset
     ) else {
       result(FlutterError(code: "EXPORT_FAILED", message: "Could not create export session", details: nil))
       return

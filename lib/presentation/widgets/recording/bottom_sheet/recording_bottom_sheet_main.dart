@@ -1,4 +1,5 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'recording_compact_view.dart';
@@ -85,6 +86,14 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   /// di riposizionare la waveform sulla bacchetta gialla.
   int _seekVersion = 0;
 
+  // Timer locale per aggiungere barre alla waveform a intervalli fissi.
+  // Disaccoppia la crescita della waveform dagli emit BLoC (che Equatable
+  // può saltare durante il silenzio → gap visivi).
+  Timer? _waveformTimer;
+  double _currentAmplitude = 0.0;
+  static const double _amplitudeFloor = 0.08;
+  static const Duration _waveformTickInterval = Duration(milliseconds: 100);
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +123,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
+  /// Avvia il timer locale che aggiunge barre alla waveform ogni 100ms.
+  /// Usa _currentAmplitude (aggiornata dai props) con un floor minimo per
+  /// garantire barre visibili anche durante il silenzio.
+  void _startWaveformTimer() {
+    _waveformTimer?.cancel();
+    _currentAmplitude = 0.0;
+    _waveformTimer = Timer.periodic(_waveformTickInterval, (_) {
+      if (!mounted || !widget.isRecording) return;
+      final amplitude = _currentAmplitude > _amplitudeFloor
+          ? _currentAmplitude
+          : _amplitudeFloor;
+      _addWavePoint(amplitude, DateTime.now().millisecondsSinceEpoch);
+    });
+  }
+
+  void _stopWaveformTimer() {
+    _waveformTimer?.cancel();
+    _waveformTimer = null;
+  }
 
   @override
   void didUpdateWidget(RecordingBottomSheet oldWidget) {
@@ -127,21 +155,30 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     if (isSeekResume) {
       // Seek-and-resume: rimpiazza _waveData con i dati troncati e segnala
       // a RecordingWaveform di riposizionare la waveform sulla bacchetta.
+      // Applica floor su tutte le barre troncate per eliminare i gap visivi.
       setState(() {
         _waveData
           ..clear()
-          ..addAll(widget.truncatedWaveData!);
+          ..addAll(widget.truncatedWaveData!
+              .map((a) => a > _amplitudeFloor ? a : _amplitudeFloor));
         _seekBarIndex = 0;
         _seekVersion++;
       });
+      _currentAmplitude = 0.0; // reset per il nuovo segmento
     }
 
-    // Aggiunge un punto alla waveform solo se l'ampiezza è > 0.
-    // Le barre a 0.0 sono invisibili e creano gap visivi (es. subito dopo
-    // seek-and-resume, prima che l'audio service produca campioni reali).
-    if (widget.isRecording && widget.amplitude > 0.0) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _addWavePoint(widget.amplitude, timestamp);
+    // Aggiorna l'ampiezza corrente — il timer la usa per le barre successive.
+    if (widget.amplitude != oldWidget.amplitude) {
+      _currentAmplitude = widget.amplitude;
+    }
+
+    // Avvia/ferma il timer waveform in base allo stato di registrazione.
+    // Il timer è l'unico punto che chiama _addWavePoint: garantisce barre
+    // a intervalli fissi (100ms) indipendentemente dagli emit BLoC.
+    if (widget.isRecording && !oldWidget.isRecording) {
+      _startWaveformTimer();
+    } else if (!widget.isRecording && oldWidget.isRecording) {
+      _stopWaveformTimer();
     }
 
     // Clear waveform data when starting a NEW recording from scratch (non seek-and-resume)
@@ -219,6 +256,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   @override
   void dispose() {
+    _stopWaveformTimer();
     _pulseController.dispose();
     _sheetAnimationController.dispose();
     super.dispose();

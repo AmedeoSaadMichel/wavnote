@@ -89,6 +89,8 @@ class RecordingInProgress extends RecordingState {
   final DateTime startTime;
   final String? title;
   final String? seekBasePath; // path del file base tagliato se è avvenuto un seek-trim
+  /// Dati waveform troncati dopo un seek-and-resume; null per registrazioni normali.
+  final List<double>? truncatedWaveData;
 
   const RecordingInProgress({
     required this.filePath,
@@ -102,12 +104,13 @@ class RecordingInProgress extends RecordingState {
     required this.startTime,
     this.title,
     this.seekBasePath,
+    this.truncatedWaveData,
   });
 
   @override
   List<Object?> get props => [
     filePath, folderId, folderName, format, sampleRate, bitRate,
-    duration, amplitude, startTime, title, seekBasePath,
+    duration, amplitude, startTime, title, seekBasePath, truncatedWaveData,
   ];
 
   RecordingInProgress copyWith({
@@ -122,6 +125,7 @@ class RecordingInProgress extends RecordingState {
     DateTime? startTime,
     String? title,
     String? seekBasePath,
+    List<double>? truncatedWaveData,
   }) {
     return RecordingInProgress(
       filePath: filePath ?? this.filePath,
@@ -135,6 +139,7 @@ class RecordingInProgress extends RecordingState {
       startTime: startTime ?? this.startTime,
       title: title ?? this.title,
       seekBasePath: seekBasePath ?? this.seekBasePath,
+      truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
     );
   }
 }
@@ -144,6 +149,7 @@ class RecordingPaused extends RecordingState {
   final String filePath;
   final String? folderId;
   final String? folderName;
+  final String? title;
   final AudioFormat format;
   final int sampleRate;
   final int bitRate;
@@ -154,6 +160,7 @@ class RecordingPaused extends RecordingState {
     required this.filePath,
     this.folderId,
     this.folderName,
+    this.title,
     required this.format,
     required this.sampleRate,
     required this.bitRate,
@@ -163,13 +170,14 @@ class RecordingPaused extends RecordingState {
 
   @override
   List<Object?> get props => [
-    filePath, folderId, folderName, format, sampleRate, bitRate, duration, startTime
+    filePath, folderId, folderName, title, format, sampleRate, bitRate, duration, startTime
   ];
 
   RecordingPaused copyWith({
     String? filePath,
     String? folderId,
     String? folderName,
+    String? title,
     AudioFormat? format,
     int? sampleRate,
     int? bitRate,
@@ -180,6 +188,7 @@ class RecordingPaused extends RecordingState {
       filePath: filePath ?? this.filePath,
       folderId: folderId ?? this.folderId,
       folderName: folderName ?? this.folderName,
+      title: title ?? this.title,
       format: format ?? this.format,
       sampleRate: sampleRate ?? this.sampleRate,
       bitRate: bitRate ?? this.bitRate,
