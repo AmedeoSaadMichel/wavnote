@@ -1,16 +1,21 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/extensions/duration_extensions.dart';
 import 'control_buttons.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 
-/// Fullscreen view for expanded recording bottom sheet (iOS Voice Memos style)
-class RecordingFullscreenView extends StatelessWidget {
+/// Vista fullscreen del bottom sheet di registrazione.
+///
+/// Mostra waveform, controlli e pulsante principale.
+/// I controlli rewind/forward e la seek label sono visibili SOLO in pausa.
+/// Il bottone chat (trascrizione) è visibile sempre in alto a destra.
+/// L'orario corrente nella subtitle viene aggiornato ogni 30 secondi.
+class RecordingFullscreenView extends StatefulWidget {
   final String? title;
   final Duration elapsed;
   final bool isRecording;
   final bool isPaused;
-  final String? filePath;
   final double amplitude;
   final List<double> waveData;
   final VoidCallback onToggle;
@@ -22,8 +27,6 @@ class RecordingFullscreenView extends StatelessWidget {
   final VoidCallback? onForward;
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
   final int seekBarIndex;
-  /// Versione del seek: incrementata ad ogni seek-and-resume per segnalare a
-  /// RecordingWaveform di riposizionare la waveform sulla bacchetta.
   final int seekVersion;
 
   const RecordingFullscreenView({
@@ -32,7 +35,6 @@ class RecordingFullscreenView extends StatelessWidget {
     required this.elapsed,
     required this.isRecording,
     this.isPaused = false,
-    required this.filePath,
     required this.amplitude,
     required this.waveData,
     required this.onToggle,
@@ -47,12 +49,35 @@ class RecordingFullscreenView extends StatelessWidget {
     this.seekVersion = 0,
   });
 
-  String get _formattedTime => elapsed.formatted;
+  @override
+  State<RecordingFullscreenView> createState() => _RecordingFullscreenViewState();
+}
 
-  /// Label seek: "← 00:03 / 00:07 →"
+class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
+  late DateTime _now;
+  Timer? _clockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    // Aggiorna ogni 30 secondi — mostriamo solo HH:mm
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  String get _formattedTime => widget.elapsed.formatted;
+
   String _seekLabel(int barIndex) {
     final seekMs = barIndex * 50;
-    final totalMs = waveData.length * 50;
+    final totalMs = widget.waveData.length * 50;
     String fmt(int ms) {
       final d = Duration(milliseconds: ms);
       final m = d.inMinutes.toString().padLeft(2, '0');
@@ -70,18 +95,24 @@ class RecordingFullscreenView extends StatelessWidget {
           mainAxisSize: MainAxisSize.max,
           children: [
             Flexible(flex: 2, child: _buildHandle()),
-            Flexible(flex: 2, child: _buildFullscreenTitle()),
-            Flexible(flex: 1, child: _buildFullscreenSubtitle()),
-            Flexible(flex: 8, child: _buildFullscreenWaveform(context)),
-            Flexible(
-              flex: 2,
-              child: _buildSeekLabel(),
-            ),
-            Flexible(flex: 4, child: _buildFullscreenPlaybackControls()),
-            Flexible(flex: 4, child: _buildFullscreenActionButton()),
+            Flexible(flex: 2, child: _buildTitle()),
+            Flexible(flex: 1, child: _buildSubtitle()),
+            Flexible(flex: 8, child: _buildWaveform(context)),
+            // Seek label e controlli solo in pausa
+            if (widget.isPaused) Flexible(flex: 2, child: _buildSeekLabel()),
+            if (widget.isPaused) Flexible(flex: 4, child: _buildPlaybackControls()),
+            Flexible(flex: 4, child: _buildActionButton()),
           ],
         ),
-        if (!isRecording || isPaused)
+        // Bottone chat (trascrizione) — sempre visibile in alto a destra
+        if (widget.onChat != null)
+          Positioned(
+            top: 12,
+            right: 16,
+            child: _buildChatButton(),
+          ),
+        // Done — solo quando non si registra attivamente
+        if (!widget.isRecording || widget.isPaused)
           Positioned(
             bottom: 40,
             right: 20,
@@ -104,11 +135,11 @@ class RecordingFullscreenView extends StatelessWidget {
     );
   }
 
-  Widget _buildFullscreenTitle() {
+  Widget _buildTitle() {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Text(
-        title ?? 'New Recording',
+        widget.title ?? 'New Recording',
         style: const TextStyle(
           color: Colors.cyan,
           fontSize: 28,
@@ -119,10 +150,9 @@ class RecordingFullscreenView extends StatelessWidget {
     );
   }
 
-  Widget _buildFullscreenSubtitle() {
-    final now = DateTime.now();
+  Widget _buildSubtitle() {
     final timeString =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        '${_now.hour.toString().padLeft(2, '0')}:${_now.minute.toString().padLeft(2, '0')}';
     return Text(
       '$timeString  $_formattedTime',
       style: TextStyle(
@@ -134,7 +164,7 @@ class RecordingFullscreenView extends StatelessWidget {
     );
   }
 
-  Widget _buildFullscreenWaveform(BuildContext context) {
+  Widget _buildWaveform(BuildContext context) {
     return Align(
       alignment: Alignment.topCenter,
       child: FractionallySizedBox(
@@ -143,37 +173,33 @@ class RecordingFullscreenView extends StatelessWidget {
         child: Container(
           width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 20),
-          child: _buildWaveformWidget(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return RecordingWaveform(
+                amplitude: widget.amplitude,
+                waveData: widget.waveData,
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                waveColor: Colors.cyan,
+                spacing: 2.0,
+                waveThickness: 2.5,
+                scaleFactor: 80.0,
+                currentDuration: widget.elapsed,
+                isPaused: widget.isPaused,
+                showPlayhead: true,
+                onSeekBarIndexChanged: widget.onSeekBarIndexChanged,
+                seekVersion: widget.seekVersion,
+              );
+            },
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildWaveformWidget() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return RecordingWaveform(
-          amplitude: amplitude,
-          waveData: waveData,
-          size: Size(constraints.maxWidth, constraints.maxHeight),
-          waveColor: Colors.cyan,
-          spacing: 2.0,
-          waveThickness: 2.5,
-          scaleFactor: 80.0,
-          currentDuration: elapsed,
-          isPaused: isPaused,
-          showPlayhead: true,
-          onSeekBarIndexChanged: onSeekBarIndexChanged,
-          seekVersion: seekVersion,
-        );
-      },
     );
   }
 
   Widget _buildSeekLabel() {
     return Center(
       child: Text(
-        _seekLabel(seekBarIndex),
+        _seekLabel(widget.seekBarIndex),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 16,
@@ -185,43 +211,26 @@ class RecordingFullscreenView extends StatelessWidget {
     );
   }
 
-  Widget _buildFullscreenTimeDisplay() {
-    return Center(
-      child: Text(
-        _formattedTime,
-        style: const TextStyle(
-          color: Colors.cyan,
-          fontSize: 38,
-          fontWeight: FontWeight.w300,
-          letterSpacing: 1.0,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
-  Widget _buildFullscreenPlaybackControls() {
+  Widget _buildPlaybackControls() {
     return FullscreenPlaybackControls(
-      isRecording: isRecording,
-      onPlay: onPlay,
-      onRewind: onRewind,
-      onForward: onForward,
+      onRewind: widget.onRewind,
+      onForward: widget.onForward,
     );
   }
 
-  Widget _buildFullscreenActionButton() {
+  Widget _buildActionButton() {
     return Center(
       child: LayoutBuilder(
         builder: (context, constraints) {
           final size = (constraints.maxHeight * 0.45).clamp(70.0, 120.0);
           return GestureDetector(
             onTap: () {
-              if (isRecording) {
-                onPause?.call();
-              } else if (isPaused) {
-                onPlay?.call();
+              if (widget.isRecording) {
+                widget.onPause?.call();
+              } else if (widget.isPaused) {
+                widget.onPlay?.call();
               } else {
-                onToggle();
+                widget.onToggle();
               }
             },
             child: Container(
@@ -229,7 +238,7 @@ class RecordingFullscreenView extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: isRecording
+                gradient: widget.isRecording
                     ? const LinearGradient(
                         colors: [
                           Color(0xFFDC143C),
@@ -244,17 +253,17 @@ class RecordingFullscreenView extends StatelessWidget {
                         ],
                       ),
                 border: Border.all(
-                  color: isRecording
+                  color: widget.isRecording
                       ? const Color(0xFFFF6B6B).withValues(alpha: 0.8)
                       : Colors.cyan,
-                  width: isRecording ? 3 : 2,
+                  width: widget.isRecording ? 3 : 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: isRecording
+                    color: widget.isRecording
                         ? const Color(0xFFDC143C).withValues(alpha: 0.4)
                         : Colors.black.withValues(alpha: 0.2),
-                    blurRadius: isRecording ? 16 : 8,
+                    blurRadius: widget.isRecording ? 16 : 8,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -262,14 +271,14 @@ class RecordingFullscreenView extends StatelessWidget {
               child: Center(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  child: isRecording
+                  child: widget.isRecording
                       ? Icon(
                           Icons.pause,
                           key: const ValueKey('pause'),
                           color: Colors.white,
                           size: size * 0.4,
                         )
-                      : isPaused
+                      : widget.isPaused
                           ? Icon(
                               Icons.play_arrow,
                               key: const ValueKey('play'),
@@ -291,9 +300,27 @@ class RecordingFullscreenView extends StatelessWidget {
     );
   }
 
+  Widget _buildChatButton() {
+    return GestureDetector(
+      onTap: widget.onChat,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(
+          Icons.chat_bubble_outline,
+          color: Colors.white,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDoneButton() {
     return GestureDetector(
-      onTap: onDone,
+      onTap: widget.onDone,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(

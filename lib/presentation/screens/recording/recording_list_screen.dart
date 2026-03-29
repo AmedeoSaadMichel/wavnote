@@ -369,7 +369,6 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
 
         return RecordingBottomSheet(
           title: currentTitle,
-          filePath: isRecording ? '/temp/current_recording.m4a' : null,
           isRecording: isRecording,
           isPaused: isPaused,
           isStarting: isStarting,

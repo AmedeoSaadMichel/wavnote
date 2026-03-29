@@ -16,7 +16,6 @@ import 'recording_fullscreen_view.dart';
 /// - Proper error handling and user feedback
 class RecordingBottomSheet extends StatefulWidget {
   final String? title; // Recording title to display
-  final String? filePath; // Path to the file being recorded
   final bool isRecording; // Whether a recording is currently in progress
   final bool isPaused; // Whether the recording is paused
   final VoidCallback onToggle; // Callback to start/stop recording
@@ -40,7 +39,6 @@ class RecordingBottomSheet extends StatefulWidget {
   const RecordingBottomSheet({
     super.key,
     required this.title,
-    required this.filePath,
     required this.isRecording,
     this.isPaused = false,
     this.isStarting = false,
@@ -359,7 +357,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   elapsed: widget.elapsed,
                   isRecording: widget.isRecording,
                   isPaused: widget.isPaused,
-                  filePath: widget.filePath,
                   amplitude: widget.amplitude,
                   waveData: _waveData,
                   seekVersion: _seekVersion,
