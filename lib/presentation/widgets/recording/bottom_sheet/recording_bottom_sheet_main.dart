@@ -29,7 +29,7 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onPlay; // Callback for play action
   final VoidCallback? onRewind; // Callback for rewind action
   final VoidCallback? onForward; // Callback for forward action
-  final Function(double)? onSeek; // Callback for seek action
+  final Function(int seekBarIndex, List<double> waveData)? onSeekAndResume;
 
   const RecordingBottomSheet({
     super.key,
@@ -48,7 +48,7 @@ class RecordingBottomSheet extends StatefulWidget {
     this.onPlay,
     this.onRewind,
     this.onForward,
-    this.onSeek,
+    this.onSeekAndResume,
   });
 
   @override
@@ -73,6 +73,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   // Waveform data shared between compact and fullscreen views
   final List<double> _waveData = [];
   static const int _maxWavePoints = 1000;
+  int _seekBarIndex = 0;
 
   @override
   void initState() {
@@ -121,6 +122,14 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     if (widget.isRecording && !oldWidget.isRecording && !oldWidget.isPaused) {
       setState(() {
         _waveData.clear();
+        _seekBarIndex = 0;
+      });
+    }
+
+    // Reset seekBarIndex all'ultimo campione quando si entra in pausa
+    if (widget.isPaused && !oldWidget.isPaused) {
+      setState(() {
+        _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
       });
     }
 
@@ -283,14 +292,24 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                 filePath: widget.filePath,
                 amplitude: widget.amplitude,
                 waveData: _waveData,
-                onToggle: widget.onToggle, // Same as compact view
+                onToggle: widget.onToggle,
                 onPause: widget.onPause,
                 onDone: widget.onDone,
                 onChat: widget.onChat,
-                onPlay: widget.onPlay,
+                onPlay: () {
+                  final lastBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
+                  if (widget.isPaused && _seekBarIndex < lastBarIndex) {
+                    widget.onSeekAndResume?.call(_seekBarIndex, List<double>.from(_waveData));
+                  } else {
+                    widget.onPlay?.call();
+                  }
+                },
                 onRewind: widget.onRewind,
                 onForward: widget.onForward,
-                onSeek: widget.onSeek,
+                onSeekBarIndexChanged: (index) {
+                  setState(() => _seekBarIndex = index);
+                },
+                seekBarIndex: _seekBarIndex,
               )
             : RecordingCompactView(
                 key: const ValueKey('compact'),
