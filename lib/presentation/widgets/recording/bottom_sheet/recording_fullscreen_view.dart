@@ -75,9 +75,7 @@ class RecordingFullscreenView extends StatelessWidget {
             Flexible(flex: 8, child: _buildFullscreenWaveform(context)),
             Flexible(
               flex: 2,
-              child: isPaused
-                  ? _buildSeekLabel()
-                  : _buildFullscreenTimeDisplay(),
+              child: _buildSeekLabel(),
             ),
             Flexible(flex: 4, child: _buildFullscreenPlaybackControls()),
             Flexible(flex: 4, child: _buildFullscreenActionButton()),
