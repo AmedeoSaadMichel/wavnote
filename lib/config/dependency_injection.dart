@@ -20,6 +20,7 @@ import 'package:get_it/get_it.dart';
 
 import '../data/repositories/recording_repository.dart';
 import '../services/audio/audio_service_coordinator.dart';
+import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
 
 /// Global service locator — use sl<T>() to resolve dependencies
@@ -47,6 +48,12 @@ Future<void> setupDependencies() async {
   if (!sl.isRegistered<RecordingRepository>()) {
     sl.registerLazySingleton<RecordingRepository>(
       () => RecordingRepository(),
+    );
+  }
+
+  if (!sl.isRegistered<AudioTrimmerService>()) {
+    sl.registerLazySingleton<AudioTrimmerService>(
+      () => AudioTrimmerService(),
     );
   }
 
