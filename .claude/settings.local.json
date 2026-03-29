@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(flutter run:*)",
+      "Bash(nc:*)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(find:*)",
+      "Bash(grep -A5 \"name: record$\" /Users/amedeosaadmichel/Documents/GitHub/wavnote/pubspec.lock)",
+      "Bash(gh auth:*)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(flutter test:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(dart test:*)",
+      "Bash(/Users/amedeosaadmichel/flutter/bin/flutter test:*)",
+      "Bash(pkill -f \"flutter test\")",
+      "Bash(/Users/amedeosaadmichel/flutter/bin/flutter analyze:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

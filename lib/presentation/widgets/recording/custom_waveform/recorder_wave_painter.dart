@@ -51,6 +51,8 @@ class CustomRecorderWavePainter extends CustomPainter {
   final double scaleFactor;
   final Duration currentlyRecordedDuration;
   final bool isPaused;
+  /// Barre future da erosione progressiva: ancora a 0.3 opacity anche durante recording.
+  final int futureBarsCount;
 
   CustomRecorderWavePainter({
     required this.waveData,
@@ -86,6 +88,7 @@ class CustomRecorderWavePainter extends CustomPainter {
     required this.scaleFactor,
     required this.currentlyRecordedDuration,
     this.isPaused = false,
+    this.futureBarsCount = 0,
   })  : _wavePaint = Paint()
           ..color = waveColor
           ..strokeWidth = waveThickness
@@ -114,7 +117,11 @@ class CustomRecorderWavePainter extends CustomPainter {
       /// wave gradient
       if (gradient != null) _waveGradient();
 
-      if (((spacing * i) + dragOffset.dx + spacing >
+      // Il pushback scatta solo per barre registrate (non future):
+      // le barre future non devono causare lo scroll del waveform.
+      final isRecordedBar = futureBarsCount == 0 || i < waveData.length - futureBarsCount;
+      if (isRecordedBar &&
+          ((spacing * i) + dragOffset.dx + spacing >
               size.width / (extendWaveform ? 1 : 2) + totalBackDistance.dx) &&
           callPushback) {
         pushBack();
@@ -153,7 +160,8 @@ class CustomRecorderWavePainter extends CustomPainter {
     return oldDelegate.totalBackDistance != totalBackDistance ||
         oldDelegate.dragOffset != dragOffset ||
         oldDelegate.waveColor != waveColor ||
-        oldDelegate.isPaused != isPaused;
+        oldDelegate.isPaused != isPaused ||
+        oldDelegate.futureBarsCount != futureBarsCount;
   }
 
   void _drawTextInRange(Canvas canvas, int i, Size size) {
@@ -233,10 +241,18 @@ class CustomRecorderWavePainter extends CustomPainter {
     // is less then double of half width which is max width and half width from
     // 0 is negative direction have some buffer on left side.
     if (dx > -halfWidth && dx < halfWidth * 2) {
+      // Barra futura = ancora da sovrascrivere durante erosione progressiva
+      final isFutureBar = futureBarsCount > 0 && i >= waveData.length - futureBarsCount;
       if (isPaused) {
         final opacity = dx < halfWidth ? 1.0 : 0.3;
         final paint = Paint()
           ..color = waveColor.withValues(alpha: opacity)
+          ..strokeWidth = waveThickness
+          ..strokeCap = waveCap;
+        canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);
+      } else if (isFutureBar) {
+        final paint = Paint()
+          ..color = waveColor.withValues(alpha: 0.3)
           ..strokeWidth = waveThickness
           ..strokeCap = waveCap;
         canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);

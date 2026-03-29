@@ -187,7 +187,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       (failure) => emit(RecordingError(failure.message,
           errorType: RecordingErrorType.recording)),
       (data) {
-        final seekTimeMs = event.seekBarIndex * 50;
+        final seekTimeMs = event.seekBarIndex * 100;
         emit(RecordingInProgress(
           filePath: s.filePath,
           folderId: s.folderId,

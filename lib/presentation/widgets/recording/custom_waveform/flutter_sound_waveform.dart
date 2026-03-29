@@ -32,6 +32,9 @@ class RecordingWaveform extends StatefulWidget {
   /// (bottomPadding = size.height/2). Default false → barre in fondo (comportamento
   /// originale usato dalla fullscreen view con Clip.none).
   final bool centerBars;
+  /// Numero di barre future ancora da sovrascrivere (erosione progressiva).
+  /// Queste barre restano a 0.3 opacity anche durante la registrazione.
+  final int futureBarsCount;
 
   const RecordingWaveform({
     super.key,
@@ -53,6 +56,7 @@ class RecordingWaveform extends StatefulWidget {
     this.onSeekBarIndexChanged,
     this.seekVersion = 0,
     this.centerBars = false,
+    this.futureBarsCount = 0,
   });
 
   @override
@@ -157,7 +161,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
     print('⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}');
 
-    const double playheadExtension = 110.0; // px di estensione sotto la waveform (copre seek label)
+    const double playheadExtension = 0.0;
     // centerBars=true → barre al centro verticale del canvas (compact view).
     // centerBars=false → barre in fondo (comportamento originale fullscreen).
     final double bottomPadding = widget.centerBars ? widget.size.height / 2 : 0;
@@ -212,6 +216,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
               scaleFactor: widget.scaleFactor,
               currentlyRecordedDuration: widget.currentDuration,
               isPaused: widget.isPaused,
+              futureBarsCount: widget.futureBarsCount,
             ),
           ),
         ),

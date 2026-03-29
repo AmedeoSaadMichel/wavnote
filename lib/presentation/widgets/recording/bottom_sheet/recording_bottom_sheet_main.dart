@@ -83,6 +83,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   /// Incrementato ad ogni seek-and-resume per segnalare a RecordingWaveform
   /// di riposizionare la waveform sulla bacchetta gialla.
   int _seekVersion = 0;
+  /// Numero di barre future ancora da sovrascrivere (erosione progressiva).
+  /// > 0 dopo un seek-and-resume finché tutte le barre future non sono state
+  /// rimpiazzate dalla nuova registrazione, una per ogni tick da 100ms.
+  int _futureBarsCount = 0;
 
   // Timer locale per aggiungere barre alla waveform a intervalli fissi.
   // Disaccoppia la crescita della waveform dagli emit BLoC (che Equatable
@@ -150,19 +154,39 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     final isSeekResume = widget.truncatedWaveData != null &&
         oldWidget.truncatedWaveData == null;
 
+    // Pre-imposta futureBarsCount appena inizia la transizione (isStarting true),
+    // PRIMA che truncatedWaveData arrivi. Questo impedisce al painter di considerare
+    // le barre future come "registrate" durante RecordingStarting e scatenare
+    // pushback multipli che spostano il waveform in avanti.
+    if (widget.isStarting && !oldWidget.isStarting) {
+      final preCount = _waveData.length - _seekBarIndex - 1;
+      if (preCount > 0) {
+        setState(() => _futureBarsCount = preCount);
+      }
+    }
+
     if (isSeekResume) {
-      // Seek-and-resume: rimpiazza _waveData con i dati troncati e segnala
-      // a RecordingWaveform di riposizionare la waveform sulla bacchetta.
-      // Applica floor su tutte le barre troncate per eliminare i gap visivi.
+      // Seek-and-resume con erosione progressiva:
+      // Mantiene le barre future in _waveData invece di eliminarle subito.
+      // Ogni tick (_addWavePoint) sovrascrive in-place la prima barra futura
+      // con la nuova ampiezza → spariscono una per una mentre la registrazione avanza.
+      final truncated = widget.truncatedWaveData!
+          .map((a) => a > _amplitudeFloor ? a : _amplitudeFloor)
+          .toList();
+      final futureBars = _waveData.length > truncated.length
+          ? List<double>.from(_waveData.sublist(truncated.length))
+          : <double>[];
       setState(() {
+        _futureBarsCount = futureBars.length;
         _waveData
           ..clear()
-          ..addAll(widget.truncatedWaveData!
-              .map((a) => a > _amplitudeFloor ? a : _amplitudeFloor));
-        _seekBarIndex = 0;
-        _seekVersion++;
+          ..addAll(truncated)
+          ..addAll(futureBars);
+        _seekBarIndex = truncated.length - 1;
+        // Non incrementa _seekVersion: il waveform resta nella posizione di pausa
+        // e scorre naturalmente quando la registrazione riprende.
       });
-      _currentAmplitude = 0.0; // reset per il nuovo segmento
+      _currentAmplitude = 0.0;
     }
 
     // Aggiorna l'ampiezza corrente — il timer la usa per le barre successive.
@@ -184,13 +208,15 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       setState(() {
         _waveData.clear();
         _seekBarIndex = 0;
+        _futureBarsCount = 0;
       });
     }
 
-    // Quando si entra in pausa: reset seekBarIndex + auto-espandi a fullscreen
-    // così l'utente vede subito la waveform per il seek.
+    // Quando si entra in pausa: le barre future rimanenti diventano barre normali.
+    // Reset seekBarIndex sull'ultima barra registrata + auto-espandi a fullscreen.
     if (widget.isPaused && !oldWidget.isPaused) {
       setState(() {
+        _futureBarsCount = 0;
         _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
         _sheetOffset = 1.0;
       });
@@ -228,30 +254,37 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
-  /// Add waveform data point
+  /// Add waveform data point.
+  /// Se ci sono barre future (_futureBarsCount > 0), sovrascrive in-place
+  /// la prima barra futura invece di appendere — erosione progressiva.
   void _addWavePoint(double amplitude, int receiveTimestamp) {
     final setStateTimestamp = DateTime.now().millisecondsSinceEpoch;
     final delay = setStateTimestamp - receiveTimestamp;
 
     setState(() {
-      _waveData.add(amplitude);
-
-      // Limit memory usage
-      if (_waveData.length > _maxWavePoints) {
-        _waveData.removeAt(0);
+      if (_futureBarsCount > 0) {
+        // Erosione progressiva: sovrascrive la prima barra futura con la nuova ampiezza.
+        // La lunghezza di _waveData resta costante finché tutte le future sono consumate.
+        final insertAt = _waveData.length - _futureBarsCount;
+        _waveData[insertAt] = amplitude;
+        _futureBarsCount--;
+      } else {
+        _waveData.add(amplitude);
+        if (_waveData.length > _maxWavePoints) {
+          _waveData.removeAt(0);
+        }
       }
 
-      // Durante la registrazione mantieni seekBarIndex sull'ultima barra:
-      // il counter fullscreen mostra "← elapsed / elapsed →" aggiornato ogni tick.
+      // Durante la registrazione: seekBarIndex = ultima barra registrata (esclude future).
       if (!widget.isPaused) {
-        _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
+        final recordedCount = _waveData.length - _futureBarsCount;
+        _seekBarIndex = recordedCount > 0 ? recordedCount - 1 : 0;
       }
 
-      // Debug log with timing
       if (_waveData.length % 5 == 0) {
         final afterSetStateTimestamp = DateTime.now().millisecondsSinceEpoch;
         final setStateDelay = afterSetStateTimestamp - setStateTimestamp;
-        print('⏱️ [$afterSetStateTimestamp] _addWavePoint: length=${_waveData.length}, amplitude=${amplitude.toStringAsFixed(3)}, delay=${delay}ms, setState=${setStateDelay}ms');
+        print('⏱️ [$afterSetStateTimestamp] _addWavePoint: length=${_waveData.length}, future=$_futureBarsCount, amplitude=${amplitude.toStringAsFixed(3)}, delay=${delay}ms, setState=${setStateDelay}ms');
       }
     });
   }
@@ -366,6 +399,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   amplitude: widget.amplitude,
                   waveData: _waveData,
                   seekVersion: _seekVersion,
+                  futureBarsCount: _futureBarsCount,
                   onToggle: widget.onToggle,
                   onPause: widget.onPause,
                   onDone: widget.onDone,
