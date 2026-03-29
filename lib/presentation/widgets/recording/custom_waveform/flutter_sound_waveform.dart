@@ -6,6 +6,8 @@ import 'recorder_wave_painter.dart';
 ///
 /// Receives amplitude values from [AudioRecorderService] and renders
 /// a scrolling waveform using [CustomRecorderWavePainter].
+/// Durante la pausa, supporta il drag orizzontale per scorrere la waveform
+/// e notifica l'indice della barra di seek tramite [onSeekBarIndexChanged].
 class RecordingWaveform extends StatefulWidget {
   final double amplitude; // Current amplitude (0.0-1.0) from AudioRecorderService
   final List<double> waveData; // Waveform data from parent
@@ -20,6 +22,9 @@ class RecordingWaveform extends StatefulWidget {
   final bool showDurationLabel;
   final Duration currentDuration;
   final Shader? gradient;
+  // ── NEW ──
+  final bool isPaused;
+  final Function(int seekBarIndex)? onSeekBarIndexChanged;
 
   const RecordingWaveform({
     super.key,
@@ -36,6 +41,9 @@ class RecordingWaveform extends StatefulWidget {
     this.showDurationLabel = false,
     required this.currentDuration,
     this.gradient,
+    // ── NEW ──
+    this.isPaused = false,
+    this.onSeekBarIndexChanged,
   });
 
   @override
@@ -43,7 +51,6 @@ class RecordingWaveform extends StatefulWidget {
 }
 
 class _RecordingWaveformState extends State<RecordingWaveform> {
-  // Scrolling offset for waveform (same as audio_waveforms library)
   Offset _totalBackDistance = Offset.zero;
   final Offset _dragOffset = Offset.zero;
   double _initialPosition = 0.0;
@@ -61,69 +68,86 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
-    print('⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}');
+  int get _currentSeekBarIndex {
+    final halfWidth = widget.size.width / 2;
+    final index = ((_totalBackDistance.dx + halfWidth) / widget.spacing).round();
+    return index.clamp(0, widget.waveData.isEmpty ? 0 : widget.waveData.length - 1);
+  }
 
-    return Container(
-      width: widget.size.width,
-      height: widget.size.height,
-      color: Colors.transparent,
-      child: RepaintBoundary(
-        child: CustomPaint(
-          painter: CustomRecorderWavePainter(
-            waveData: widget.waveData.isEmpty ? [0.0] : widget.waveData,
-            waveColor: widget.waveColor,
-            showMiddleLine: widget.showMiddleLine,
-            spacing: widget.spacing,
-            initialPosition: _initialPosition,
-            showTop: true,
-            showBottom: true,
-            bottomPadding: 0,
-            waveCap: StrokeCap.round,
-            middleLineColor: widget.middleLineColor,
-            middleLineThickness: widget.middleLineThickness,
-            totalBackDistance: _totalBackDistance,
-            dragOffset: _dragOffset,
-            waveThickness: widget.waveThickness,
-            pushBack: _onPushBack,
-            callPushback: true,
-            extendWaveform: true,
-            updateFrequecy: 10.0, // Update every 10 samples (0.5 second at 50ms intervals)
-            showHourInDuration: false,
-            showDurationLabel: widget.showDurationLabel,
-            durationStyle: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-            ),
-            durationLinesColor: Colors.white30,
-            durationTextPadding: 10,
-            durationLinesHeight: 8,
-            labelSpacing: 12,
-            gradient: widget.gradient,
-            shouldClearLabels: false,
-            revertClearLabelCall: () {},
-            setCurrentPositionDuration: (int ms) {},
-            shouldCalculateScrolledPosition: false,
-            scaleFactor: widget.scaleFactor,
-            currentlyRecordedDuration: widget.currentDuration,
-          ),
-        ),
-      ),
-    );
+  double get _maxScrollDx {
+    if (widget.waveData.isEmpty) return 0.0;
+    return ((widget.waveData.length - 1) * widget.spacing).toDouble();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!widget.isPaused) return;
+    final newDx = (_totalBackDistance.dx - details.delta.dx).clamp(0.0, _maxScrollDx);
+    setState(() {
+      _totalBackDistance = Offset(newDx, 0);
+    });
+    widget.onSeekBarIndexChanged?.call(_currentSeekBarIndex);
   }
 
   /// Called when waveform needs to scroll back (same as audio_waveforms library)
   /// IMPORTANT: Does NOT call setState - the parent widget's setState handles repainting
   void _onPushBack() {
-    print('🔄 _onPushBack called: incrementing _totalBackDistance by ${widget.spacing}');
-
-    // Just update values without setState (same as original audio_waveforms library)
-    // The parent's setState (from _addWavePoint) will trigger the repaint
     _initialPosition = 0.0;
     _totalBackDistance = _totalBackDistance + Offset(widget.spacing, 0.0);
+  }
 
-    print('🔄 New _totalBackDistance = $_totalBackDistance');
+  @override
+  Widget build(BuildContext context) {
+    final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
+    print('⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}');
+
+    return GestureDetector(
+      onHorizontalDragUpdate: widget.isPaused ? _onHorizontalDragUpdate : null,
+      child: Container(
+        width: widget.size.width,
+        height: widget.size.height,
+        color: Colors.transparent,
+        child: RepaintBoundary(
+          child: CustomPaint(
+            painter: CustomRecorderWavePainter(
+              waveData: widget.waveData.isEmpty ? [0.0] : widget.waveData,
+              waveColor: widget.waveColor,
+              showMiddleLine: widget.showMiddleLine,
+              spacing: widget.spacing,
+              initialPosition: _initialPosition,
+              showTop: true,
+              showBottom: true,
+              bottomPadding: 0,
+              waveCap: StrokeCap.round,
+              middleLineColor: widget.middleLineColor,
+              middleLineThickness: widget.middleLineThickness,
+              totalBackDistance: _totalBackDistance,
+              dragOffset: _dragOffset,
+              waveThickness: widget.waveThickness,
+              pushBack: _onPushBack,
+              callPushback: !widget.isPaused,
+              extendWaveform: true,
+              updateFrequecy: 10.0,
+              showHourInDuration: false,
+              showDurationLabel: widget.showDurationLabel,
+              durationStyle: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+              durationLinesColor: Colors.white30,
+              durationTextPadding: 10,
+              durationLinesHeight: 8,
+              labelSpacing: 12,
+              gradient: widget.gradient,
+              shouldClearLabels: false,
+              revertClearLabelCall: () {},
+              setCurrentPositionDuration: (int ms) {},
+              shouldCalculateScrolledPosition: false,
+              scaleFactor: widget.scaleFactor,
+              currentlyRecordedDuration: widget.currentDuration,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
