@@ -15,6 +15,11 @@ import UIKit
       AudioTrimmerPlugin.register(with: registrar)
     }
 
+    // Registra il plugin audio engine (AVAudioEngine nativo)
+    if let registrar = self.registrar(forPlugin: "AudioEnginePlugin") {
+      AudioEnginePlugin.register(with: registrar)
+    }
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

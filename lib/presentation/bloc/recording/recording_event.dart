@@ -246,6 +246,31 @@ class MoveSelectedRecordingsToFolder extends RecordingEvent {
   List<Object> get props => [targetFolderId, currentFolderId];
 }
 
+/// Event per aggiornare la posizione della seek bar nella waveform (drag).
+class UpdateSeekBarIndex extends RecordingEvent {
+  final int seekBarIndex;
+  const UpdateSeekBarIndex({required this.seekBarIndex});
+  @override
+  List<Object> get props => [seekBarIndex];
+}
+
+/// Event per riprodurre in anteprima la registrazione dal punto del playhead.
+/// Lo stato rimane RecordingPaused; cambia solo isPlayingPreview → true.
+/// Legge seekBarIndex dallo stato RecordingPaused corrente.
+class PlayRecordingPreview extends RecordingEvent {
+  const PlayRecordingPreview();
+}
+
+/// Event per fermare l'anteprima di playback e tornare a RecordingPaused puro.
+/// [isNaturalCompletion] è true quando il playback finisce da solo (fine file),
+/// false quando l'utente clicca pausa manualmente.
+class StopRecordingPreview extends RecordingEvent {
+  final bool isNaturalCompletion;
+  const StopRecordingPreview({this.isNaturalCompletion = false});
+  @override
+  List<Object> get props => [isNaturalCompletion];
+}
+
 /// Event per cercare una posizione nella waveform e riprendere la registrazione da lì.
 /// Triggera il trim audio al punto di seek, poi riavvia il recorder.
 class SeekAndResumeRecording extends RecordingEvent {

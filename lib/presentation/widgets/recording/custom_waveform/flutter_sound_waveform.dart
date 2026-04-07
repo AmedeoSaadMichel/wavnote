@@ -35,6 +35,9 @@ class RecordingWaveform extends StatefulWidget {
   /// Numero di barre future ancora da sovrascrivere (erosione progressiva).
   /// Queste barre restano a 0.3 opacity anche durante la registrazione.
   final int futureBarsCount;
+  /// Indice seek bar dal BLoC; quando cambia dall'esterno (es. playback preview)
+  /// la waveform riposiziona automaticamente il suo offset.
+  final int? externalSeekBarIndex;
 
   const RecordingWaveform({
     super.key,
@@ -57,6 +60,7 @@ class RecordingWaveform extends StatefulWidget {
     this.seekVersion = 0,
     this.centerBars = false,
     this.futureBarsCount = 0,
+    this.externalSeekBarIndex,
   });
 
   @override
@@ -112,6 +116,30 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
       final lastIndex = widget.waveData.length - 1;
       setState(() {
         _totalBackDistance = Offset((lastIndex * widget.spacing) - halfWidth, 0);
+      });
+      return;
+    }
+
+    // Erosione progressiva: futureBarsCount cala → una barra futura è stata registrata.
+    // Il painter non vede nuove barre (lunghezza fissa) → non chiama pushBack.
+    // Avanziamo manualmente lo scroll di un spacing per far scorrere la waveform.
+    if (!widget.isPaused &&
+        widget.futureBarsCount < oldWidget.futureBarsCount &&
+        widget.waveData.isNotEmpty) {
+      setState(() {
+        _initialPosition = 0.0;
+        _totalBackDistance = _totalBackDistance + Offset(widget.spacing, 0.0);
+      });
+    }
+
+    // Playback preview: riposiziona la waveform quando l'indice cambia dall'esterno
+    if (widget.externalSeekBarIndex != null &&
+        widget.externalSeekBarIndex != oldWidget.externalSeekBarIndex &&
+        widget.externalSeekBarIndex != _currentSeekBarIndex) {
+      final halfWidth = widget.size.width / 2;
+      final targetDx = (widget.externalSeekBarIndex! * widget.spacing) - halfWidth;
+      setState(() {
+        _totalBackDistance = Offset(targetDx, 0);
       });
     }
   }

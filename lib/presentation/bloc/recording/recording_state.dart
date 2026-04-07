@@ -155,6 +155,10 @@ class RecordingPaused extends RecordingState {
   final int bitRate;
   final Duration duration;
   final DateTime startTime;
+  /// true mentre il playback di anteprima è attivo (ascolto del registrato).
+  final bool isPlayingPreview;
+  /// Indice della barra di seek nella waveform (single source of truth).
+  final int seekBarIndex;
 
   const RecordingPaused({
     required this.filePath,
@@ -166,11 +170,14 @@ class RecordingPaused extends RecordingState {
     required this.bitRate,
     required this.duration,
     required this.startTime,
+    this.isPlayingPreview = false,
+    this.seekBarIndex = 0,
   });
 
   @override
   List<Object?> get props => [
-    filePath, folderId, folderName, title, format, sampleRate, bitRate, duration, startTime
+    filePath, folderId, folderName, title, format, sampleRate, bitRate,
+    duration, startTime, isPlayingPreview, seekBarIndex,
   ];
 
   RecordingPaused copyWith({
@@ -183,6 +190,8 @@ class RecordingPaused extends RecordingState {
     int? bitRate,
     Duration? duration,
     DateTime? startTime,
+    bool? isPlayingPreview,
+    int? seekBarIndex,
   }) {
     return RecordingPaused(
       filePath: filePath ?? this.filePath,
@@ -194,6 +203,8 @@ class RecordingPaused extends RecordingState {
       bitRate: bitRate ?? this.bitRate,
       duration: duration ?? this.duration,
       startTime: startTime ?? this.startTime,
+      isPlayingPreview: isPlayingPreview ?? this.isPlayingPreview,
+      seekBarIndex: seekBarIndex ?? this.seekBarIndex,
     );
   }
 }

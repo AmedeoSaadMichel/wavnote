@@ -640,11 +640,12 @@ class AudioPlayerService implements IAudioServiceRepository {
   }
   
   @override
-  Future<bool> startPlaying(String filePath) async {
+  Future<bool> startPlaying(String filePath, {Duration? initialPosition}) async {
     if (!_ensureInitialized()) return false;
 
     try {
-      debugPrint('🎵 AudioPlayerService: Starting playback for $filePath');
+      debugPrint('🎵 AudioPlayerService: Starting playback for $filePath'
+          '${initialPosition != null ? ' from ${initialPosition.inMilliseconds}ms' : ''}');
 
       // Validate file
       if (!await _validateAudioFile(filePath)) {
@@ -659,27 +660,35 @@ class AudioPlayerService implements IAudioServiceRepository {
 
       // Check if source is already cached
       AudioSource? audioSource = _getCachedSource(filePath);
-      
+
       if (audioSource != null) {
         debugPrint('✅ Using cached audio source for $filePath');
-        await _audioPlayer!.setAudioSource(audioSource);
+        await _audioPlayer!.setAudioSource(
+          audioSource,
+          initialPosition: initialPosition,
+        );
       } else {
         debugPrint('🔄 Loading and caching new audio source for $filePath');
         audioSource = AudioSource.file(filePath);
-        await _audioPlayer!.setAudioSource(audioSource);
+        await _audioPlayer!.setAudioSource(
+          audioSource,
+          initialPosition: initialPosition,
+        );
         _cacheSource(filePath, audioSource);
       }
 
       await _audioPlayer!.setSpeed(_playbackSpeed);
       await _audioPlayer!.setVolume(_playbackVolume);
-      
+
       // CRITICAL: Update state BEFORE calling play()
       _currentlyPlayingFile = filePath;
       _playbackActive = true;
       _playbackPaused = false;
-      
-      await _audioPlayer!.play();
-      
+
+      // Non-blocking: play() restituisce un Future che completa quando il
+      // playback finisce. Non facciamo await per evitare di bloccare il caller.
+      _audioPlayer!.play();
+
       // Start amplitude simulation for waveform
       _startAmplitudeSimulation();
 
@@ -885,7 +894,7 @@ class AudioPlayerService implements IAudioServiceRepository {
   }
 
   @override
-  Future<RecordingEntity?> stopRecording() async {
+  Future<RecordingEntity?> stopRecording({bool raw = false}) async {
     debugPrint('❌ Recording not supported in player service');
     return null;
   }

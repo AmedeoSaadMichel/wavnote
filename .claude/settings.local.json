@@ -15,7 +15,19 @@
       "Bash(dart test:*)",
       "Bash(/Users/amedeosaadmichel/flutter/bin/flutter test:*)",
       "Bash(pkill -f \"flutter test\")",
-      "Bash(/Users/amedeosaadmichel/flutter/bin/flutter analyze:*)"
+      "Bash(/Users/amedeosaadmichel/flutter/bin/flutter analyze:*)",
+      "Bash(grep -r \"permission_handler\\\\|flutter_permission\\\\|RECORD_AUDIO\" /Users/amedeosaadmichel/Documents/GitHub/wavnote --include=*.yaml --include=*.kt --include=*.swift)",
+      "Bash(dart analyze:*)",
+      "Bash(1 git:*)",
+      "Bash(sqlite3 '__TRACKED_VAR__/Library/Application Support/com.apple.TCC/TCC.db' 'SELECT client, auth_value FROM access WHERE service='\\\\''kTCCServiceMicrophone'\\\\'';')",
+      "Bash(xcrun simctl:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:www.hackingwithswift.com)",
+      "Bash(xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Debug -destination 'generic/platform=iOS Simulator' -quiet)"
     ],
     "deny": [],
     "ask": []

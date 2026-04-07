@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/extensions/duration_extensions.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
+import 'control_buttons.dart';
 
 /// Vista compatta del bottom sheet di registrazione.
 ///
@@ -149,72 +150,12 @@ class RecordingCompactView extends StatelessWidget {
     );
   }
 
-  /// Bottone record con animazione pulse.
   Widget _buildRecordButton() {
-    return GestureDetector(
+    return RecordPupilButton(
+      isRecording: isRecording,
+      size: 80,
+      pulseAnimation: pulseAnimation,
       onTap: onToggle,
-      child: AnimatedBuilder(
-        animation: pulseAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: pulseAnimation.value,
-            child: Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: isRecording
-                  ? const LinearGradient(
-                      colors: [
-                        Color(0xFFDC143C),
-                        Color(0xFFB22222),
-                        Color(0xFF8B0000),
-                      ],
-                    )
-                  : const LinearGradient(
-                      colors: [
-                        Color(0xFFFFA500),
-                        Color(0xFFFFC107),
-                      ],
-                    ),
-              border: Border.all(
-                color: isRecording
-                    ? const Color(0xFFFF6B6B).withValues(alpha: 0.8)
-                    : Colors.cyan,
-                width: isRecording ? 3 : 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isRecording
-                      ? const Color(0xFFDC143C).withValues(alpha: 0.4)
-                      : Colors.black.withValues(alpha: 0.2),
-                  blurRadius: isRecording ? 16 : 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: isRecording
-                    ? const Icon(
-                        Icons.stop,
-                        key: ValueKey('stop'),
-                        color: Colors.white,
-                        size: 32,
-                      )
-                    : const Icon(
-                        Icons.fiber_manual_record,
-                        key: ValueKey('rec'),
-                        color: Color(0xFF2E1065),
-                        size: 30,
-                      ),
-              ),
-            ),
-          ),
-        );
-        },
-      ),
     );
   }
 }

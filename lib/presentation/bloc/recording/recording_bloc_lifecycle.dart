@@ -76,31 +76,61 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       currentDuration = (state as RecordingPaused).duration;
     }
 
+    // Approccio 1: se seek-and-resume, usa raw mode per mantenere tutto in WAV
+    final useRaw = seekBasePath != null;
     final result = await _stopRecordingUseCase.execute(
       waveformData: event.waveformData,
       overrideDuration: currentDuration,
+      raw: useRaw,
     );
 
     await result.fold(
       (failure) async => emit(RecordingError(failure.message,
           errorType: RecordingErrorType.recording)),
       (recording) async {
-        // Se seek-and-resume è stato usato, concatena base + continuazione
+        var finalRecording = recording;
+
         if (seekBasePath != null) {
           try {
+            // Approccio 1: tutto in WAV → singola codifica finale
+            // 1. Concatena WAV base + WAV continuazione → WAV combinato
+            final combinedWavPath = '${recording.filePath}.combined.wav';
             await _trimmerService.concatenateAudio(
               basePath: seekBasePath,
               appendPath: recording.filePath,
-              outputPath: recording.filePath,
-              format: recording.format.name.toLowerCase(),
+              outputPath: combinedWavPath,
+              format: 'wav', // PCM lossless concat
             );
+
+            // 2. Rimuovi i file intermedi
             final baseFile = File(seekBasePath);
             if (await baseFile.exists()) await baseFile.delete();
+            final contFile = File(recording.filePath);
+            if (await contFile.exists()) await contFile.delete();
+
+            // 3. Converti WAV combinato → formato finale (singola codifica)
+            final formatExt = recording.format.fileExtension.substring(1);
+            final finalPath = recording.filePath.replaceAll('.wav', '.$formatExt');
+            final convertResult = await _audioService.convertAudioFile(
+              inputPath: combinedWavPath,
+              outputPath: finalPath,
+              targetFormat: recording.format,
+            );
+
+            // 4. Rimuovi il WAV combinato
+            try { await File(combinedWavPath).delete(); } catch (_) {}
+
+            if (convertResult != null) {
+              final finalFile = File(finalPath);
+              final fileSize = await finalFile.exists() ? await finalFile.length() : 0;
+              finalRecording = recording.copyWith(filePath: finalPath, fileSize: fileSize);
+            }
           } catch (e) {
-            print('⚠️ Concatenazione fallita, mantengo solo la continuazione: $e');
+            debugPrint('⚠️ Concatenazione/conversione seek-and-resume fallita: $e');
           }
         }
-        emit(RecordingCompleted(recording: recording));
+
+        emit(RecordingCompleted(recording: finalRecording));
         _refreshFolderCounts();
       },
     );
@@ -140,6 +170,15 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     if (state is! RecordingPaused) return;
 
     final s = state as RecordingPaused;
+
+    // Se il preview è attivo, fermalo prima di riprendere la registrazione
+    if (s.isPlayingPreview) {
+      _previewPositionSubscription?.cancel();
+      _previewPositionSubscription = null;
+      _previewCompletionSubscription?.cancel();
+      _previewCompletionSubscription = null;
+      await _audioService.stopPlaying();
+    }
 
     final result = await _pauseRecordingUseCase.executeResume();
     result.fold(
@@ -215,10 +254,94 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     try {
       _stopAmplitudeUpdates();
       _stopDurationUpdates();
+      _previewPositionSubscription?.cancel();
+      _previewPositionSubscription = null;
+      _previewCompletionSubscription?.cancel();
+      _previewCompletionSubscription = null;
+      if (await _audioService.isPlaying()) await _audioService.stopPlaying();
       await _audioService.cancelRecording();
       emit(const RecordingCancelled());
     } catch (e) {
       print('❌ Error cancelling recording: $e');
     }
+  }
+
+  // ==== SEEK BAR INDEX ====
+
+  Future<void> _onUpdateSeekBarIndex(
+      UpdateSeekBarIndex event, Emitter<RecordingState> emit) async {
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+    if (s.seekBarIndex == event.seekBarIndex) return;
+    debugPrint('📍 SeekBar → bar ${event.seekBarIndex} (${event.seekBarIndex * 100}ms)');
+    emit(s.copyWith(seekBarIndex: event.seekBarIndex));
+  }
+
+  // ==== PLAYBACK PREVIEW ====
+
+  Future<void> _onPlayRecordingPreview(
+      PlayRecordingPreview event, Emitter<RecordingState> emit) async {
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    // Ferma eventuale playback in corso
+    if (await _audioService.isPlaying()) await _audioService.stopPlaying();
+
+    final seekMs = s.seekBarIndex * 100;
+    debugPrint('🔊 Play preview from bar ${s.seekBarIndex} (${seekMs}ms)');
+
+    final initialPosition = seekMs > 0 ? Duration(milliseconds: seekMs) : null;
+    final started = await _audioService.startPlaying(
+      s.filePath,
+      initialPosition: initialPosition,
+    );
+    if (!started) {
+      debugPrint('❌ PlayRecordingPreview: impossibile avviare il playback di ${s.filePath}');
+      return;
+    }
+
+    emit(s.copyWith(isPlayingPreview: true));
+
+    // Aggiorna seekBarIndex durante il playback preview
+    _previewPositionSubscription?.cancel();
+    _previewPositionSubscription =
+        _audioService.getPlaybackPositionStream().listen((position) {
+      final newIndex = position.inMilliseconds ~/ 100;
+      if (state is RecordingPaused) {
+        final current = (state as RecordingPaused).seekBarIndex;
+        if (newIndex != current) {
+          add(UpdateSeekBarIndex(seekBarIndex: newIndex));
+        }
+      }
+    });
+
+    // Auto-stop quando il playback finisce naturalmente
+    _previewCompletionSubscription?.cancel();
+    _previewCompletionSubscription =
+        _audioService.getPlaybackCompletionStream().listen(
+      (_) => add(const StopRecordingPreview(isNaturalCompletion: true)),
+    );
+  }
+
+  Future<void> _onStopRecordingPreview(
+      StopRecordingPreview event, Emitter<RecordingState> emit) async {
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    _previewPositionSubscription?.cancel();
+    _previewPositionSubscription = null;
+    _previewCompletionSubscription?.cancel();
+    _previewCompletionSubscription = null;
+    await _audioService.stopPlaying();
+
+    // Completamento naturale → cursore all'ULTIMA barra della waveform.
+    // Le barre sono 0-indexed: N barre hanno indici 0..N-1.
+    // duration/100 dà N (il conteggio), quindi l'ultimo indice è N-1.
+    // Esempio: 9300ms → 93 barre → lastBar = 92.
+    final newSeekBarIndex = event.isNaturalCompletion
+        ? (s.duration.inMilliseconds ~/ 100 - 1).clamp(0, 999999)
+        : s.seekBarIndex;
+
+    emit(s.copyWith(isPlayingPreview: false, seekBarIndex: newSeekBarIndex));
   }
 }

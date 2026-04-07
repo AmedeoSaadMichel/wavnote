@@ -26,15 +26,27 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onPause; // Callback for pause action
   final VoidCallback? onDone; // Callback for done action
   final VoidCallback? onChat; // Callback for chat/transcript action
-  final VoidCallback? onPlay; // Callback for play action
+  /// Riprende la registrazione (bottone pupilla in pausa).
+  final VoidCallback? onResume;
+  /// Avvia il playback di anteprima dal seekBarIndex corrente (letto dallo stato BLoC).
+  final VoidCallback? onPlayFromPosition;
+  /// Ferma il playback di anteprima.
+  final VoidCallback? onStopPreview;
+  /// True quando il playback di anteprima è attivo.
+  final bool isPlayingPreview;
   final VoidCallback? onRewind; // Callback for rewind action
   final VoidCallback? onForward; // Callback for forward action
   final Function(int seekBarIndex, List<double> waveData)? onSeekAndResume;
+  /// Callback per aggiornare la posizione della seek bar nel BLoC.
+  final Function(int seekBarIndex)? onSeekBarIndexChanged;
   /// Dati waveform troncati dopo un seek-and-resume; non-null solo al primo
   /// frame dopo la ripresa da un punto precedente.
   final List<double>? truncatedWaveData;
   /// True quando il BLoC è in stato RecordingStarting (transizione, non collassare).
   final bool isStarting;
+  /// seekBarIndex dallo stato BLoC — usato durante il playback preview per
+  /// far scorrere la waveform in sincrono con l'audio.
+  final int? blocSeekBarIndex;
 
   const RecordingBottomSheet({
     super.key,
@@ -50,11 +62,16 @@ class RecordingBottomSheet extends StatefulWidget {
     this.onPause,
     this.onDone,
     this.onChat,
-    this.onPlay,
+    this.onResume,
+    this.onPlayFromPosition,
+    this.onStopPreview,
+    this.isPlayingPreview = false,
     this.onRewind,
     this.onForward,
     this.onSeekAndResume,
+    this.onSeekBarIndexChanged,
     this.truncatedWaveData,
+    this.blocSeekBarIndex,
   });
 
   @override
@@ -131,6 +148,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void _startWaveformTimer() {
     _waveformTimer?.cancel();
     _currentAmplitude = 0.0;
+    print('⏱️ [DART] _startWaveformTimer: START — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}');
     _waveformTimer = Timer.periodic(_waveformTickInterval, (_) {
       if (!mounted || !widget.isRecording) return;
       final amplitude = _currentAmplitude > _amplitudeFloor
@@ -141,6 +159,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   }
 
   void _stopWaveformTimer() {
+    print('⏱️ [DART] _stopWaveformTimer: STOP — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}');
     _waveformTimer?.cancel();
     _waveformTimer = null;
   }
@@ -148,6 +167,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   @override
   void didUpdateWidget(RecordingBottomSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Sincronizza _seekBarIndex locale con il BLoC durante il playback preview
+    if (widget.isPlayingPreview &&
+        widget.blocSeekBarIndex != null &&
+        widget.blocSeekBarIndex != _seekBarIndex) {
+      _seekBarIndex = widget.blocSeekBarIndex!;
+    }
 
     // Detecta seek-and-resume: truncatedWaveData passa da null → non-null
     // (il RecordingStarting intermedio mantiene null, RecordingInProgress post-seek ha i dati)
@@ -400,24 +426,39 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   waveData: _waveData,
                   seekVersion: _seekVersion,
                   futureBarsCount: _futureBarsCount,
+                  pulseAnimation: _pulseAnimation,
                   onToggle: widget.onToggle,
                   onPause: widget.onPause,
                   onDone: widget.onDone,
                   onChat: widget.onChat,
-                  onPlay: () {
-                    final lastBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
-                    if (widget.isPaused && _seekBarIndex < lastBarIndex) {
-                      widget.onSeekAndResume?.call(_seekBarIndex, List<double>.from(_waveData));
+                  // Pupil button: riprende la registrazione.
+                  // Se la seekbar è stata spostata indietro → seek-and-resume (trim).
+                  // Se è all'ultima barra → resume semplice.
+                  onResume: () {
+                    final isAtEnd = _seekBarIndex >= _waveData.length - 1;
+                    if (isAtEnd || widget.onSeekAndResume == null) {
+                      widget.onResume?.call();
                     } else {
-                      widget.onPlay?.call();
+                      widget.onSeekAndResume!(_seekBarIndex, List<double>.from(_waveData));
                     }
                   },
+                  // Play nei controlli: avvia/ferma playback dal playhead
+                  onPlay: () {
+                    if (widget.isPlayingPreview) {
+                      widget.onStopPreview?.call();
+                    } else {
+                      widget.onPlayFromPosition?.call();
+                    }
+                  },
+                  isPlayingPreview: widget.isPlayingPreview,
                   onRewind: widget.onRewind,
                   onForward: widget.onForward,
                   onSeekBarIndexChanged: (index) {
                     setState(() => _seekBarIndex = index);
+                    widget.onSeekBarIndexChanged?.call(index);
                   },
                   seekBarIndex: _seekBarIndex,
+                  blocSeekBarIndex: widget.isPlayingPreview ? widget.blocSeekBarIndex : null,
                 )
               : RecordingCompactView(
                   key: const ValueKey('compact'),

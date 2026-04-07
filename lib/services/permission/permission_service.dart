@@ -1,5 +1,6 @@
 // File: services/permission/permission_service.dart
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,10 +11,27 @@ import 'package:flutter/foundation.dart';
 class PermissionService {
   static const String _tag = 'PermissionService';
 
+  /// Canale nativo per la gestione dei permessi su macOS
+  static const _engineChannel = MethodChannel('com.wavnote/audio_engine');
+
   // ==== MICROPHONE PERMISSIONS ====
 
   /// Check if microphone permission is granted
   static Future<bool> hasMicrophonePermission() async {
+    // Su macOS permission_handler non è supportato: usa il canale nativo
+    if (Platform.isMacOS) {
+      try {
+        debugPrint('$_tag: macOS — checkMicPermission via canale nativo');
+        final status = await _engineChannel.invokeMethod<String>('checkMicPermission');
+        final granted = status == 'authorized';
+        debugPrint('$_tag: macOS mic status=$status (granted=$granted)');
+        return granted;
+      } catch (e) {
+        debugPrint('$_tag: macOS checkMicPermission error: $e');
+        return false;
+      }
+    }
+
     try {
       debugPrint('$_tag: Checking microphone permission...');
 
@@ -31,6 +49,21 @@ class PermissionService {
 
   /// Request microphone permission with detailed handling
   static Future<PermissionResult> requestMicrophonePermission() async {
+    // Su macOS permission_handler non è supportato: usa il canale nativo
+    if (Platform.isMacOS) {
+      try {
+        debugPrint('$_tag: macOS — requestMicPermission via canale nativo');
+        final granted = await _engineChannel.invokeMethod<bool>('requestMicPermission');
+        debugPrint('$_tag: macOS requestMicPermission granted=$granted');
+        if (granted == true) return PermissionResult.granted();
+        // Permesso negato → l'utente deve aprire Preferenze di Sistema
+        return PermissionResult.permanentlyDenied();
+      } catch (e) {
+        debugPrint('$_tag: macOS requestMicPermission error: $e');
+        return PermissionResult.error('Errore richiesta permesso macOS: $e');
+      }
+    }
+
     try {
       debugPrint('$_tag: Requesting microphone permission...');
 

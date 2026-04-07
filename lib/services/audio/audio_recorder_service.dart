@@ -220,7 +220,7 @@ class AudioRecorderService implements IAudioServiceRepository {
   }
 
   @override
-  Future<RecordingEntity?> stopRecording() async {
+  Future<RecordingEntity?> stopRecording({bool raw = false}) async {
     if (!_isRecording || _currentRecordingPath == null || _recorder == null) {
       _lastError = 'No active recording to stop';
       return null;
@@ -355,7 +355,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== PLAYBACK — delegated to AudioPlayerService via coordinator ====
 
-  @override Future<bool> startPlaying(String filePath) async => false;
+  @override Future<bool> startPlaying(String filePath, {Duration? initialPosition}) async => false;
   @override Future<bool> stopPlaying() async => false;
   @override Future<bool> pausePlaying() async => false;
   @override Future<bool> resumePlaying() async => false;

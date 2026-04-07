@@ -43,23 +43,22 @@ class SeekAndResumeUseCase {
 
       final trimDurationMs = seekBarIndex * 50;
 
-      // 1. Ferma il recorder per fare flush del file
-      final entity = await _audioService.stopRecording();
+      // 1. Ferma il recorder in raw mode → restituisce WAV grezzo (Approccio 1)
+      final entity = await _audioService.stopRecording(raw: true);
       if (entity == null) {
         return Left(AudioRecordingFailure.stopFailed('Impossibile fare flush della registrazione per il trim'));
       }
 
-      // entity.filePath è il path ASSOLUTO impostato da AudioRecorderService
-      // (il parametro filePath può essere relativo e non accessibile da iOS)
+      // entity.filePath è il path WAV interno
       final absoluteFilePath = entity.filePath;
 
-      // 2. Taglia e salva il contenuto pre-seek nella basePath
+      // 2. Taglia e salva il contenuto pre-seek nella basePath (WAV → WAV, lossless)
       final basePath = _buildBasePath(absoluteFilePath);
       try {
         await _trimmerService.trimAudio(
           filePath: absoluteFilePath,
           durationMs: trimDurationMs,
-          format: format.name.toLowerCase(),
+          format: 'wav', // Approccio 1: trim su WAV è sempre lossless (Passthrough)
           outputPath: basePath,
         );
       } on PlatformException catch (e) {

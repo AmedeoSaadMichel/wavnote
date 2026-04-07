@@ -10,6 +10,13 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Registra i plugin nativi audio
+    let trimmerRegistrar = flutterViewController.registrar(forPlugin: "AudioTrimmerPlugin")
+    AudioTrimmerPlugin.register(with: trimmerRegistrar)
+
+    let engineRegistrar = flutterViewController.registrar(forPlugin: "AudioEnginePlugin")
+    AudioEnginePlugin.register(with: engineRegistrar)
+
     super.awakeFromNib()
   }
 }

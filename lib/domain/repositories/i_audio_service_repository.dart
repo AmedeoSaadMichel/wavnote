@@ -18,8 +18,9 @@ abstract class IAudioServiceRepository {
     required int bitRate,
   });
 
-  /// Stop current recording and return recording details
-  Future<RecordingEntity?> stopRecording();
+  /// Stop current recording and return recording details.
+  /// Se [raw] è true, restituisce il WAV grezzo senza conversione al formato finale.
+  Future<RecordingEntity?> stopRecording({bool raw = false});
 
   /// Pause current recording
   Future<bool> pauseRecording();
@@ -51,7 +52,7 @@ abstract class IAudioServiceRepository {
   // ==== PLAYBACK OPERATIONS ====
 
   /// Start playing an audio file
-  Future<bool> startPlaying(String filePath);
+  Future<bool> startPlaying(String filePath, {Duration? initialPosition});
 
   /// Stop current playback
   Future<bool> stopPlaying();

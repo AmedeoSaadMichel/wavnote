@@ -11,7 +11,7 @@
 - **Quando chiedo di correggere gli errori, puoi cambiare la logica ma devi chiedere prima di fare qualsiasi modifica logica.**
 - **Segui sempre la struttura esatta definita in idea_project_structure.txt**
 - Non è necessario creare tutti i file in idea_project_structure.txt; servono solo quelli essenziali.
-- Le modifiche alla struttura sono consentite SOLO quando è impossibile mantenere i file sotto le 500 righe
+- Le modifiche alla struttura sono consentite SOLO quando è impossibile mantenere i file sotto le 800 righe
 - Quando vengono apportate modifiche alla struttura a causa dei limiti di dimensione del file:
   - Spiega perché la modifica era necessaria
   - Fornisci SEMPRE il file idea_project_structure.txt aggiornato completo
@@ -19,7 +19,9 @@
 
 ## CRITICO: Limite di Dimensione dei File
 
-- **Massimo 500 righe per file** - Se un file supera le 500 righe, DEVE essere refactorizzato
+- **Obiettivo: 500 righe per file** (opzionale, da preferire quando possibile)
+- **Massimo assoluto: 800 righe per file** - Se un file supera le 800 righe, DEVE essere refactorizzato
+- **Eccezione: il limite può essere superato con permesso esplicito dell'utente** — in tal caso non è necessario refactorizzare
 - Se il refactoring all'interno della struttura attuale è impossibile, solo allora modifica la struttura del progetto
 - Suddividi i file troppo grandi in componenti più piccoli e focalizzati seguendo il principio di responsabilità singola
 

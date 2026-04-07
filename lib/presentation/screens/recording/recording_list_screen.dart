@@ -354,6 +354,8 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
         final isRecording = recordingState.isRecording;
         final isPaused = recordingState is RecordingPaused;
         final isStarting = recordingState is RecordingStarting;
+        final isPlayingPreview = recordingState is RecordingPaused &&
+            recordingState.isPlayingPreview;
         final currentTitle = recordingState is RecordingInProgress
             ? recordingState.title ?? 'New Recording'
             : recordingState is RecordingPaused
@@ -366,12 +368,16 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
         final truncatedWaveData = recordingState is RecordingInProgress
             ? recordingState.truncatedWaveData
             : null;
+        final blocSeekBarIndex = recordingState is RecordingPaused
+            ? recordingState.seekBarIndex
+            : null;
 
         return RecordingBottomSheet(
           title: currentTitle,
           isRecording: isRecording,
           isPaused: isPaused,
           isStarting: isStarting,
+          isPlayingPreview: isPlayingPreview,
           onToggle: toggleRecording,
           elapsed: elapsed,
           amplitude: amplitude,
@@ -385,9 +391,13 @@ class _RecordingListScreenState extends State<RecordingListScreen> with Recordin
           onPause: pauseRecording,
           onDone: finishRecording,
           onChat: showTranscriptOptions,
-          onPlay: playRecording,
+          onResume: resumeRecording,
+          onPlayFromPosition: playRecordingPreview,
+          onStopPreview: stopRecordingPreview,
           onRewind: rewindRecording,
           onForward: forwardRecording,
+          onSeekBarIndexChanged: updateSeekBarIndex,
+          blocSeekBarIndex: blocSeekBarIndex,
           onSeekAndResume: (seekBarIndex, waveData) {
             final bloc = context.read<RecordingBloc>();
             final blocState = bloc.state;

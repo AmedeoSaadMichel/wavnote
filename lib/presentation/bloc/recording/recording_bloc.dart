@@ -16,6 +16,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:bloc/bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'package:equatable/equatable.dart';
 
 // Domain imports
@@ -59,6 +60,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<void>? _previewCompletionSubscription;
+  StreamSubscription<Duration>? _previewPositionSubscription;
   Timer? _durationTimer;
 
   RecordingBloc({
@@ -102,6 +105,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<ResumeRecording>(_onResumeRecording);
     on<CancelRecording>(_onCancelRecording);
     on<SeekAndResumeRecording>(_onSeekAndResumeRecording);
+    on<UpdateSeekBarIndex>(_onUpdateSeekBarIndex);
+    on<PlayRecordingPreview>(_onPlayRecordingPreview);
+    on<StopRecordingPreview>(_onStopRecordingPreview);
 
     // Real-time update handlers
     on<UpdateRecordingAmplitude>(_onUpdateRecordingAmplitude);
@@ -138,6 +144,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   Future<void> close() async {
     await _amplitudeSubscription?.cancel();
     await _durationSubscription?.cancel();
+    await _previewCompletionSubscription?.cancel();
+    await _previewPositionSubscription?.cancel();
     _durationTimer?.cancel();
 
     if (_audioService is AudioServiceCoordinator) {

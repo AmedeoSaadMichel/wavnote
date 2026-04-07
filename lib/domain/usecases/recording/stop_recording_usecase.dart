@@ -44,6 +44,7 @@ class StopRecordingUseCase {
   Future<Either<Failure, RecordingEntity>> execute({
     List<double>? waveformData,
     Duration? overrideDuration,
+    bool raw = false,
   }) async {
     try {
       // 1. Validate active recording
@@ -53,8 +54,8 @@ class StopRecordingUseCase {
         return Left(AudioRecordingFailure.stopFailed('No active recording to stop'));
       }
 
-      // 2. Stop audio service
-      final recordingEntity = await _audioService.stopRecording();
+      // 2. Stop audio service (raw=true restituisce WAV grezzo per seek-and-resume)
+      final recordingEntity = await _audioService.stopRecording(raw: raw);
       if (recordingEntity == null) {
         return Left(AudioRecordingFailure.stopFailed('Audio service returned null'));
       }

@@ -28,13 +28,20 @@ class RecordingFullscreenView extends StatefulWidget {
   final VoidCallback? onPause;
   final VoidCallback? onDone;
   final VoidCallback? onChat;
+  /// Riprende la registrazione (bottone pupilla quando in pausa).
+  final VoidCallback? onResume;
+  /// Avvia/ferma il playback di anteprima dal playhead (bottone play nei controlli).
   final VoidCallback? onPlay;
   final VoidCallback? onRewind;
   final VoidCallback? onForward;
+  final bool isPlayingPreview;
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
   final int seekBarIndex;
   final int seekVersion;
   final int futureBarsCount;
+  final Animation<double> pulseAnimation;
+  /// seekBarIndex dal BLoC — durante il playback preview fa scorrere la waveform.
+  final int? blocSeekBarIndex;
 
   const RecordingFullscreenView({
     super.key,
@@ -45,16 +52,20 @@ class RecordingFullscreenView extends StatefulWidget {
     required this.amplitude,
     required this.waveData,
     required this.onToggle,
+    required this.pulseAnimation,
     this.onPause,
     this.onDone,
     this.onChat,
+    this.onResume,
     this.onPlay,
     this.onRewind,
     this.onForward,
+    this.isPlayingPreview = false,
     this.onSeekBarIndexChanged,
     this.seekBarIndex = 0,
     this.seekVersion = 0,
     this.futureBarsCount = 0,
+    this.blocSeekBarIndex,
   });
 
   @override
@@ -240,6 +251,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                 futureBarsCount: widget.futureBarsCount,
                 onSeekBarIndexChanged: widget.onSeekBarIndexChanged,
                 seekVersion: widget.seekVersion,
+                externalSeekBarIndex: widget.isPlayingPreview ? widget.blocSeekBarIndex : null,
               );
             },
           ),
@@ -253,6 +265,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
       onRewind: widget.onRewind,
       onPlay: widget.onPlay,
       onForward: widget.onForward,
+      isPlayingPreview: widget.isPlayingPreview,
     );
   }
 
@@ -261,77 +274,22 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final size = (constraints.maxHeight * 0.45).clamp(70.0, 120.0);
-          return GestureDetector(
+          return RecordPupilButton(
+            isRecording: widget.isRecording,
+            size: size,
+            pulseAnimation: widget.pulseAnimation,
+            // In pausa: ▶ per riprendere la registrazione
+            overlayIcon: widget.isPaused ? Icons.play_arrow : null,
             onTap: () {
               if (widget.isRecording) {
                 widget.onPause?.call();
               } else if (widget.isPaused) {
-                widget.onPlay?.call();
+                // Il pupil button riprende la registrazione (non il preview)
+                widget.onResume?.call();
               } else {
                 widget.onToggle();
               }
             },
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: widget.isRecording
-                    ? const LinearGradient(
-                        colors: [
-                          Color(0xFFDC143C),
-                          Color(0xFFB22222),
-                          Color(0xFF8B0000),
-                        ],
-                      )
-                    : const LinearGradient(
-                        colors: [
-                          Color(0xFFFFA500),
-                          Color(0xFFFFC107),
-                        ],
-                      ),
-                border: Border.all(
-                  color: widget.isRecording
-                      ? const Color(0xFFFF6B6B).withValues(alpha: 0.8)
-                      : Colors.cyan,
-                  width: widget.isRecording ? 3 : 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.isRecording
-                        ? const Color(0xFFDC143C).withValues(alpha: 0.4)
-                        : Colors.black.withValues(alpha: 0.2),
-                    blurRadius: widget.isRecording ? 16 : 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: widget.isRecording
-                      ? Icon(
-                          Icons.pause,
-                          key: const ValueKey('pause'),
-                          color: Colors.white,
-                          size: size * 0.4,
-                        )
-                      : widget.isPaused
-                          ? Icon(
-                              Icons.play_arrow,
-                              key: const ValueKey('play'),
-                              color: Colors.white,
-                              size: size * 0.45,
-                            )
-                          : Icon(
-                              Icons.fiber_manual_record,
-                              key: const ValueKey('rec'),
-                              color: Colors.white,
-                              size: size * 0.4,
-                            ),
-                ),
-              ),
-            ),
           );
         },
       ),

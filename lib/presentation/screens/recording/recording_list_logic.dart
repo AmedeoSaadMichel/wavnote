@@ -524,11 +524,37 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     print('🎤 Transcript options tapped');
   }
 
-  void playRecording() {
-    print('▶️ Play recording tapped - resuming recording');
+  /// Riprende la registrazione dal punto di pausa (bottone pupilla).
+  void resumeRecording() {
+    print('▶️ Resume recording tapped');
     final recordingBloc = context.read<RecordingBloc>();
     if (recordingBloc.state.canResumeRecording) {
       recordingBloc.add(const ResumeRecording());
+    }
+  }
+
+  /// Avvia il playback di anteprima dalla posizione corrente della seek bar (BLoC state).
+  void playRecordingPreview() {
+    final bloc = context.read<RecordingBloc>();
+    if (bloc.state is RecordingPaused) {
+      bloc.add(const PlayRecordingPreview());
+    }
+  }
+
+  /// Aggiorna la posizione della seek bar nello stato BLoC.
+  void updateSeekBarIndex(int index) {
+    final bloc = context.read<RecordingBloc>();
+    if (bloc.state is RecordingPaused) {
+      bloc.add(UpdateSeekBarIndex(seekBarIndex: index));
+    }
+  }
+
+  /// Ferma il playback di anteprima e torna a RecordingPaused puro.
+  void stopRecordingPreview() {
+    print('⏹ Stop preview');
+    final bloc = context.read<RecordingBloc>();
+    if (bloc.state is RecordingPaused) {
+      bloc.add(const StopRecordingPreview());
     }
   }
 
