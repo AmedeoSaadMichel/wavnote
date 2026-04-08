@@ -1,5 +1,5 @@
 // File: domain/entities/folder_entity.dart
-// 
+//
 // Folder Entity - Domain Layer
 // ===========================
 //
@@ -17,12 +17,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import '../../core/enums/folder_type.dart';
+import '../../core/constants/app_constants.dart';
 
 /// Pure business entity representing a voice memo folder
 ///
 /// This entity contains only business logic and has no dependencies
 /// on external frameworks or UI components beyond basic Flutter types.
-/// 
+///
 /// Folders serve as organizational containers for voice recordings, with two types:
 /// - Default folders: System-provided folders (All Recordings, Favorites, Recently Deleted)
 /// - Custom folders: User-created folders for personal organization
@@ -171,10 +172,7 @@ class FolderEntity extends Equatable {
   FolderEntity updateCount(int newCount) {
     if (newCount < 0) throw ArgumentError('Recording count cannot be negative');
 
-    return copyWith(
-      recordingCount: newCount,
-      updatedAt: DateTime.now(),
-    );
+    return copyWith(recordingCount: newCount, updatedAt: DateTime.now());
   }
 
   /// Rename the folder
@@ -187,10 +185,7 @@ class FolderEntity extends Equatable {
       throw StateError('This folder cannot be renamed');
     }
 
-    return copyWith(
-      name: newName.trim(),
-      updatedAt: DateTime.now(),
-    );
+    return copyWith(name: newName.trim(), updatedAt: DateTime.now());
   }
 
   // ==== FACTORY CONSTRUCTORS ====
@@ -265,7 +260,7 @@ class FolderEntity extends Equatable {
     return FolderEntity(
       id: id,
       name: name,
-      icon: IconData(iconCodePoint, fontFamily: 'MaterialIcons'),
+      icon: AppConstants.getIconFromCodePoint(iconCodePoint),
       color: Color(colorValue),
       recordingCount: recordingCount,
       type: type,

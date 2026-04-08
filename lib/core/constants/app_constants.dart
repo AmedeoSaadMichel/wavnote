@@ -8,7 +8,6 @@ import '../enums/audio_format.dart';
 /// audio settings, and configuration values used throughout the app.
 /// Enhanced with mystical cosmic theme and new audio service configuration.
 class AppConstants {
-
   // ==== APP INFORMATION ====
   static const String appName = 'WavNote';
   static const String appVersion = '1.0.0';
@@ -57,7 +56,16 @@ class AppConstants {
   };
 
   /// Playback speed options
-  static const List<double> playbackSpeeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0];
+  static const List<double> playbackSpeeds = [
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+    3.0,
+  ];
 
   /// Audio service configuration (NEW)
   static const bool enableRealAudioRecording = true;
@@ -75,7 +83,17 @@ class AppConstants {
   static const String defaultRecordingPrefix = 'Recording';
   static const String defaultFolderName = 'Voice Memos';
   static const int maxFileNameLength = 255;
-  static const List<String> invalidFileNameChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+  static const List<String> invalidFileNameChars = [
+    '/',
+    '\\',
+    ':',
+    '*',
+    '?',
+    '"',
+    '<',
+    '>',
+    '|',
+  ];
 
   /// File size limits (in bytes)
   static const int maxRecordingFileSize = 500 * 1024 * 1024; // 500MB
@@ -337,24 +355,24 @@ class AppConstants {
   // ==== PERMISSIONS (NEW) ====
 
   /// Required permissions
-  static const List<String> requiredPermissions = [
-    'microphone',
-    'storage',
-  ];
+  static const List<String> requiredPermissions = ['microphone', 'storage'];
 
   /// Optional permissions
-  static const List<String> optionalPermissions = [
-    'location',
-  ];
+  static const List<String> optionalPermissions = ['location'];
 
   // ==== ERROR MESSAGES (ENHANCED WITH MYSTICAL THEME) ====
 
   /// User-friendly error messages with mystical theme
-  static const String errorGeneric = 'The cosmic energies are misaligned. Please try again.';
-  static const String errorPermission = 'We need your permission to access the ethereal realm of audio.';
-  static const String errorStorage = 'The astral storage dimension is full. Please free some space.';
-  static const String errorRecording = 'The recording spell was interrupted. Please try again.';
-  static const String errorPlayback = 'Unable to channel the audio frequencies. Please check the file.';
+  static const String errorGeneric =
+      'The cosmic energies are misaligned. Please try again.';
+  static const String errorPermission =
+      'We need your permission to access the ethereal realm of audio.';
+  static const String errorStorage =
+      'The astral storage dimension is full. Please free some space.';
+  static const String errorRecording =
+      'The recording spell was interrupted. Please try again.';
+  static const String errorPlayback =
+      'Unable to channel the audio frequencies. Please check the file.';
 
   /// Legacy error messages (maintained for compatibility)
   static const String errorNetwork = 'Network connection error';
@@ -367,9 +385,12 @@ class AppConstants {
   // ==== SUCCESS MESSAGES (ENHANCED WITH MYSTICAL THEME) ====
 
   /// Success messages with mystical theme
-  static const String successRecordingStarted = 'Recording begins... capturing your cosmic voice.';
-  static const String successRecordingSaved = 'Your voice has been inscribed in the eternal memory.';
-  static const String successPlaybackStarted = 'Channeling the stored frequencies...';
+  static const String successRecordingStarted =
+      'Recording begins... capturing your cosmic voice.';
+  static const String successRecordingSaved =
+      'Your voice has been inscribed in the eternal memory.';
+  static const String successPlaybackStarted =
+      'Channeling the stored frequencies...';
 
   /// Legacy success messages (maintained for compatibility)
   static const String successFolderCreated = 'Folder created successfully';
@@ -417,6 +438,15 @@ class AppConstants {
   /// Get folder icon by index
   static IconData getFolderIcon(int index) {
     return folderIcons[index % folderIcons.length];
+  }
+
+  /// Get folder icon by codePoint (prevents tree shaking errors)
+  static IconData getIconFromCodePoint(int codePoint) {
+    try {
+      return folderIcons.firstWhere((icon) => icon.codePoint == codePoint);
+    } catch (_) {
+      return Icons.folder; // Default fallback
+    }
   }
 
   /// Validate folder name

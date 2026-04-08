@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
 
-enum FolderType {
-  defaultFolder,
-  customFolder,
-}
+enum FolderType { defaultFolder, customFolder }
 
 class VoiceMemoFolder {
   final String id;
@@ -62,7 +60,7 @@ class VoiceMemoFolder {
     return VoiceMemoFolder(
       id: json['id'],
       title: json['title'],
-      icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
+      icon: AppConstants.getIconFromCodePoint(json['icon']),
       color: Color(json['color']),
       count: json['count'],
       type: FolderType.values[json['type']],

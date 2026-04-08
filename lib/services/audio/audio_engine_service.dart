@@ -197,11 +197,7 @@ class AudioEngineService {
     try {
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'convertAudio',
-        {
-          'wavPath': wavPath,
-          'outputPath': outputPath,
-          'format': format,
-        },
+        {'wavPath': wavPath, 'outputPath': outputPath, 'format': format},
       );
       if (result != null) {
         return Map<String, dynamic>.from(result);
@@ -231,7 +227,7 @@ class AudioEngineService {
     }
   }
 
-  Future<bool> startPlayback(String path) async {
+  Future<bool> startPlayback(String path, {Duration? position}) async {
     if (_isPlaying) {
       await stopPlayback();
     }
@@ -239,9 +235,12 @@ class AudioEngineService {
     try {
       _currentPlaybackPath = path;
 
-      final result = await _channel.invokeMethod<bool>('startPlayback', {
-        'path': path,
-      });
+      final args = <String, dynamic>{'path': path};
+      if (position != null) {
+        args['position'] = position.inMilliseconds;
+      }
+
+      final result = await _channel.invokeMethod<bool>('startPlayback', args);
 
       if (result == true) {
         _isPlaying = true;
@@ -354,12 +353,15 @@ class AudioEngineService {
   }
 
   /// Configura la categoria della sessione audio nativa.
-  Future<bool> setAudioSessionCategory(String category, {List<String> options = const ['defaultToSpeaker', 'allowBluetooth']}) async {
+  Future<bool> setAudioSessionCategory(
+    String category, {
+    List<String> options = const ['defaultToSpeaker', 'allowBluetooth'],
+  }) async {
     try {
-      final result = await _channel.invokeMethod<bool>('setAudioSessionCategory', {
-        'category': category,
-        'options': options,
-      });
+      final result = await _channel.invokeMethod<bool>(
+        'setAudioSessionCategory',
+        {'category': category, 'options': options},
+      );
       return result ?? false;
     } catch (e) {
       print('AudioEngineService: Failed to set audio session category: $e');

@@ -82,7 +82,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         case "startPlayback":
             if let args = call.arguments as? [String: Any],
                let path = args["path"] as? String {
-                startPlayback(path: path, result: result)
+                let position = args["position"] as? Int
+                startPlayback(path: path, position: position, result: result)
             } else {
                 result(FlutterError(code: "INVALID_ARGS", message: "Missing path", details: nil))
             }
@@ -275,6 +276,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
             var bufferCount = 0
             let tapInput = inputNode!
+
+            // FIX: Rimuove esplicitamente qualsiasi tap precedente per evitare il crash 'nullptr == Tap()'
+            tapInput.removeTap(onBus: 0)
 
             tapInput.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
                 guard let self = self, self.audioFile != nil else { return }
@@ -541,7 +545,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
     // MARK: - Playback
 
-    private func startPlayback(path: String, result: @escaping FlutterResult) {
+    private func startPlayback(path: String, position: Int?, result: @escaping FlutterResult) {
         if isRecording && !isPaused {
             exportForPlayback(sourcePath: path) { [weak self] tempPath, error in
                 guard let self = self else { return }
@@ -554,22 +558,22 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     return
                 }
                 self.playbackTempPath = tempPath
-                self.startPlaybackInternal(path: tempPath, result: result)
+                self.startPlaybackInternal(path: tempPath, position: position, result: result)
             }
         } else if isRecording && isPaused {
-            startPlaybackFromSegments(result: result)
+            startPlaybackFromSegments(position: position, result: result)
         } else {
-            startPlaybackInternal(path: path, result: result)
+            startPlaybackInternal(path: path, position: position, result: result)
         }
     }
 
-    private func startPlaybackFromSegments(result: @escaping FlutterResult) {
+    private func startPlaybackFromSegments(position: Int?, result: @escaping FlutterResult) {
         guard !recordingSegments.isEmpty else {
             result(FlutterError(code: "NO_SEGMENTS", message: "No recording segments available", details: nil))
             return
         }
         if recordingSegments.count == 1 {
-            startPlaybackInternal(path: recordingSegments[0], result: result)
+            startPlaybackInternal(path: recordingSegments[0], position: position, result: result)
         } else {
             let tempDir = NSTemporaryDirectory()
             let tempPath = tempDir + "wavnote_pb_\(Int(Date().timeIntervalSince1970 * 1000)).wav"
@@ -579,10 +583,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 guard let self = self else { return }
                 if let error = error {
                     NSLog("▶️ [NATIVE-macOS] playbackFromSegments CONCAT ERROR: \(error)")
-                    self.startPlaybackInternal(path: self.recordingSegments[0], result: result)
+                    self.startPlaybackInternal(path: self.recordingSegments[0], position: position, result: result)
                 } else {
                     self.playbackTempPath = tempPath
-                    self.startPlaybackInternal(path: tempPath, result: result)
+                    self.startPlaybackInternal(path: tempPath, position: position, result: result)
                 }
             }
         }
@@ -611,7 +615,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func startPlaybackInternal(path: String, result: @escaping FlutterResult) {
+    private func startPlaybackInternal(path: String, position: Int?, result: @escaping FlutterResult) {
         NSLog("🔊 [NATIVE-macOS] startPlaybackInternal — path=\(path)")
         do {
             if playbackEngine != nil {
@@ -634,17 +638,80 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             }
             engine.attach(player)
             engine.connect(player, to: engine.mainMixerNode, format: file.processingFormat)
+            
             playbackGeneration += 1
             let gen = playbackGeneration
-            player.scheduleFile(file, at: nil) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self = self, self.playbackGeneration == gen else { return }
+            try engine.start()
+            
+            if let pos = position, pos > 0 {
+                // Avvio con seek
+                let rawFramePosition = AVAudioFramePosition(Double(pos) / 1000.0 * srPb)
+                let framePosition = min(rawFramePosition, file.length > 0 ? file.length - 1 : 0)
+                let frameCount = max(1, AVAudioFrameCount(file.length - framePosition))
+                
+                if frameCount < 4410 {
+                    NSLog("🔊 [NATIVE-macOS] startPlaybackInternal: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
                     self.isPlaying = false
+                    result(true)
+                    return
+                }
+                
+                seekOffsetFrames = Int64(framePosition)
+                if #available(macOS 10.13, *) {
+                    player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                        DispatchQueue.main.async {
+                            guard let self = self, self.playbackEngine != nil else { return }
+                            guard self.playbackGeneration == gen else { return }
+                            NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
+                            self.isPlaying = false
+                        }
+                    }
+                } else {
+                    player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil) { [weak self] in
+                        DispatchQueue.main.async {
+                            guard let self = self, self.playbackEngine != nil else { return }
+                            guard self.playbackGeneration == gen else { return }
+                            let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
+                            DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
+                                guard self.playbackGeneration == gen else { return }
+                                NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
+                                self.isPlaying = false
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Avvio normale dall'inizio
+                seekOffsetFrames = 0
+                if #available(macOS 10.13, *) {
+                    player.scheduleFile(file, at: nil, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                        DispatchQueue.main.async {
+                            guard let self = self, self.playbackEngine != nil else { return }
+                            guard self.playbackGeneration == gen else { return }
+                            NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
+                            self.isPlaying = false
+                        }
+                    }
+                } else {
+                    player.scheduleFile(file, at: nil) { [weak self] in
+                        DispatchQueue.main.async {
+                            guard let self = self, self.playbackEngine != nil else { return }
+                            guard self.playbackGeneration == gen else { return }
+                            let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
+                            DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
+                                guard self.playbackGeneration == gen else { return }
+                                NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
+                                self.isPlaying = false
+                            }
+                        }
+                    }
                 }
             }
-            seekOffsetFrames = 0
-            try engine.start()
+
+            // Forza il pre-buffering per evitare la starvation I/O che causa la chiusura precoce del playback
+            player.prepare(withFrameCount: 8192)
             player.play()
+            
             isPlaying = true
             isPlaybackPaused = false
             result(true)
@@ -691,10 +758,21 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             result(FlutterError(code: "INVALID_POSITION", message: "Position out of range", details: nil))
             return
         }
+        
         // Clamp: l'ultima barra waveform può mappare esattamente a file.length frame.
-        // Riduciamo al frame precedente per evitare il reject del guard originale.
+        // Se framePosition >= file.length, non c'è nulla da suonare.
         let framePosition = min(rawFramePosition, file.length > 0 ? file.length - 1 : 0)
         let frameCount = max(1, AVAudioFrameCount(file.length - framePosition))
+        
+        // Se mancano pochi frame (es. < 441 per <10ms a 44.1kHz), ignora o triggera fine subito,
+        // altrimenti il CoreAudio potrebbe incantarsi senza emettere completion
+        if frameCount < 4410 {
+             NSLog("🔊 [NATIVE-macOS] seekTo: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
+             self.isPlaying = false
+             result(true)
+             return
+        }
+
         NSLog("🔊 [NATIVE-macOS] seekTo: file.length=\(file.length) (\(Double(file.length)/sampleRate)s) framePos=\(framePosition) frameCount=\(frameCount) → suonerà \(Double(frameCount)/sampleRate)s")
         // Incrementa la generazione prima di stop(): il completion handler orfano
         // del vecchio segmento (triggerato da player.stop()) confronterà la propria
@@ -703,30 +781,60 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         let gen = playbackGeneration
         seekOffsetFrames = Int64(framePosition)
         player.stop()
-        player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil) { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self, self.playbackGeneration == gen else { return }
-                self.isPlaying = false
+        
+        if #available(macOS 10.13, *) {
+            player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+                DispatchQueue.main.async {
+                    guard let self = self, self.playbackEngine != nil else { return }
+                    guard self.playbackGeneration == gen else { return }
+                    NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
+                    self.isPlaying = false
+                }
+            }
+        } else {
+            player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil) { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self = self, self.playbackEngine != nil else { return }
+                    guard self.playbackGeneration == gen else { return }
+                    let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
+                    DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
+                        guard self.playbackGeneration == gen else { return }
+                        NSLog("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
+                        self.isPlaying = false
+                    }
+                }
             }
         }
+        
+        // Forza il pre-buffering prima del play per evitare starvation e interruzione anticipata
+        player.prepare(withFrameCount: 8192)
         player.play()
+        
         isPlaying = true
         result(true)
     }
 
     private func getPlaybackPosition(result: @escaping FlutterResult) {
         guard let p = audioPlayer, let f = audioFileForPlayback else { result(0); return }
-        // Usa playerTime per ottenere i campioni renderizzati relativi al segmento corrente,
-        // poi aggiunge seekOffsetFrames per calcolare la posizione assoluta nel file.
+        
         let sampleRate = f.processingFormat.sampleRate
-        let renderedFrames: Int64
+        var renderedFrames: Int64 = 0
+        
         if let nodeTime = p.lastRenderTime, let playerTime = p.playerTime(forNodeTime: nodeTime) {
-            renderedFrames = max(0, Int64(playerTime.sampleTime))
-        } else {
-            renderedFrames = 0
+            // Latenza tra node e device (hardware buffer delay)
+            let outputLatency = playbackEngine?.outputNode.presentationLatency ?? 0
+            let frameLatency = Int64(outputLatency * sampleRate)
+            
+            // Sottraiamo la latenza in frame per avere la posizione esatta all'altoparlante
+            let adjustedSampleTime = max(0, Int64(playerTime.sampleTime) - frameLatency)
+            renderedFrames = adjustedSampleTime
+            // NSLog("🔊 [NATIVE-macOS] pos: sampleTime=\(playerTime.sampleTime) rendered=\(renderedFrames) latency=\(frameLatency)")
         }
+        
         let totalFrames = seekOffsetFrames + renderedFrames
-        result(Int(Double(totalFrames) / sampleRate * 1000))
+        let clampedFrames = min(totalFrames, f.length)
+        
+        result(Int(Double(clampedFrames) / sampleRate * 1000))
     }
 
     private func getPlaybackDuration(result: @escaping FlutterResult) {

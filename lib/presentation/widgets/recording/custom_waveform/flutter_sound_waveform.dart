@@ -9,7 +9,8 @@ import 'recorder_wave_painter.dart';
 /// Durante la pausa, supporta il drag orizzontale per scorrere la waveform
 /// e notifica l'indice della barra di seek tramite [onSeekBarIndexChanged].
 class RecordingWaveform extends StatefulWidget {
-  final double amplitude; // Current amplitude (0.0-1.0) from AudioRecorderService
+  final double
+  amplitude; // Current amplitude (0.0-1.0) from AudioRecorderService
   final List<double> waveData; // Waveform data from parent
   final Size size;
   final Color waveColor;
@@ -25,16 +26,20 @@ class RecordingWaveform extends StatefulWidget {
   final bool isPaused;
   final bool showPlayhead;
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
+
   /// Versione del seek: incrementata ogni volta che avviene un seek-and-resume.
   /// Quando cambia, la waveform riposiziona l'ultima barra sul playhead.
   final int seekVersion;
+
   /// Se true, le barre vengono disegnate al centro verticale del canvas
   /// (bottomPadding = size.height/2). Default false → barre in fondo (comportamento
   /// originale usato dalla fullscreen view con Clip.none).
   final bool centerBars;
+
   /// Numero di barre future ancora da sovrascrivere (erosione progressiva).
   /// Queste barre restano a 0.3 opacity anche durante la registrazione.
   final int futureBarsCount;
+
   /// Indice seek bar dal BLoC; quando cambia dall'esterno (es. playback preview)
   /// la waveform riposiziona automaticamente il suo offset.
   final int? externalSeekBarIndex;
@@ -81,7 +86,10 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     if (widget.waveData.isNotEmpty) {
       final halfWidth = widget.size.width / 2;
       final lastIndex = widget.waveData.length - 1;
-      _totalBackDistance = Offset((lastIndex * widget.spacing) - halfWidth, 0);
+      _totalBackDistance = Offset(
+        (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
+        0,
+      );
     }
   }
 
@@ -100,22 +108,32 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
 
     // Seek-and-resume: riposiziona in modo che l'ultima barra sia sul playhead.
     // seekVersion cambia solo una volta per ogni seek → scatta esattamente una volta.
-    if (widget.seekVersion != oldWidget.seekVersion && widget.waveData.isNotEmpty) {
+    if (widget.seekVersion != oldWidget.seekVersion &&
+        widget.waveData.isNotEmpty) {
       final halfWidth = widget.size.width / 2;
       final lastIndex = widget.waveData.length - 1;
       setState(() {
-        _totalBackDistance = Offset((lastIndex * widget.spacing) - halfWidth, 0);
+        _totalBackDistance = Offset(
+          (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
+          0,
+        );
         _initialPosition = 0.0;
       });
       return;
     }
 
-    // Quando si entra in pausa: centra l'ultima barra sul playhead
+    // Quando si entra in pausa: centra l'ultima barra sul playhead.
+    // Aggiungiamo metà del tick (spacing / 2) come piccolo offset per assicurarci
+    // che la barra appaia incollata "da sinistra" e non col suo esatto centro
+    // sul playhead, così da eliminare l'effetto "spazio vuoto finale".
     if (widget.isPaused && !oldWidget.isPaused && widget.waveData.isNotEmpty) {
       final halfWidth = widget.size.width / 2;
       final lastIndex = widget.waveData.length - 1;
       setState(() {
-        _totalBackDistance = Offset((lastIndex * widget.spacing) - halfWidth, 0);
+        _totalBackDistance = Offset(
+          (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
+          0,
+        );
       });
       return;
     }
@@ -137,17 +155,46 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
         widget.externalSeekBarIndex != oldWidget.externalSeekBarIndex &&
         widget.externalSeekBarIndex != _currentSeekBarIndex) {
       final halfWidth = widget.size.width / 2;
-      final targetDx = (widget.externalSeekBarIndex! * widget.spacing) - halfWidth;
+      final targetDx =
+          (widget.externalSeekBarIndex! * widget.spacing) -
+          halfWidth +
+          (widget.spacing / 2);
       setState(() {
         _totalBackDistance = Offset(targetDx, 0);
       });
+    }
+
+    // Auto-follow end: durante la registrazione (non in pausa), se la waveform
+    // cresce e supera il centro (halfWidth), forziamo _totalBackDistance per
+    // tenere l'ultima barra ancorata al playhead. Questo aggira il ritardo del pushBack.
+    if (!widget.isPaused &&
+        widget.waveData.length > oldWidget.waveData.length) {
+      final halfWidth = widget.size.width / 2;
+      final currentWaveformWidth = widget.waveData.length * widget.spacing;
+      if (currentWaveformWidth > halfWidth) {
+        final lastIndex = widget.waveData.length - 1;
+        setState(() {
+          _totalBackDistance = Offset(
+            (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
+            0,
+          );
+          _initialPosition = 0.0;
+        });
+      }
     }
   }
 
   int get _currentSeekBarIndex {
     final halfWidth = widget.size.width / 2;
-    final index = ((_totalBackDistance.dx + halfWidth) / widget.spacing).round();
-    return index.clamp(0, widget.waveData.isEmpty ? 0 : widget.waveData.length - 1);
+    // Sottraiamo lo shift (spacing/2) dal calcolo inverso
+    final index =
+        ((_totalBackDistance.dx + halfWidth - (widget.spacing / 2)) /
+                widget.spacing)
+            .round();
+    return index.clamp(
+      0,
+      widget.waveData.isEmpty ? 0 : widget.waveData.length - 1,
+    );
   }
 
   // ── Listener handlers (non partecipano alla gesture arena) ──────────────
@@ -157,16 +204,19 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
 
   void _onPointerMove(PointerMoveEvent event) {
     if (!widget.isPaused) return;
-    // Processa solo il delta orizzontale; i movimenti verticali passano
-    // al parent GestureDetector senza interferenza (Listener non è nel gesture arena)
     final dx = event.delta.dx;
     if (dx == 0) return;
 
     final halfWidth = widget.size.width / 2;
-    final minDx = -halfWidth;
+    // Il limite sinistro per scrollare indietro al massimo (fino a 0)
+    final minDx = -halfWidth + (widget.spacing / 2);
+    // Il limite destro per scrollare in avanti al massimo (fino a fine wave)
     final maxDx = widget.waveData.isEmpty
         ? 0.0
-        : ((widget.waveData.length - 1) * widget.spacing) - halfWidth;
+        : ((widget.waveData.length - 1) * widget.spacing) -
+              halfWidth +
+              (widget.spacing / 2);
+
     final newDx = (_totalBackDistance.dx - dx).clamp(minDx, maxDx);
     setState(() {
       _totalBackDistance = Offset(newDx, 0);
@@ -187,7 +237,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   @override
   Widget build(BuildContext context) {
     final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
-    print('⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}');
+    print(
+      '⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}',
+    );
 
     const double playheadExtension = 0.0;
     // centerBars=true → barre al centro verticale del canvas (compact view).
@@ -202,56 +254,56 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
         clipBehavior: Clip.none,
         children: [
           Container(
-        width: widget.size.width,
-        height: widget.size.height,
-        color: Colors.transparent,
-        child: RepaintBoundary(
-          child: CustomPaint(
-            painter: CustomRecorderWavePainter(
-              waveData: widget.waveData.isEmpty ? [0.0] : widget.waveData,
-              waveColor: widget.waveColor,
-              showMiddleLine: widget.showMiddleLine,
-              spacing: widget.spacing,
-              initialPosition: _initialPosition,
-              showTop: true,
-              showBottom: true,
-              bottomPadding: bottomPadding,
-              waveCap: StrokeCap.round,
-              middleLineColor: widget.middleLineColor,
-              middleLineThickness: widget.middleLineThickness,
-              totalBackDistance: _totalBackDistance,
-              dragOffset: _dragOffset,
-              waveThickness: widget.waveThickness,
-              pushBack: _onPushBack,
-              callPushback: !widget.isPaused,
-              extendWaveform: false,
-              updateFrequecy: 10.0,
-              showHourInDuration: false,
-              showDurationLabel: widget.showDurationLabel,
-              durationStyle: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
+            width: widget.size.width,
+            height: widget.size.height,
+            color: Colors.transparent,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: CustomRecorderWavePainter(
+                  waveData: widget.waveData.isEmpty ? [0.0] : widget.waveData,
+                  waveColor: widget.waveColor,
+                  showMiddleLine: widget.showMiddleLine,
+                  spacing: widget.spacing,
+                  initialPosition: _initialPosition,
+                  showTop: true,
+                  showBottom: true,
+                  bottomPadding: bottomPadding,
+                  waveCap: StrokeCap.round,
+                  middleLineColor: widget.middleLineColor,
+                  middleLineThickness: widget.middleLineThickness,
+                  totalBackDistance: _totalBackDistance,
+                  dragOffset: _dragOffset,
+                  waveThickness: widget.waveThickness,
+                  pushBack: _onPushBack,
+                  callPushback: !widget.isPaused,
+                  extendWaveform: false,
+                  updateFrequecy: 10.0,
+                  showHourInDuration: false,
+                  showDurationLabel: widget.showDurationLabel,
+                  durationStyle: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                  durationLinesColor: Colors.white30,
+                  durationTextPadding: 10,
+                  durationLinesHeight: 8,
+                  labelSpacing: 12,
+                  gradient: widget.gradient,
+                  shouldClearLabels: false,
+                  revertClearLabelCall: () {},
+                  setCurrentPositionDuration: (int ms) {},
+                  shouldCalculateScrolledPosition: false,
+                  scaleFactor: widget.scaleFactor,
+                  currentlyRecordedDuration: widget.currentDuration,
+                  isPaused: widget.isPaused,
+                  futureBarsCount: widget.futureBarsCount,
+                ),
               ),
-              durationLinesColor: Colors.white30,
-              durationTextPadding: 10,
-              durationLinesHeight: 8,
-              labelSpacing: 12,
-              gradient: widget.gradient,
-              shouldClearLabels: false,
-              revertClearLabelCall: () {},
-              setCurrentPositionDuration: (int ms) {},
-              shouldCalculateScrolledPosition: false,
-              scaleFactor: widget.scaleFactor,
-              currentlyRecordedDuration: widget.currentDuration,
-              isPaused: widget.isPaused,
-              futureBarsCount: widget.futureBarsCount,
             ),
-          ),
-        ),
           ),
           // Linea playhead: visibile solo in fullscreen (showPlayhead: true)
           if (widget.showPlayhead)
-          Positioned(
+            Positioned(
               left: widget.size.width / 2 - 1,
               top: 0,
               child: Container(

@@ -232,7 +232,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       _iosPausedDuration = Duration.zero;
       _iosPauseStartTime = null;
 
-      debugPrint('✅ Registrazione fermata${raw ? " (raw WAV)" : ""}: ${recording.name} (${duration.inMilliseconds}ms)');
+      debugPrint(
+        '✅ Registrazione fermata${raw ? " (raw WAV)" : ""}: ${recording.name} (${duration.inMilliseconds}ms)',
+      );
       return recording;
     }
 
@@ -335,7 +337,10 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   // ==== PLAYBACK OPERATIONS ====
 
   @override
-  Future<bool> startPlaying(String filePath, {Duration? initialPosition}) async {
+  Future<bool> startPlaying(
+    String filePath, {
+    Duration? initialPosition,
+  }) async {
     try {
       if (!_isInitialized) {
         final ok = await initialize();
@@ -347,14 +352,16 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       // Il motore nativo gestisce startPlaybackFromSegments automaticamente.
       if (_useNativeEngine && _iosNativeActive && _engineService != null) {
         final resolvedPath = await _resolvePath(filePath);
-        final success = await _engineService!.startPlayback(resolvedPath);
+        final success = await _engineService!.startPlayback(
+          resolvedPath,
+          position: initialPosition,
+        );
         if (success) {
-          if (initialPosition != null && initialPosition > Duration.zero) {
-            await _engineService!.seekTo(initialPosition);
-          }
           _nativePlaybackActive = true;
           _setupNativePlaybackStreams();
-          debugPrint('✅ AudioServiceCoordinator: playback nativo avviato (registrazione in pausa)');
+          debugPrint(
+            '✅ AudioServiceCoordinator: playback nativo avviato (registrazione in pausa) at $initialPosition',
+          );
         }
         return success;
       }
@@ -409,7 +416,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       _activePlayer == null ? false : await _activePlayer!.seekTo(position);
 
   Future<bool> seekToWithRecordingDuration(
-      Duration position, Duration recordingDuration) async {
+    Duration position,
+    Duration recordingDuration,
+  ) async {
     if (_activePlayer == null) return false;
     if (position.isNegative || position > recordingDuration) return false;
     return await (_activePlayer as AudioPlayerService)
@@ -417,8 +426,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   }
 
   @override
-  Future<bool> setPlaybackSpeed(double speed) async =>
-      _activePlayer == null ? false : await _activePlayer!.setPlaybackSpeed(speed);
+  Future<bool> setPlaybackSpeed(double speed) async => _activePlayer == null
+      ? false
+      : await _activePlayer!.setPlaybackSpeed(speed);
 
   @override
   Future<bool> setVolume(double volume) async =>
@@ -437,12 +447,14 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       _activePlayer == null ? false : await _activePlayer!.isPlaybackPaused();
 
   @override
-  Future<Duration> getCurrentPlaybackPosition() async =>
-      _activePlayer == null ? Duration.zero : await _activePlayer!.getCurrentPlaybackPosition();
+  Future<Duration> getCurrentPlaybackPosition() async => _activePlayer == null
+      ? Duration.zero
+      : await _activePlayer!.getCurrentPlaybackPosition();
 
   @override
-  Future<Duration> getCurrentPlaybackDuration() async =>
-      _activePlayer == null ? Duration.zero : await _activePlayer!.getCurrentPlaybackDuration();
+  Future<Duration> getCurrentPlaybackDuration() async => _activePlayer == null
+      ? Duration.zero
+      : await _activePlayer!.getCurrentPlaybackDuration();
 
   @override
   Stream<Duration> getPlaybackPositionStream() =>
@@ -491,11 +503,11 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     required Duration startTime,
     required Duration endTime,
   }) => _recordingService.trimAudioFile(
-        inputPath: inputPath,
-        outputPath: outputPath,
-        startTime: startTime,
-        endTime: endTime,
-      );
+    inputPath: inputPath,
+    outputPath: outputPath,
+    startTime: startTime,
+    endTime: endTime,
+  );
 
   @override
   Future<String?> mergeAudioFiles({
@@ -503,14 +515,16 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     required String outputPath,
     required AudioFormat outputFormat,
   }) => _recordingService.mergeAudioFiles(
-        inputPaths: inputPaths,
-        outputPath: outputPath,
-        outputFormat: outputFormat,
-      );
+    inputPaths: inputPaths,
+    outputPath: outputPath,
+    outputFormat: outputFormat,
+  );
 
   @override
-  Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100}) =>
-      _recordingService.getWaveformData(filePath, sampleCount: sampleCount);
+  Future<List<double>> getWaveformData(
+    String filePath, {
+    int sampleCount = 100,
+  }) => _recordingService.getWaveformData(filePath, sampleCount: sampleCount);
 
   // ==== DEVICE & PERMISSIONS ====
 
@@ -598,8 +612,11 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
 
     // Il motore nativo non ha uno stream di completion: poll ogni 200ms
     _nativeCompletionTimer?.cancel();
-    _nativeCompletionTimer = Timer.periodic(const Duration(milliseconds: 200), (_) async {
-      final stillPlaying = await _engineService?.checkIsPlayingNative() ?? false;
+    _nativeCompletionTimer = Timer.periodic(const Duration(milliseconds: 200), (
+      _,
+    ) async {
+      final stillPlaying =
+          await _engineService?.checkIsPlayingNative() ?? false;
       if (!stillPlaying && _nativePlaybackActive) {
         _nativeCompletionTimer?.cancel();
         _nativeCompletionTimer = null;
@@ -619,14 +636,12 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   }
 
   void _setupPlaybackStreams() {
-    _playbackPositionSubscription =
-        _playbackService.getPlaybackPositionStream().listen(
-              (pos) => _positionController?.add(pos),
-            );
-    _playbackCompletionSubscription =
-        _playbackService.getPlaybackCompletionStream().listen(
-              (_) => _completionController?.add(null),
-            );
+    _playbackPositionSubscription = _playbackService
+        .getPlaybackPositionStream()
+        .listen((pos) => _positionController?.add(pos));
+    _playbackCompletionSubscription = _playbackService
+        .getPlaybackCompletionStream()
+        .listen((_) => _completionController?.add(null));
   }
 
   void _cleanupPlaybackStreams() {
@@ -658,7 +673,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       final parts = filePath.split('/');
       if (parts.length >= 2) {
         final folder = parts[parts.length - 2];
-        if (folder.isNotEmpty && RegExp(r'^\d+$').hasMatch(folder)) return folder;
+        if (folder.isNotEmpty && RegExp(r'^\d+$').hasMatch(folder))
+          return folder;
       }
     } catch (_) {}
     return 'all_recordings';

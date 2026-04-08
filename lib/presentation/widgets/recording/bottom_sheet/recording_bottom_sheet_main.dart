@@ -20,7 +20,8 @@ class RecordingBottomSheet extends StatefulWidget {
   final bool isPaused; // Whether the recording is paused
   final VoidCallback onToggle; // Callback to start/stop recording
   final Duration elapsed; // Time elapsed since the recording started
-  final double amplitude; // Current amplitude from AudioRecorderService (0.0-1.0)
+  final double
+  amplitude; // Current amplitude from AudioRecorderService (0.0-1.0)
   final double width; // Available screen width
   final Function(String)? onTitleChanged; // Callback for title changes
   final VoidCallback? onPause; // Callback for pause action
@@ -28,22 +29,29 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onChat; // Callback for chat/transcript action
   /// Riprende la registrazione (bottone pupilla in pausa).
   final VoidCallback? onResume;
+
   /// Avvia il playback di anteprima dal seekBarIndex corrente (letto dallo stato BLoC).
   final VoidCallback? onPlayFromPosition;
+
   /// Ferma il playback di anteprima.
   final VoidCallback? onStopPreview;
+
   /// True quando il playback di anteprima è attivo.
   final bool isPlayingPreview;
   final VoidCallback? onRewind; // Callback for rewind action
   final VoidCallback? onForward; // Callback for forward action
   final Function(int seekBarIndex, List<double> waveData)? onSeekAndResume;
+
   /// Callback per aggiornare la posizione della seek bar nel BLoC.
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
+
   /// Dati waveform troncati dopo un seek-and-resume; non-null solo al primo
   /// frame dopo la ripresa da un punto precedente.
   final List<double>? truncatedWaveData;
+
   /// True quando il BLoC è in stato RecordingStarting (transizione, non collassare).
   final bool isStarting;
+
   /// seekBarIndex dallo stato BLoC — usato durante il playback preview per
   /// far scorrere la waveform in sincrono con l'audio.
   final int? blocSeekBarIndex;
@@ -97,9 +105,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   final List<double> _waveData = [];
   static const int _maxWavePoints = 1000;
   int _seekBarIndex = 0;
+
   /// Incrementato ad ogni seek-and-resume per segnalare a RecordingWaveform
   /// di riposizionare la waveform sulla bacchetta gialla.
   int _seekVersion = 0;
+
   /// Numero di barre future ancora da sovrascrivere (erosione progressiva).
   /// > 0 dopo un seek-and-resume finché tutte le barre future non sono state
   /// rimpiazzate dalla nuova registrazione, una per ogni tick da 100ms.
@@ -142,24 +152,24 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
-  /// Avvia il timer locale che aggiunge barre alla waveform ogni 100ms.
-  /// Usa _currentAmplitude (aggiornata dai props) con un floor minimo per
-  /// garantire barre visibili anche durante il silenzio.
+  /// Avvia il timer locale che sincronizza la waveform al tempo reale.
+  /// Ad ogni tick calcola quante barre dovrebbero esserci basandosi su
+  /// widget.elapsed e recupera eventuali tick persi (jank).
   void _startWaveformTimer() {
     _waveformTimer?.cancel();
     _currentAmplitude = 0.0;
-    print('⏱️ [DART] _startWaveformTimer: START — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}');
+    print(
+      '⏱️ [DART] _startWaveformTimer: START — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}',
+    );
     _waveformTimer = Timer.periodic(_waveformTickInterval, (_) {
-      if (!mounted || !widget.isRecording) return;
-      final amplitude = _currentAmplitude > _amplitudeFloor
-          ? _currentAmplitude
-          : _amplitudeFloor;
-      _addWavePoint(amplitude, DateTime.now().millisecondsSinceEpoch);
+      _syncWaveformToElapsedTime();
     });
   }
 
   void _stopWaveformTimer() {
-    print('⏱️ [DART] _stopWaveformTimer: STOP — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}');
+    print(
+      '⏱️ [DART] _stopWaveformTimer: STOP — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}',
+    );
     _waveformTimer?.cancel();
     _waveformTimer = null;
   }
@@ -177,8 +187,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
     // Detecta seek-and-resume: truncatedWaveData passa da null → non-null
     // (il RecordingStarting intermedio mantiene null, RecordingInProgress post-seek ha i dati)
-    final isSeekResume = widget.truncatedWaveData != null &&
-        oldWidget.truncatedWaveData == null;
+    final isSeekResume =
+        widget.truncatedWaveData != null && oldWidget.truncatedWaveData == null;
 
     // Pre-imposta futureBarsCount appena inizia la transizione (isStarting true),
     // PRIMA che truncatedWaveData arrivi. Questo impedisce al painter di considerare
@@ -230,7 +240,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
 
     // Clear waveform data when starting a NEW recording from scratch (non seek-and-resume)
-    if (widget.isRecording && !oldWidget.isRecording && !oldWidget.isPaused && !isSeekResume) {
+    if (widget.isRecording &&
+        !oldWidget.isRecording &&
+        !oldWidget.isPaused &&
+        !isSeekResume) {
       setState(() {
         _waveData.clear();
         _seekBarIndex = 0;
@@ -239,9 +252,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
 
     // Quando si entra in pausa: le barre future rimanenti diventano barre normali.
+    // Esegue una sincronizzazione finale per colmare eventuali tick mancanti
+    // tra l'ultimo timer tick e la durata esatta finale restituita dal nativo.
     // Reset seekBarIndex sull'ultima barra registrata + auto-espandi a fullscreen.
     if (widget.isPaused && !oldWidget.isPaused) {
+      final finalExpectedBars = (widget.elapsed.inMilliseconds / 100)
+          .floor()
+          .clamp(0, _maxWavePoints);
+      final currentBars = _waveData.length;
+      final barsToAdd = finalExpectedBars - currentBars;
+
       setState(() {
+        if (barsToAdd > 0) {
+          for (int i = 0; i < barsToAdd; i++) {
+            _waveData.add(
+              _amplitudeFloor,
+            ); // Riempe i tick finali mancanti con silenzio base
+          }
+        }
+
         _futureBarsCount = 0;
         _seekBarIndex = _waveData.isEmpty ? 0 : _waveData.length - 1;
         _sheetOffset = 1.0;
@@ -280,42 +309,61 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
-  /// Add waveform data point.
-  /// Se ci sono barre future (_futureBarsCount > 0), sovrascrive in-place
-  /// la prima barra futura invece di appendere — erosione progressiva.
-  void _addWavePoint(double amplitude, int receiveTimestamp) {
-    final setStateTimestamp = DateTime.now().millisecondsSinceEpoch;
-    final delay = setStateTimestamp - receiveTimestamp;
+  /// Sincronizza la waveform al tempo reale della registrazione.
+  /// Calcola quante barre dovrebbero esserci in base a widget.elapsed
+  /// e aggiunge/recupera eventuali barre perse per jank.
+  void _syncWaveformToElapsedTime() {
+    if (!mounted || !widget.isRecording) return;
+
+    final elapsedMs = widget.elapsed.inMilliseconds;
+    final expectedBars = (elapsedMs / 100).floor().clamp(0, _maxWavePoints);
+    final amplitude = _currentAmplitude > _amplitudeFloor
+        ? _currentAmplitude
+        : _amplitudeFloor;
 
     setState(() {
-      if (_futureBarsCount > 0) {
-        // Erosione progressiva: sovrascrive la prima barra futura con la nuova ampiezza.
-        // La lunghezza di _waveData resta costante finché tutte le future sono consumate.
-        final insertAt = _waveData.length - _futureBarsCount;
-        _waveData[insertAt] = amplitude;
-        _futureBarsCount--;
-      } else {
-        _waveData.add(amplitude);
-        if (_waveData.length > _maxWavePoints) {
-          _waveData.removeAt(0);
+      final currentBars = _waveData.length;
+      final barsToAdd = expectedBars - currentBars;
+
+      if (barsToAdd > 0) {
+        // Recupera barre perse: ogni barra mancante usa l'ampiezza corrente
+        for (int i = 0; i < barsToAdd; i++) {
+          if (_futureBarsCount > 0) {
+            // Erosione progressiva: sovrascrive la prima barra futura
+            final insertAt = _waveData.length - _futureBarsCount;
+            _waveData[insertAt] = amplitude;
+            _futureBarsCount--;
+          } else {
+            _waveData.add(amplitude);
+            if (_waveData.length > _maxWavePoints) {
+              _waveData.removeAt(0);
+            }
+          }
+        }
+      } else if (barsToAdd == 0 && _waveData.isNotEmpty) {
+        // Aggiorna solo l'ultima barra con l'ampiezza più recente
+        if (_futureBarsCount > 0) {
+          final insertAt = _waveData.length - _futureBarsCount;
+          _waveData[insertAt] = amplitude;
+          _futureBarsCount--;
+        } else {
+          _waveData[_waveData.length - 1] = amplitude;
         }
       }
 
-      // Durante la registrazione: seekBarIndex = ultima barra registrata (esclude future).
+      // seekBarIndex = ultima barra registrata (esclude future)
       if (!widget.isPaused) {
         final recordedCount = _waveData.length - _futureBarsCount;
         _seekBarIndex = recordedCount > 0 ? recordedCount - 1 : 0;
       }
 
       if (_waveData.length % 5 == 0) {
-        final afterSetStateTimestamp = DateTime.now().millisecondsSinceEpoch;
-        final setStateDelay = afterSetStateTimestamp - setStateTimestamp;
-        print('⏱️ [$afterSetStateTimestamp] _addWavePoint: length=${_waveData.length}, future=$_futureBarsCount, amplitude=${amplitude.toStringAsFixed(3)}, delay=${delay}ms, setState=${setStateDelay}ms');
+        print(
+          '⏱️ [${DateTime.now().millisecondsSinceEpoch}] _syncWaveform: expected=$expectedBars, actual=${_waveData.length}, future=$_futureBarsCount, amp=${amplitude.toStringAsFixed(3)}',
+        );
       }
     });
   }
-
-
 
   @override
   void dispose() {
@@ -324,7 +372,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     _sheetAnimationController.dispose();
     super.dispose();
   }
-
 
   // Called when drag starts
   void _onVerticalDragStart(DragStartDetails details) {
@@ -358,10 +405,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     maxHeight = screenHeight * 0.9;
 
     // Sheet espandibile durante registrazione, pausa o transizione seek-and-resume
-    final bool canExpand = widget.isRecording || widget.isPaused || widget.isStarting;
+    final bool canExpand =
+        widget.isRecording || widget.isPaused || widget.isStarting;
 
     final double currentHeight = canExpand
-        ? minHeight + (maxHeight - minHeight) * _sheetOffset + MediaQuery.of(context).padding.bottom
+        ? minHeight +
+              (maxHeight - minHeight) * _sheetOffset +
+              MediaQuery.of(context).padding.bottom
         : 180 + MediaQuery.of(context).padding.bottom;
 
     return Positioned(
@@ -375,9 +425,15 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         child: GestureDetector(
           // In pausa il drag è disabilitato: la sheet resta in fullscreen
           // e non può essere compattata manualmente.
-          onVerticalDragStart: (canExpand && !widget.isPaused) ? _onVerticalDragStart : null,
-          onVerticalDragUpdate: (canExpand && !widget.isPaused) ? _onVerticalDragUpdate : null,
-          onVerticalDragEnd: (canExpand && !widget.isPaused) ? _onVerticalDragEnd : null,
+          onVerticalDragStart: (canExpand && !widget.isPaused)
+              ? _onVerticalDragStart
+              : null,
+          onVerticalDragUpdate: (canExpand && !widget.isPaused)
+              ? _onVerticalDragUpdate
+              : null,
+          onVerticalDragEnd: (canExpand && !widget.isPaused)
+              ? _onVerticalDragEnd
+              : null,
           child: _buildContainer(),
         ),
       ),
@@ -402,19 +458,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF8E2DE2),
-              Color(0xFFDA22FF),
-              Color(0xFFFF4E50),
-            ],
+            colors: [Color(0xFF8E2DE2), Color(0xFFDA22FF), Color(0xFFFF4E50)],
           ),
         ),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 400),
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
           child: _sheetOffset > 0.7
               ? RecordingFullscreenView(
                   key: const ValueKey('fullscreen'),
@@ -439,7 +489,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                     if (isAtEnd || widget.onSeekAndResume == null) {
                       widget.onResume?.call();
                     } else {
-                      widget.onSeekAndResume!(_seekBarIndex, List<double>.from(_waveData));
+                      widget.onSeekAndResume!(
+                        _seekBarIndex,
+                        List<double>.from(_waveData),
+                      );
                     }
                   },
                   // Play nei controlli: avvia/ferma playback dal playhead
@@ -458,7 +511,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                     widget.onSeekBarIndexChanged?.call(index);
                   },
                   seekBarIndex: _seekBarIndex,
-                  blocSeekBarIndex: widget.isPlayingPreview ? widget.blocSeekBarIndex : null,
+                  blocSeekBarIndex: widget.isPlayingPreview
+                      ? widget.blocSeekBarIndex
+                      : null,
                 )
               : RecordingCompactView(
                   key: const ValueKey('compact'),

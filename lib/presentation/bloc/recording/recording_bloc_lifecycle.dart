@@ -14,7 +14,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   // ==== START ====
 
   Future<void> _onStartRecording(
-      StartRecording event, Emitter<RecordingState> emit) async {
+    StartRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     emit(const RecordingStarting());
 
     final result = await _startRecordingUseCase.execute(
@@ -25,23 +27,29 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     );
 
     result.fold(
-      (failure) => emit(RecordingError(failure.message,
-          errorType: RecordingErrorType.recording)),
+      (failure) => emit(
+        RecordingError(
+          failure.message,
+          errorType: RecordingErrorType.recording,
+        ),
+      ),
       (data) {
         _startAmplitudeUpdates();
         _startDurationUpdates();
-        emit(RecordingInProgress(
-          filePath: data.filePath,
-          folderId: data.folderId,
-          folderName: event.folderName,
-          format: data.format,
-          sampleRate: data.sampleRate,
-          bitRate: data.bitRate,
-          duration: Duration.zero,
-          amplitude: 0.0,
-          startTime: data.startTime,
-          title: data.title,
-        ));
+        emit(
+          RecordingInProgress(
+            filePath: data.filePath,
+            folderId: data.folderId,
+            folderName: event.folderName,
+            format: data.format,
+            sampleRate: data.sampleRate,
+            bitRate: data.bitRate,
+            duration: Duration.zero,
+            amplitude: 0.0,
+            startTime: data.startTime,
+            title: data.title,
+          ),
+        );
         // Risolve il titolo geolocalizzato in background; la registrazione
         // è già partita e l'UI è aggiornata con il titolo temporaneo.
         _refreshTitleInBackground();
@@ -52,10 +60,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   // ==== STOP ====
 
   Future<void> _onStopRecording(
-      StopRecording event, Emitter<RecordingState> emit) async {
+    StopRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingInProgress && state is! RecordingPaused) {
-      emit(const RecordingError('No active recording to stop',
-          errorType: RecordingErrorType.state));
+      emit(
+        const RecordingError(
+          'No active recording to stop',
+          errorType: RecordingErrorType.state,
+        ),
+      );
       return;
     }
 
@@ -85,8 +99,12 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     );
 
     await result.fold(
-      (failure) async => emit(RecordingError(failure.message,
-          errorType: RecordingErrorType.recording)),
+      (failure) async => emit(
+        RecordingError(
+          failure.message,
+          errorType: RecordingErrorType.recording,
+        ),
+      ),
       (recording) async {
         var finalRecording = recording;
 
@@ -110,7 +128,10 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
             // 3. Converti WAV combinato → formato finale (singola codifica)
             final formatExt = recording.format.fileExtension.substring(1);
-            final finalPath = recording.filePath.replaceAll('.wav', '.$formatExt');
+            final finalPath = recording.filePath.replaceAll(
+              '.wav',
+              '.$formatExt',
+            );
             final convertResult = await _audioService.convertAudioFile(
               inputPath: combinedWavPath,
               outputPath: finalPath,
@@ -118,15 +139,24 @@ extension _RecordingBlocLifecycle on RecordingBloc {
             );
 
             // 4. Rimuovi il WAV combinato
-            try { await File(combinedWavPath).delete(); } catch (_) {}
+            try {
+              await File(combinedWavPath).delete();
+            } catch (_) {}
 
             if (convertResult != null) {
               final finalFile = File(finalPath);
-              final fileSize = await finalFile.exists() ? await finalFile.length() : 0;
-              finalRecording = recording.copyWith(filePath: finalPath, fileSize: fileSize);
+              final fileSize = await finalFile.exists()
+                  ? await finalFile.length()
+                  : 0;
+              finalRecording = recording.copyWith(
+                filePath: finalPath,
+                fileSize: fileSize,
+              );
             }
           } catch (e) {
-            debugPrint('⚠️ Concatenazione/conversione seek-and-resume fallita: $e');
+            debugPrint(
+              '⚠️ Concatenazione/conversione seek-and-resume fallita: $e',
+            );
           }
         }
 
@@ -139,7 +169,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   // ==== PAUSE ====
 
   Future<void> _onPauseRecording(
-      PauseRecording event, Emitter<RecordingState> emit) async {
+    PauseRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingInProgress) return;
 
     _stopAmplitudeUpdates();
@@ -149,24 +181,28 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final result = await _pauseRecordingUseCase.executePause();
     result.fold(
       (failure) => print('❌ Failed to pause: ${failure.message}'),
-      (duration) => emit(RecordingPaused(
-        filePath: s.filePath,
-        folderId: s.folderId,
-        folderName: s.folderName,
-        title: s.title,
-        format: s.format,
-        sampleRate: s.sampleRate,
-        bitRate: s.bitRate,
-        duration: duration,
-        startTime: s.startTime,
-      )),
+      (duration) => emit(
+        RecordingPaused(
+          filePath: s.filePath,
+          folderId: s.folderId,
+          folderName: s.folderName,
+          title: s.title,
+          format: s.format,
+          sampleRate: s.sampleRate,
+          bitRate: s.bitRate,
+          duration: duration,
+          startTime: s.startTime,
+        ),
+      ),
     );
   }
 
   // ==== RESUME ====
 
   Future<void> _onResumeRecording(
-      ResumeRecording event, Emitter<RecordingState> emit) async {
+    ResumeRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingPaused) return;
 
     final s = state as RecordingPaused;
@@ -181,10 +217,11 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     }
 
     final result = await _pauseRecordingUseCase.executeResume();
-    result.fold(
-      (failure) => print('❌ Failed to resume: ${failure.message}'),
-      (duration) {
-        emit(RecordingInProgress(
+    result.fold((failure) => print('❌ Failed to resume: ${failure.message}'), (
+      duration,
+    ) {
+      emit(
+        RecordingInProgress(
           filePath: s.filePath,
           folderId: s.folderId,
           folderName: s.folderName,
@@ -195,17 +232,19 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           amplitude: 0.0,
           startTime: s.startTime,
           title: s.title,
-        ));
-        _startAmplitudeUpdates();
-        _startDurationUpdates();
-      },
-    );
+        ),
+      );
+      _startAmplitudeUpdates();
+      _startDurationUpdates();
+    });
   }
 
   // ==== SEEK-AND-RESUME ====
 
   Future<void> _onSeekAndResumeRecording(
-      SeekAndResumeRecording event, Emitter<RecordingState> emit) async {
+    SeekAndResumeRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingPaused) return;
 
     final s = state as RecordingPaused;
@@ -223,24 +262,30 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     );
 
     result.fold(
-      (failure) => emit(RecordingError(failure.message,
-          errorType: RecordingErrorType.recording)),
+      (failure) => emit(
+        RecordingError(
+          failure.message,
+          errorType: RecordingErrorType.recording,
+        ),
+      ),
       (data) {
         final seekTimeMs = event.seekBarIndex * 100;
-        emit(RecordingInProgress(
-          filePath: s.filePath,
-          folderId: s.folderId,
-          folderName: s.folderName,
-          format: s.format,
-          sampleRate: s.sampleRate,
-          bitRate: s.bitRate,
-          duration: Duration(milliseconds: seekTimeMs),
-          amplitude: 0.0,
-          startTime: s.startTime,
-          title: s.title,
-          seekBasePath: data.seekBasePath,
-          truncatedWaveData: data.truncatedWaveData,
-        ));
+        emit(
+          RecordingInProgress(
+            filePath: s.filePath,
+            folderId: s.folderId,
+            folderName: s.folderName,
+            format: s.format,
+            sampleRate: s.sampleRate,
+            bitRate: s.bitRate,
+            duration: Duration(milliseconds: seekTimeMs),
+            amplitude: 0.0,
+            startTime: s.startTime,
+            title: s.title,
+            seekBasePath: data.seekBasePath,
+            truncatedWaveData: data.truncatedWaveData,
+          ),
+        );
         _startAmplitudeUpdates();
         _startDurationUpdates();
       },
@@ -250,7 +295,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   // ==== CANCEL ====
 
   Future<void> _onCancelRecording(
-      CancelRecording event, Emitter<RecordingState> emit) async {
+    CancelRecording event,
+    Emitter<RecordingState> emit,
+  ) async {
     try {
       _stopAmplitudeUpdates();
       _stopDurationUpdates();
@@ -269,18 +316,24 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   // ==== SEEK BAR INDEX ====
 
   Future<void> _onUpdateSeekBarIndex(
-      UpdateSeekBarIndex event, Emitter<RecordingState> emit) async {
+    UpdateSeekBarIndex event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
     if (s.seekBarIndex == event.seekBarIndex) return;
-    debugPrint('📍 SeekBar → bar ${event.seekBarIndex} (${event.seekBarIndex * 100}ms)');
+    debugPrint(
+      '📍 SeekBar → bar ${event.seekBarIndex} (${event.seekBarIndex * 100}ms)',
+    );
     emit(s.copyWith(seekBarIndex: event.seekBarIndex));
   }
 
   // ==== PLAYBACK PREVIEW ====
 
   Future<void> _onPlayRecordingPreview(
-      PlayRecordingPreview event, Emitter<RecordingState> emit) async {
+    PlayRecordingPreview event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
 
@@ -296,7 +349,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       initialPosition: initialPosition,
     );
     if (!started) {
-      debugPrint('❌ PlayRecordingPreview: impossibile avviare il playback di ${s.filePath}');
+      debugPrint(
+        '❌ PlayRecordingPreview: impossibile avviare il playback di ${s.filePath}',
+      );
       return;
     }
 
@@ -304,27 +359,31 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
     // Aggiorna seekBarIndex durante il playback preview
     _previewPositionSubscription?.cancel();
-    _previewPositionSubscription =
-        _audioService.getPlaybackPositionStream().listen((position) {
-      final newIndex = position.inMilliseconds ~/ 100;
-      if (state is RecordingPaused) {
-        final current = (state as RecordingPaused).seekBarIndex;
-        if (newIndex != current) {
-          add(UpdateSeekBarIndex(seekBarIndex: newIndex));
-        }
-      }
-    });
+    _previewPositionSubscription = _audioService
+        .getPlaybackPositionStream()
+        .listen((position) {
+          final newIndex = position.inMilliseconds ~/ 100;
+          if (state is RecordingPaused) {
+            final current = (state as RecordingPaused).seekBarIndex;
+            if (newIndex != current) {
+              add(UpdateSeekBarIndex(seekBarIndex: newIndex));
+            }
+          }
+        });
 
     // Auto-stop quando il playback finisce naturalmente
     _previewCompletionSubscription?.cancel();
-    _previewCompletionSubscription =
-        _audioService.getPlaybackCompletionStream().listen(
-      (_) => add(const StopRecordingPreview(isNaturalCompletion: true)),
-    );
+    _previewCompletionSubscription = _audioService
+        .getPlaybackCompletionStream()
+        .listen(
+          (_) => add(const StopRecordingPreview(isNaturalCompletion: true)),
+        );
   }
 
   Future<void> _onStopRecordingPreview(
-      StopRecordingPreview event, Emitter<RecordingState> emit) async {
+    StopRecordingPreview event,
+    Emitter<RecordingState> emit,
+  ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
 
@@ -335,11 +394,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     await _audioService.stopPlaying();
 
     // Completamento naturale → cursore all'ULTIMA barra della waveform.
-    // Le barre sono 0-indexed: N barre hanno indici 0..N-1.
-    // duration/100 dà N (il conteggio), quindi l'ultimo indice è N-1.
-    // Esempio: 9300ms → 93 barre → lastBar = 92.
+    // Nessun -1, altrimenti si fissa a 1 tick di distanza dalla vera fine visiva.
     final newSeekBarIndex = event.isNaturalCompletion
-        ? (s.duration.inMilliseconds ~/ 100 - 1).clamp(0, 999999)
+        ? (s.duration.inMilliseconds ~/ 100).clamp(0, 999999)
         : s.seekBarIndex;
 
     emit(s.copyWith(isPlayingPreview: false, seekBarIndex: newSeekBarIndex));
