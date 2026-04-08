@@ -30,5 +30,9 @@
 	<string>NSApplication</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>WavNote needs microphone access to record voice memos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WavNote uses your location to name recordings with the place where they were recorded.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>WavNote uses your location to name recordings with the place where they were recorded.</string>
 </dict>
 </plist>
