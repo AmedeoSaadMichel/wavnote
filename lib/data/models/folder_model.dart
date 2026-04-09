@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 
 enum FolderType { defaultFolder, customFolder }
@@ -6,8 +5,8 @@ enum FolderType { defaultFolder, customFolder }
 class VoiceMemoFolder {
   final String id;
   final String title;
-  final IconData icon;
-  final Color color;
+  final int iconCodePoint;
+  final int colorValue;
   final int count;
   final FolderType type;
   final bool isDeletable;
@@ -15,8 +14,8 @@ class VoiceMemoFolder {
   VoiceMemoFolder({
     required this.id,
     required this.title,
-    required this.icon,
-    required this.color,
+    required this.iconCodePoint,
+    required this.colorValue,
     this.count = 0,
     required this.type,
     this.isDeletable = false,
@@ -25,8 +24,8 @@ class VoiceMemoFolder {
   VoiceMemoFolder copyWith({
     String? id,
     String? title,
-    IconData? icon,
-    Color? color,
+    int? iconCodePoint,
+    int? colorValue,
     int? count,
     FolderType? type,
     bool? isDeletable,
@@ -34,8 +33,8 @@ class VoiceMemoFolder {
     return VoiceMemoFolder(
       id: id ?? this.id,
       title: title ?? this.title,
-      icon: icon ?? this.icon,
-      color: color ?? this.color,
+      iconCodePoint: iconCodePoint ?? this.iconCodePoint,
+      colorValue: colorValue ?? this.colorValue,
       count: count ?? this.count,
       type: type ?? this.type,
       isDeletable: isDeletable ?? this.isDeletable,
@@ -47,8 +46,8 @@ class VoiceMemoFolder {
     return {
       'id': id,
       'title': title,
-      'icon': icon.codePoint,
-      'color': color.value,
+      'icon': iconCodePoint,
+      'color': colorValue,
       'count': count,
       'type': type.index,
       'isDeletable': isDeletable,
@@ -60,8 +59,8 @@ class VoiceMemoFolder {
     return VoiceMemoFolder(
       id: json['id'],
       title: json['title'],
-      icon: AppConstants.getIconFromCodePoint(json['icon']),
-      color: Color(json['color']),
+      iconCodePoint: json['icon'],
+      colorValue: json['color'],
       count: json['count'],
       type: FolderType.values[json['type']],
       isDeletable: json['isDeletable'],

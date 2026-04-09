@@ -1,7 +1,5 @@
+// File: services/storage/database_service.dart
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
-
 import '../../data/models/folder_model.dart';
 
 class DatabaseService {
@@ -10,31 +8,27 @@ class DatabaseService {
       VoiceMemoFolder(
         id: 'all_recordings',
         title: 'All Recordings',
-        icon: Icons.graphic_eq,
-        color: Colors.cyan,
+        iconCodePoint: Icons.graphic_eq.codePoint,
+        colorValue: Colors.cyan.value,
         type: FolderType.defaultFolder,
         isDeletable: false,
       ),
       VoiceMemoFolder(
         id: 'favourites',
         title: 'Favourites',
-        icon: Icons.favorite,
-        color: Colors.red,
+        iconCodePoint: Icons.favorite.codePoint,
+        colorValue: Colors.red.value,
         type: FolderType.defaultFolder,
         isDeletable: false,
       ),
       VoiceMemoFolder(
         id: 'recently_deleted',
         title: 'Recently Deleted',
-        icon: FontAwesomeIcons.skull,
-        color: Colors.yellow,
+        iconCodePoint: Icons.delete.codePoint,
+        colorValue: Colors.yellow.value,
         type: FolderType.defaultFolder,
         isDeletable: false,
       ),
     ];
   }
-
-
-
-
 }

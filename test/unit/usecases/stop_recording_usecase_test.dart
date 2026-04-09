@@ -16,7 +16,7 @@ import 'package:dartz/dartz.dart';
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
 import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
-import 'package:wavnote/services/location/geolocation_service.dart';
+import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/core/errors/failures.dart';
 
@@ -24,7 +24,7 @@ import '../../helpers/test_helpers.dart';
 
 class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
-class MockGeolocationService extends Mock implements GeolocationService {}
+class MockLocationRepository extends Mock implements ILocationRepository {}
 
 void main() {
   setUpAll(() async {
@@ -35,13 +35,13 @@ void main() {
     late StopRecordingUseCase useCase;
     late MockAudioServiceRepository mockAudioService;
     late MockRecordingRepository mockRecordingRepository;
-    late MockGeolocationService mockGeolocationService;
+    late MockLocationRepository mockLocationRepository;
     late RecordingEntity testRecording;
 
     setUp(() {
       mockAudioService = MockAudioServiceRepository();
       mockRecordingRepository = MockRecordingRepository();
-      mockGeolocationService = MockGeolocationService();
+      mockLocationRepository = MockLocationRepository();
 
       testRecording = TestHelpers.createTestRecording(
         id: 'test_recording_id',
@@ -55,7 +55,7 @@ void main() {
       when(() => mockAudioService.isRecording()).thenAnswer((_) async => true);
       when(() => mockAudioService.isRecordingPaused()).thenAnswer((_) async => false);
       when(() => mockAudioService.stopRecording()).thenAnswer((_) async => testRecording);
-      when(() => mockGeolocationService.getRecordingLocationName())
+      when(() => mockLocationRepository.getRecordingLocationName())
           .thenAnswer((_) async => 'Via Cerlini 19, Milano');
       when(() => mockRecordingRepository.createRecording(any()))
           .thenAnswer((_) async => testRecording);
@@ -66,7 +66,7 @@ void main() {
       useCase = StopRecordingUseCase(
         audioService: mockAudioService,
         recordingRepository: mockRecordingRepository,
-        geolocationService: mockGeolocationService,
+        locationRepository: mockLocationRepository,
       );
     });
 
@@ -80,7 +80,7 @@ void main() {
 
         verify(() => mockAudioService.isRecording()).called(1);
         verify(() => mockAudioService.stopRecording()).called(1);
-        verify(() => mockGeolocationService.getRecordingLocationName()).called(1);
+        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
         verify(() => mockRecordingRepository.createRecording(any())).called(1);
       });
 
@@ -136,7 +136,7 @@ void main() {
       });
 
       test('falls back to timestamp name when geolocation fails', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenThrow(Exception('Location unavailable'));
 
         final result = await useCase.execute();

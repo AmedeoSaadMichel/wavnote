@@ -6,17 +6,17 @@ import 'package:flutter/services.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/errors/failures.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
-import '../../../services/audio/audio_trimmer_service.dart';
+import '../../../domain/repositories/i_audio_trimmer_repository.dart';
 
 class SeekAndResumeUseCase {
   final IAudioServiceRepository _audioService;
-  final AudioTrimmerService _trimmerService;
+  final IAudioTrimmerRepository _trimmerService;
 
   SeekAndResumeUseCase({
     required IAudioServiceRepository audioService,
-    required AudioTrimmerService trimmerService,
-  })  : _audioService = audioService,
-        _trimmerService = trimmerService;
+    required IAudioTrimmerRepository trimmerService,
+  }) : _audioService = audioService,
+       _trimmerService = trimmerService;
 
   Future<Either<Failure, SeekAndResumeResult>> execute({
     required String filePath,
@@ -33,12 +33,18 @@ class SeekAndResumeUseCase {
       if (seekBarIndex >= lastBarIndex) {
         final resumed = await _audioService.resumeRecording();
         if (!resumed) {
-          return Left(AudioRecordingFailure.startFailed('Impossibile riprendere la registrazione'));
+          return Left(
+            AudioRecordingFailure.startFailed(
+              'Impossibile riprendere la registrazione',
+            ),
+          );
         }
-        return Right(SeekAndResumeResult(
-          seekBasePath: null,
-          truncatedWaveData: List<double>.from(waveData),
-        ));
+        return Right(
+          SeekAndResumeResult(
+            seekBasePath: null,
+            truncatedWaveData: List<double>.from(waveData),
+          ),
+        );
       }
 
       final trimDurationMs = seekBarIndex * 50;
@@ -46,7 +52,11 @@ class SeekAndResumeUseCase {
       // 1. Ferma il recorder in raw mode → restituisce WAV grezzo (Approccio 1)
       final entity = await _audioService.stopRecording(raw: true);
       if (entity == null) {
-        return Left(AudioRecordingFailure.stopFailed('Impossibile fare flush della registrazione per il trim'));
+        return Left(
+          AudioRecordingFailure.stopFailed(
+            'Impossibile fare flush della registrazione per il trim',
+          ),
+        );
       }
 
       // entity.filePath è il path WAV interno
@@ -58,11 +68,14 @@ class SeekAndResumeUseCase {
         await _trimmerService.trimAudio(
           filePath: absoluteFilePath,
           durationMs: trimDurationMs,
-          format: 'wav', // Approccio 1: trim su WAV è sempre lossless (Passthrough)
+          format:
+              'wav', // Approccio 1: trim su WAV è sempre lossless (Passthrough)
           outputPath: basePath,
         );
       } on PlatformException catch (e) {
-        return Left(AudioRecordingFailure.startFailed('Trim fallito: ${e.message}'));
+        return Left(
+          AudioRecordingFailure.startFailed('Trim fallito: ${e.message}'),
+        );
       }
 
       // 3. Tronca waveData al punto di seek
@@ -76,21 +89,27 @@ class SeekAndResumeUseCase {
         bitRate: bitRate,
       );
       if (!started) {
-        return Left(AudioRecordingFailure.startFailed(
-          'Impossibile riavviare la registrazione dopo il trim',
-        ));
+        return Left(
+          AudioRecordingFailure.startFailed(
+            'Impossibile riavviare la registrazione dopo il trim',
+          ),
+        );
       }
 
-      return Right(SeekAndResumeResult(
-        seekBasePath: basePath,
-        truncatedWaveData: truncated,
-      ));
+      return Right(
+        SeekAndResumeResult(
+          seekBasePath: basePath,
+          truncatedWaveData: truncated,
+        ),
+      );
     } catch (e, st) {
       debugPrint('❌ SeekAndResumeUseCase: $e\n$st');
-      return Left(UnexpectedFailure(
-        message: 'Errore inatteso durante seek-and-resume: $e',
-        code: 'SEEK_RESUME_UNEXPECTED',
-      ));
+      return Left(
+        UnexpectedFailure(
+          message: 'Errore inatteso durante seek-and-resume: $e',
+          code: 'SEEK_RESUME_UNEXPECTED',
+        ),
+      );
     }
   }
 

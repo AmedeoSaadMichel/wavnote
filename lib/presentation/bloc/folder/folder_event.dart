@@ -27,20 +27,21 @@ class RefreshFolders extends FolderEvent {
 /// Event to create a new custom folder
 class CreateFolder extends FolderEvent {
   final String name;
-  final Color color;
-  final IconData icon;
+  final int iconCodePoint;
+  final int colorValue;
 
   const CreateFolder({
     required this.name,
-    required this.color,
-    required this.icon,
+    required this.iconCodePoint,
+    required this.colorValue,
   });
 
   @override
-  List<Object> get props => [name, color, icon];
+  List<Object> get props => [name, iconCodePoint, colorValue];
 
   @override
-  String toString() => 'CreateFolder { name: $name, color: $color, icon: $icon }';
+  String toString() =>
+      'CreateFolder { name: $name, iconCodePoint: $iconCodePoint, colorValue: $colorValue }';
 }
 
 /// Event to delete a custom folder
@@ -61,16 +62,14 @@ class UpdateFolderCount extends FolderEvent {
   final String folderId;
   final int newCount;
 
-  const UpdateFolderCount({
-    required this.folderId,
-    required this.newCount,
-  });
+  const UpdateFolderCount({required this.folderId, required this.newCount});
 
   @override
   List<Object> get props => [folderId, newCount];
 
   @override
-  String toString() => 'UpdateFolderCount { folderId: $folderId, newCount: $newCount }';
+  String toString() =>
+      'UpdateFolderCount { folderId: $folderId, newCount: $newCount }';
 }
 
 /// Event to rename a custom folder
@@ -78,16 +77,14 @@ class RenameFolderEvent extends FolderEvent {
   final String folderId;
   final String newName;
 
-  const RenameFolderEvent({
-    required this.folderId,
-    required this.newName,
-  });
+  const RenameFolderEvent({required this.folderId, required this.newName});
 
   @override
   List<Object> get props => [folderId, newName];
 
   @override
-  String toString() => 'RenameFolderEvent { folderId: $folderId, newName: $newName }';
+  String toString() =>
+      'RenameFolderEvent { folderId: $folderId, newName: $newName }';
 }
 
 /// Event to sort folders by different criteria
@@ -159,12 +156,7 @@ class DeleteSelectedFolders extends FolderEvent {
 }
 
 /// Enum for folder sorting options
-enum FolderSortType {
-  name,
-  createdDate,
-  recordingCount,
-  lastModified,
-}
+enum FolderSortType { name, createdDate, recordingCount, lastModified }
 
 extension FolderSortTypeExtension on FolderSortType {
   String get displayName {

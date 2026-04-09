@@ -1,5 +1,5 @@
 // File: presentation/bloc/settings/settings_bloc.dart
-// 
+//
 // Settings BLoC - Presentation Layer
 // =================================
 //
@@ -52,10 +52,13 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 // Core imports
-import '../../../core/enums/audio_format.dart';    // Audio format definitions
+import '../../../core/enums/audio_format.dart';
 
-// Data layer imports
-import '../../../data/database/database_helper.dart'; // Database operations
+// Config imports
+import '../../../config/dependency_injection.dart';
+
+// Domain imports
+import '../../../domain/repositories/i_settings_repository.dart';
 
 // BLoC parts
 part 'settings_event.dart'; // Settings events (user actions)
@@ -78,10 +81,10 @@ part 'settings_state.dart'; // Settings states (app states)
 /// ```dart
 /// // Load settings
 /// context.read<SettingsBloc>().add(const LoadSettings());
-/// 
+///
 /// // Update audio format
 /// context.read<SettingsBloc>().add(UpdateAudioFormat(AudioFormat.m4a));
-/// 
+///
 /// // Listen to settings changes
 /// BlocBuilder<SettingsBloc, SettingsState>(
 ///   builder: (context, state) {
@@ -93,8 +96,11 @@ part 'settings_state.dart'; // Settings states (app states)
 /// );
 /// ```
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
+  final ISettingsRepository _settingsRepository;
 
-  SettingsBloc() : super(const SettingsInitial()) {
+  SettingsBloc({required ISettingsRepository settingsRepository})
+    : _settingsRepository = settingsRepository,
+      super(const SettingsInitial()) {
     on<LoadSettings>(_onLoadSettings);
     on<UpdateAudioFormat>(_onUpdateAudioFormat);
     on<UpdateAudioQuality>(_onUpdateAudioQuality);
@@ -112,9 +118,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Load settings from storage
   Future<void> _onLoadSettings(
-      LoadSettings event,
-      Emitter<SettingsState> emit,
-      ) async {
+    LoadSettings event,
+    Emitter<SettingsState> emit,
+  ) async {
     try {
       emit(const SettingsLoading());
 
@@ -123,7 +129,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: settings));
       print('✅ Settings loaded successfully');
-
     } catch (e) {
       print('❌ Error loading settings: $e');
       emit(SettingsError('Failed to load settings: ${e.toString()}'));
@@ -133,35 +138,43 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   /// Load settings from database
   Future<AppSettings> _loadSettingsFromDatabase() async {
     try {
-      final db = await DatabaseHelper.database;
-      final List<Map<String, dynamic>> maps = await db.query(DatabaseHelper.settingsTable);
-      
-      // Convert to key-value map
-      final Map<String, String> settingsMap = {};
-      for (final map in maps) {
-        settingsMap[map[DatabaseHelper.settingKeyColumn]] = map[DatabaseHelper.settingValueColumn];
-      }
-      
+      final settingsMap = await _settingsRepository.loadAllSettings();
+
       print('📊 Loaded ${settingsMap.length} settings from database');
       print('📊 Settings map: $settingsMap');
-      
+
       // Create AppSettings from stored values, with defaults for missing values
       return AppSettings(
         audioFormat: _parseAudioFormat(settingsMap['audioFormat']),
         audioQuality: _parseAudioQuality(settingsMap['audioQuality']),
         sampleRate: int.tryParse(settingsMap['sampleRate'] ?? '') ?? 44100,
         bitRate: int.tryParse(settingsMap['bitRate'] ?? '') ?? 128000,
-        enableRealTimeWaveform: _parseBool(settingsMap['enableRealTimeWaveform'], true),
-        enableAmplitudeVisualization: _parseBool(settingsMap['enableAmplitudeVisualization'], true),
-        enableHapticFeedback: _parseBool(settingsMap['enableHapticFeedback'], true),
+        enableRealTimeWaveform: _parseBool(
+          settingsMap['enableRealTimeWaveform'],
+          true,
+        ),
+        enableAmplitudeVisualization: _parseBool(
+          settingsMap['enableAmplitudeVisualization'],
+          true,
+        ),
+        enableHapticFeedback: _parseBool(
+          settingsMap['enableHapticFeedback'],
+          true,
+        ),
         enableAnimations: _parseBool(settingsMap['enableAnimations'], true),
         lastOpenedFolderId: () {
           final rawValue = settingsMap['lastOpenedFolderId'];
-          final processedValue = (rawValue?.isEmpty == true || rawValue == null) ? 'main' : rawValue;
-          print('📁 Loading lastOpenedFolderId - Raw: "$rawValue", Processed: "$processedValue"');
+          final processedValue = (rawValue?.isEmpty == true || rawValue == null)
+              ? 'main'
+              : rawValue;
+          print(
+            '📁 Loading lastOpenedFolderId - Raw: "$rawValue", Processed: "$processedValue"',
+          );
           return processedValue;
         }(),
-        lastModified: DateTime.tryParse(settingsMap['lastModified'] ?? '') ?? DateTime.now(),
+        lastModified:
+            DateTime.tryParse(settingsMap['lastModified'] ?? '') ??
+            DateTime.now(),
       );
     } catch (e) {
       print('❌ Error loading settings from database: $e');
@@ -205,9 +218,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   /// Save settings to database
   Future<void> _saveSettingsToDatabase(AppSettings settings) async {
     try {
-      final db = await DatabaseHelper.database;
-      final now = DateTime.now().toIso8601String();
-      
       // Prepare all settings as key-value pairs
       final settingsToSave = {
         'audioFormat': settings.audioFormat.index.toString(),
@@ -215,22 +225,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         'sampleRate': settings.sampleRate.toString(),
         'bitRate': settings.bitRate.toString(),
         'enableRealTimeWaveform': settings.enableRealTimeWaveform.toString(),
-        'enableAmplitudeVisualization': settings.enableAmplitudeVisualization.toString(),
+        'enableAmplitudeVisualization': settings.enableAmplitudeVisualization
+            .toString(),
         'enableHapticFeedback': settings.enableHapticFeedback.toString(),
         'enableAnimations': settings.enableAnimations.toString(),
         'lastOpenedFolderId': settings.lastOpenedFolderId ?? 'main',
         'lastModified': settings.lastModified.toIso8601String(),
       };
-      
-      // Save each setting (insert or update)
-      for (final entry in settingsToSave.entries) {
-        await db.execute('''
-          INSERT OR REPLACE INTO ${DatabaseHelper.settingsTable} 
-          (${DatabaseHelper.settingKeyColumn}, ${DatabaseHelper.settingValueColumn}, ${DatabaseHelper.settingUpdatedAtColumn}) 
-          VALUES (?, ?, ?)
-        ''', [entry.key, entry.value, now]);
-      }
-      
+
+      await _settingsRepository.saveSettings(settingsToSave);
+
       print('💾 Saved ${settingsToSave.length} settings to database');
       print('💾 Saved settings: $settingsToSave');
     } catch (e) {
@@ -241,9 +245,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Update audio format preference
   Future<void> _onUpdateAudioFormat(
-      UpdateAudioFormat event,
-      Emitter<SettingsState> emit,
-      ) async {
+    UpdateAudioFormat event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -258,7 +262,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Audio format updated and saved: ${event.format.name}');
-
     } catch (e) {
       print('❌ Error updating audio format: $e');
       emit(SettingsError('Failed to update audio format: ${e.toString()}'));
@@ -267,9 +270,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Update audio quality setting
   Future<void> _onUpdateAudioQuality(
-      UpdateAudioQuality event,
-      Emitter<SettingsState> emit,
-      ) async {
+    UpdateAudioQuality event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -281,7 +284,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Audio quality updated to: ${event.quality.name}');
-
     } catch (e) {
       print('❌ Error updating audio quality: $e');
       emit(SettingsError('Failed to update audio quality: ${e.toString()}'));
@@ -290,9 +292,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Update sample rate
   Future<void> _onUpdateSampleRate(
-      UpdateSampleRate event,
-      Emitter<SettingsState> emit,
-      ) async {
+    UpdateSampleRate event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -304,7 +306,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Sample rate updated to: ${event.sampleRate} Hz');
-
     } catch (e) {
       print('❌ Error updating sample rate: $e');
       emit(SettingsError('Failed to update sample rate: ${e.toString()}'));
@@ -313,9 +314,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Update bit rate
   Future<void> _onUpdateBitRate(
-      UpdateBitRate event,
-      Emitter<SettingsState> emit,
-      ) async {
+    UpdateBitRate event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -327,7 +328,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Bit rate updated to: ${event.bitRate} kbps');
-
     } catch (e) {
       print('❌ Error updating bit rate: $e');
       emit(SettingsError('Failed to update bit rate: ${e.toString()}'));
@@ -336,9 +336,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Toggle real-time waveform setting
   Future<void> _onToggleRealTimeWaveform(
-      ToggleRealTimeWaveform event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ToggleRealTimeWaveform event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -350,7 +350,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Real-time waveform: ${updatedSettings.enableRealTimeWaveform}');
-
     } catch (e) {
       print('❌ Error toggling real-time waveform: $e');
       emit(SettingsError('Failed to toggle waveform setting'));
@@ -359,21 +358,23 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Toggle amplitude visualization setting
   Future<void> _onToggleAmplitudeVisualization(
-      ToggleAmplitudeVisualization event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ToggleAmplitudeVisualization event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
 
     try {
       final updatedSettings = currentState.settings.copyWith(
-        enableAmplitudeVisualization: !currentState.settings.enableAmplitudeVisualization,
+        enableAmplitudeVisualization:
+            !currentState.settings.enableAmplitudeVisualization,
       );
 
       emit(SettingsLoaded(settings: updatedSettings));
-      print('✅ Amplitude visualization: ${updatedSettings.enableAmplitudeVisualization}');
-
+      print(
+        '✅ Amplitude visualization: ${updatedSettings.enableAmplitudeVisualization}',
+      );
     } catch (e) {
       print('❌ Error toggling amplitude visualization: $e');
       emit(SettingsError('Failed to toggle amplitude visualization'));
@@ -382,9 +383,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Toggle haptic feedback setting
   Future<void> _onToggleHapticFeedback(
-      ToggleHapticFeedback event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ToggleHapticFeedback event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -396,7 +397,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Haptic feedback: ${updatedSettings.enableHapticFeedback}');
-
     } catch (e) {
       print('❌ Error toggling haptic feedback: $e');
       emit(SettingsError('Failed to toggle haptic feedback'));
@@ -405,9 +405,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Toggle animations setting
   Future<void> _onToggleAnimations(
-      ToggleAnimations event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ToggleAnimations event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -419,7 +419,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: updatedSettings));
       print('✅ Animations: ${updatedSettings.enableAnimations}');
-
     } catch (e) {
       print('❌ Error toggling animations: $e');
       emit(SettingsError('Failed to toggle animations'));
@@ -428,9 +427,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Update last opened folder for navigation persistence
   Future<void> _onUpdateLastOpenedFolder(
-      UpdateLastOpenedFolder event,
-      Emitter<SettingsState> emit,
-      ) async {
+    UpdateLastOpenedFolder event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -444,10 +443,13 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       await _saveSettingsToDatabase(updatedSettings);
 
       emit(SettingsLoaded(settings: updatedSettings));
-      final displayName = event.folderId == 'main' ? 'main screen' : event.folderId;
+      final displayName = event.folderId == 'main'
+          ? 'main screen'
+          : event.folderId;
       print('📁 Last opened folder updated and saved: $displayName');
-      print('📁 Database should now contain lastOpenedFolderId: ${event.folderId}');
-
+      print(
+        '📁 Database should now contain lastOpenedFolderId: ${event.folderId}',
+      );
     } catch (e) {
       print('❌ Error updating last opened folder: $e');
       emit(SettingsError('Failed to update folder navigation'));
@@ -456,9 +458,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Reset all settings to defaults
   Future<void> _onResetSettings(
-      ResetSettings event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ResetSettings event,
+    Emitter<SettingsState> emit,
+  ) async {
     try {
       emit(const SettingsLoading());
 
@@ -466,7 +468,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: defaultSettings));
       print('✅ Settings reset to defaults');
-
     } catch (e) {
       print('❌ Error resetting settings: $e');
       emit(SettingsError('Failed to reset settings: ${e.toString()}'));
@@ -476,20 +477,14 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   /// Load only the lastOpenedFolderId for fast router initialization
   static Future<String> loadLastOpenedFolderIdSync() async {
     try {
-      final db = await DatabaseHelper.database;
-      final result = await db.query(
-        DatabaseHelper.settingsTable,
-        columns: [DatabaseHelper.settingValueColumn],
-        where: '${DatabaseHelper.settingKeyColumn} = ?',
-        whereArgs: ['lastOpenedFolderId'],
-        limit: 1,
-      );
-      
-      if (result.isNotEmpty) {
-        final rawValue = result.first[DatabaseHelper.settingValueColumn] as String?;
-        final processedValue = (rawValue?.isEmpty == true || rawValue == null) ? 'main' : rawValue;
-        print('📁 Fast loading lastOpenedFolderId - Raw: "$rawValue", Processed: "$processedValue"');
-        return processedValue;
+      final settingsRepo = sl<ISettingsRepository>();
+      final value = await settingsRepo.loadSetting('lastOpenedFolderId');
+
+      if (value != null && value.isNotEmpty) {
+        print(
+          '📁 Fast loading lastOpenedFolderId - Raw: "$value", Processed: "$value"',
+        );
+        return value;
       } else {
         print('📁 No lastOpenedFolderId found, defaulting to main');
         return 'main';
@@ -503,37 +498,46 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   /// Load settings synchronously for router initialization (DEPRECATED - use loadLastOpenedFolderIdSync)
   static Future<AppSettings> loadSettingsSync() async {
     try {
-      final db = await DatabaseHelper.database;
-      final settingsData = await db.query(DatabaseHelper.settingsTable);
-      
-      print('📊 Sync loading ${settingsData.length} settings from database');
-      
-      // Convert list of maps to single settings map
-      final settingsMap = <String, String>{};
-      for (final row in settingsData) {
-        final key = row[DatabaseHelper.settingKeyColumn] as String;
-        final value = row[DatabaseHelper.settingValueColumn] as String;
-        settingsMap[key] = value;
-      }
+      final settingsRepo = sl<ISettingsRepository>();
+      final settingsMap = await settingsRepo.loadAllSettings();
 
+      print('📊 Sync loading ${settingsMap.length} settings from database');
       print('📊 Sync settings map: $settingsMap');
-      
+
       // Process lastOpenedFolderId
       final rawValue = settingsMap['lastOpenedFolderId'];
-      final processedValue = (rawValue?.isEmpty == true || rawValue == null) ? 'main' : rawValue;
-      print('📁 Sync loading lastOpenedFolderId - Raw: "$rawValue", Processed: "$processedValue"');
-      
+      final processedValue = (rawValue?.isEmpty == true || rawValue == null)
+          ? 'main'
+          : rawValue;
+      print(
+        '📁 Sync loading lastOpenedFolderId - Raw: "$rawValue", Processed: "$processedValue"',
+      );
+
       return AppSettings(
         audioFormat: _parseAudioFormatStatic(settingsMap['audioFormat']),
         audioQuality: _parseAudioQualityStatic(settingsMap['audioQuality']),
         sampleRate: int.tryParse(settingsMap['sampleRate'] ?? '') ?? 44100,
         bitRate: int.tryParse(settingsMap['bitRate'] ?? '') ?? 128000,
-        enableRealTimeWaveform: _parseBoolStatic(settingsMap['enableRealTimeWaveform'], true),
-        enableAmplitudeVisualization: _parseBoolStatic(settingsMap['enableAmplitudeVisualization'], true),
-        enableHapticFeedback: _parseBoolStatic(settingsMap['enableHapticFeedback'], true),
-        enableAnimations: _parseBoolStatic(settingsMap['enableAnimations'], true),
+        enableRealTimeWaveform: _parseBoolStatic(
+          settingsMap['enableRealTimeWaveform'],
+          true,
+        ),
+        enableAmplitudeVisualization: _parseBoolStatic(
+          settingsMap['enableAmplitudeVisualization'],
+          true,
+        ),
+        enableHapticFeedback: _parseBoolStatic(
+          settingsMap['enableHapticFeedback'],
+          true,
+        ),
+        enableAnimations: _parseBoolStatic(
+          settingsMap['enableAnimations'],
+          true,
+        ),
         lastOpenedFolderId: processedValue,
-        lastModified: DateTime.tryParse(settingsMap['lastModified'] ?? '') ?? DateTime.now(),
+        lastModified:
+            DateTime.tryParse(settingsMap['lastModified'] ?? '') ??
+            DateTime.now(),
       );
     } catch (e) {
       print('❌ Error sync loading settings: $e');
@@ -576,9 +580,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Export settings to JSON
   Future<void> _onExportSettings(
-      ExportSettings event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ExportSettings event,
+    Emitter<SettingsState> emit,
+  ) async {
     if (state is! SettingsLoaded) return;
 
     final currentState = state as SettingsLoaded;
@@ -590,7 +594,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       // For now, just maintain current state
       emit(currentState);
-
     } catch (e) {
       print('❌ Error exporting settings: $e');
       emit(SettingsError('Failed to export settings: ${e.toString()}'));
@@ -599,9 +602,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   /// Import settings from JSON
   Future<void> _onImportSettings(
-      ImportSettings event,
-      Emitter<SettingsState> emit,
-      ) async {
+    ImportSettings event,
+    Emitter<SettingsState> emit,
+  ) async {
     try {
       emit(const SettingsLoading());
 
@@ -609,7 +612,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       emit(SettingsLoaded(settings: settings));
       print('✅ Settings imported successfully');
-
     } catch (e) {
       print('❌ Error importing settings: $e');
       emit(SettingsError('Failed to import settings: ${e.toString()}'));
@@ -618,12 +620,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 }
 
 /// Audio quality enum
-enum AudioQuality {
-  low,
-  medium,
-  high,
-  lossless,
-}
+enum AudioQuality { low, medium, high, lossless }
 
 extension AudioQualityExtension on AudioQuality {
   String get name {
@@ -689,7 +686,8 @@ class AppSettings extends Equatable {
   final bool enableAmplitudeVisualization;
   final bool enableHapticFeedback;
   final bool enableAnimations;
-  final String? lastOpenedFolderId; // Track last opened folder for navigation persistence
+  final String?
+  lastOpenedFolderId; // Track last opened folder for navigation persistence
   final DateTime lastModified;
 
   const AppSettings({
@@ -729,11 +727,14 @@ class AppSettings extends Equatable {
       sampleRate: json['sampleRate'] ?? 44100,
       bitRate: json['bitRate'] ?? 128000,
       enableRealTimeWaveform: json['enableRealTimeWaveform'] ?? true,
-      enableAmplitudeVisualization: json['enableAmplitudeVisualization'] ?? true,
+      enableAmplitudeVisualization:
+          json['enableAmplitudeVisualization'] ?? true,
       enableHapticFeedback: json['enableHapticFeedback'] ?? true,
       enableAnimations: json['enableAnimations'] ?? true,
       lastOpenedFolderId: json['lastOpenedFolderId'],
-      lastModified: DateTime.parse(json['lastModified'] ?? DateTime.now().toIso8601String()),
+      lastModified: DateTime.parse(
+        json['lastModified'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 
@@ -771,8 +772,10 @@ class AppSettings extends Equatable {
       audioQuality: audioQuality ?? this.audioQuality,
       sampleRate: sampleRate ?? this.sampleRate,
       bitRate: bitRate ?? this.bitRate,
-      enableRealTimeWaveform: enableRealTimeWaveform ?? this.enableRealTimeWaveform,
-      enableAmplitudeVisualization: enableAmplitudeVisualization ?? this.enableAmplitudeVisualization,
+      enableRealTimeWaveform:
+          enableRealTimeWaveform ?? this.enableRealTimeWaveform,
+      enableAmplitudeVisualization:
+          enableAmplitudeVisualization ?? this.enableAmplitudeVisualization,
       enableHapticFeedback: enableHapticFeedback ?? this.enableHapticFeedback,
       enableAnimations: enableAnimations ?? this.enableAnimations,
       lastOpenedFolderId: lastOpenedFolderId ?? this.lastOpenedFolderId,
@@ -795,5 +798,6 @@ class AppSettings extends Equatable {
   ];
 
   @override
-  String toString() => 'AppSettings(format: ${audioFormat.name}, quality: ${audioQuality.name})';
+  String toString() =>
+      'AppSettings(format: ${audioFormat.name}, quality: ${audioQuality.name})';
 }

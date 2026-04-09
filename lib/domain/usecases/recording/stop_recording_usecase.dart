@@ -13,7 +13,7 @@ import '../../../core/errors/failures.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
-import '../../../services/location/geolocation_service.dart';
+import '../../../domain/repositories/i_location_repository.dart';
 
 /// Use case for stopping an active audio recording
 ///
@@ -26,15 +26,15 @@ import '../../../services/location/geolocation_service.dart';
 class StopRecordingUseCase {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
-  final GeolocationService _geolocationService;
+  final ILocationRepository _locationRepository;
 
   StopRecordingUseCase({
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
-    required GeolocationService geolocationService,
-  })  : _audioService = audioService,
-        _recordingRepository = recordingRepository,
-        _geolocationService = geolocationService;
+    required ILocationRepository locationRepository,
+  }) : _audioService = audioService,
+       _recordingRepository = recordingRepository,
+       _locationRepository = locationRepository;
 
   /// Execute the stop recording process.
   ///
@@ -51,20 +51,30 @@ class StopRecordingUseCase {
       final isRecording = await _audioService.isRecording();
       final isPaused = await _audioService.isRecordingPaused();
       if (!isRecording && !isPaused) {
-        return Left(AudioRecordingFailure.stopFailed('No active recording to stop'));
+        return Left(
+          AudioRecordingFailure.stopFailed('No active recording to stop'),
+        );
       }
 
       // 2. Stop audio service (raw=true restituisce WAV grezzo per seek-and-resume)
       final recordingEntity = await _audioService.stopRecording(raw: raw);
       if (recordingEntity == null) {
-        return Left(AudioRecordingFailure.stopFailed('Audio service returned null'));
+        return Left(
+          AudioRecordingFailure.stopFailed('Audio service returned null'),
+        );
       }
 
       // 3. Generate location-based name
-      final namedRecording = await _generateLocationBasedRecording(recordingEntity);
+      final namedRecording = await _generateLocationBasedRecording(
+        recordingEntity,
+      );
 
       // 4. Apply waveform data and duration override
-      final finalRecording = _addWaveformData(namedRecording, waveformData, overrideDuration);
+      final finalRecording = _addWaveformData(
+        namedRecording,
+        waveformData,
+        overrideDuration,
+      );
 
       // 5. Validate
       final validationError = _validateRecording(finalRecording);
@@ -75,42 +85,54 @@ class StopRecordingUseCase {
       // 6. Persist
       final saved = await _recordingRepository.createRecording(finalRecording);
       return Right(saved);
-
     } catch (e, st) {
       debugPrint('❌ StopRecordingUseCase: $e\n$st');
-      return Left(UnexpectedFailure(
-        message: 'Unexpected error stopping recording: $e',
-        code: 'STOP_RECORDING_UNEXPECTED',
-      ));
+      return Left(
+        UnexpectedFailure(
+          message: 'Unexpected error stopping recording: $e',
+          code: 'STOP_RECORDING_UNEXPECTED',
+        ),
+      );
     }
   }
 
   /// Generate location-based recording name with incremental numbering
-  Future<RecordingEntity> _generateLocationBasedRecording(RecordingEntity recording) async {
+  Future<RecordingEntity> _generateLocationBasedRecording(
+    RecordingEntity recording,
+  ) async {
     try {
       // Get the current address from geolocation with timeout
       String locationName;
-      
+
       try {
         // Add a shorter timeout to prevent blocking
-        locationName = await _geolocationService.getRecordingLocationName()
+        locationName = await _locationRepository
+            .getRecordingLocationName()
             .timeout(const Duration(seconds: 3));
-        debugPrint('📍 StopRecordingUseCase: Using geolocation address: "$locationName"');
+        debugPrint(
+          '📍 StopRecordingUseCase: Using geolocation address: "$locationName"',
+        );
       } catch (e) {
-        debugPrint('⚠️ StopRecordingUseCase: Geolocation timeout/error, using fallback: $e');
+        debugPrint(
+          '⚠️ StopRecordingUseCase: Geolocation timeout/error, using fallback: $e',
+        );
         // Use timestamp-based fallback if geolocation fails
         final now = DateTime.now();
-        locationName = 'Recording ${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
-        debugPrint('📍 StopRecordingUseCase: Using fallback name: "$locationName"');
+        locationName =
+            'Recording ${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+        debugPrint(
+          '📍 StopRecordingUseCase: Using fallback name: "$locationName"',
+        );
       }
 
       // Get existing recordings in this folder to determine the next number
-      final existingRecordings = await _recordingRepository.getRecordingsByFolder(recording.folderId);
-      
+      final existingRecordings = await _recordingRepository
+          .getRecordingsByFolder(recording.folderId);
+
       // Filter recordings that start with the location name
-      final matchingRecordings = existingRecordings.where((r) => 
-        r.name.startsWith(locationName)
-      ).toList();
+      final matchingRecordings = existingRecordings
+          .where((r) => r.name.startsWith(locationName))
+          .toList();
 
       // Determine the next number
       String newName;
@@ -119,8 +141,9 @@ class StopRecordingUseCase {
         newName = locationName;
       } else {
         // Find the highest number used
-        int highestNumber = 0; // Start from 0, so first recording without number = 1
-        
+        int highestNumber =
+            0; // Start from 0, so first recording without number = 1
+
         for (final existingRecording in matchingRecordings) {
           if (existingRecording.name == locationName) {
             // This is the base name without number (represents number 1)
@@ -138,21 +161,21 @@ class StopRecordingUseCase {
             }
           }
         }
-        
+
         // Next recording should be the next number
         newName = '$locationName ${highestNumber + 1}';
       }
 
-      debugPrint('📝 StopRecordingUseCase: Generated name: "$newName" (${matchingRecordings.length} existing)');
-
-      // Create updated recording with the new name and location
-      return recording.copyWith(
-        name: newName,
-        locationName: locationName,
+      debugPrint(
+        '📝 StopRecordingUseCase: Generated name: "$newName" (${matchingRecordings.length} existing)',
       );
 
+      // Create updated recording with the new name and location
+      return recording.copyWith(name: newName, locationName: locationName);
     } catch (e) {
-      debugPrint('❌ StopRecordingUseCase: Error generating location-based name: $e');
+      debugPrint(
+        '❌ StopRecordingUseCase: Error generating location-based name: $e',
+      );
       // Return original recording if naming fails
       return recording;
     }
@@ -166,10 +189,12 @@ class StopRecordingUseCase {
   ) {
     // Use override duration if provided, otherwise keep original
     final finalDuration = overrideDuration ?? recording.duration;
-    
+
     // Add waveform data if provided and not empty
     if (waveformData != null && waveformData.isNotEmpty) {
-      debugPrint('🎵 StopRecordingUseCase: Adding ${waveformData.length} waveform data points');
+      debugPrint(
+        '🎵 StopRecordingUseCase: Adding ${waveformData.length} waveform data points',
+      );
       return recording.copyWith(
         waveformData: waveformData,
         duration: finalDuration,

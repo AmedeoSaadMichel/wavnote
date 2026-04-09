@@ -3,6 +3,7 @@ import '../../domain/entities/recording_entity.dart';
 import '../../domain/repositories/i_recording_repository.dart';
 import '../../core/enums/audio_format.dart';
 import '../database/database_helper.dart';
+import '../mappers/recording_sort_mapper.dart';
 import '../models/recording_model.dart';
 import 'recording_repository_base.dart';
 
@@ -11,7 +12,6 @@ import 'recording_repository_base.dart';
 /// Handles all search, filter, and sorting operations
 /// for recordings with optimized database queries.
 class RecordingRepositorySearch extends RecordingRepositoryBase {
-
   /// Search recordings by name or location
   Future<List<RecordingEntity>> searchRecordings(String query) async {
     try {
@@ -25,8 +25,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'created_at DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Found ${recordings.length} recordings matching "$query"');
       return recordings;
@@ -37,7 +38,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
   }
 
   /// Get recordings by audio format
-  Future<List<RecordingEntity>> getRecordingsByFormat(AudioFormat format) async {
+  Future<List<RecordingEntity>> getRecordingsByFormat(
+    AudioFormat format,
+  ) async {
     try {
       final db = await getDatabaseWithTable();
 
@@ -48,8 +51,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'created_at DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Found ${recordings.length} recordings in ${format.name} format');
       return recordings;
@@ -71,8 +75,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'created_at DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Found ${recordings.length} favorite recordings');
       return recordings;
@@ -84,9 +89,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
 
   /// Get recordings within date range
   Future<List<RecordingEntity>> getRecordingsByDateRange(
-      DateTime startDate,
-      DateTime endDate,
-      ) async {
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
     try {
       final db = await getDatabaseWithTable();
 
@@ -97,8 +102,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'created_at DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Found ${recordings.length} recordings in date range');
       return recordings;
@@ -110,9 +116,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
 
   /// Get recordings by duration range
   Future<List<RecordingEntity>> getRecordingsByDurationRange(
-      Duration minDuration,
-      Duration maxDuration,
-      ) async {
+    Duration minDuration,
+    Duration maxDuration,
+  ) async {
     try {
       final db = await getDatabaseWithTable();
 
@@ -123,8 +129,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'duration_seconds DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Found ${recordings.length} recordings in duration range');
       return recordings;
@@ -136,20 +143,23 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
 
   /// Get recordings sorted by criteria
   Future<List<RecordingEntity>> getRecordingsSorted(
-      RecordingSortCriteria criteria,
-      ) async {
+    RecordingSortCriteria criteria,
+  ) async {
     try {
       final db = await getDatabaseWithTable();
 
       final List<Map<String, dynamic>> maps = await db.query(
         DatabaseHelper.recordingsTable,
-        orderBy: criteria.sqlOrderBy,
+        orderBy: RecordingSortMapper.toSqlOrderBy(criteria),
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
-      print('✅ Found ${recordings.length} recordings sorted by ${criteria.name}');
+      print(
+        '✅ Found ${recordings.length} recordings sorted by ${criteria.name}',
+      );
       return recordings;
     } catch (e) {
       print('❌ Error getting sorted recordings: $e');
@@ -173,10 +183,13 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: 'created_at DESC',
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
-      print('✅ Found ${recordings.length} recordings with tags: ${tags.join(", ")}');
+      print(
+        '✅ Found ${recordings.length} recordings with tags: ${tags.join(", ")}',
+      );
       return recordings;
     } catch (e) {
       print('❌ Error getting recordings by tags: $e');
@@ -248,10 +261,14 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
       }
 
       // Build final where clause
-      final whereClause = conditions.isNotEmpty ? conditions.join(' AND ') : null;
+      final whereClause = conditions.isNotEmpty
+          ? conditions.join(' AND ')
+          : null;
 
       // Determine order by
-      final orderBy = sortBy?.sqlOrderBy ?? 'created_at DESC';
+      final orderBy = sortBy != null
+          ? RecordingSortMapper.toSqlOrderBy(sortBy)
+          : 'created_at DESC';
 
       final List<Map<String, dynamic>> maps = await db.query(
         DatabaseHelper.recordingsTable,
@@ -260,8 +277,9 @@ class RecordingRepositorySearch extends RecordingRepositoryBase {
         orderBy: orderBy,
       );
 
-      final recordings = maps.map((map) =>
-          RecordingModel.fromDatabase(map).toEntity()).toList();
+      final recordings = maps
+          .map((map) => RecordingModel.fromDatabase(map).toEntity())
+          .toList();
 
       print('✅ Advanced search found ${recordings.length} recordings');
       return recordings;

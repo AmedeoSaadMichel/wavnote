@@ -198,12 +198,12 @@ class _FolderListTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: folder.color.withValues(alpha: 0.2),
+                color: Color(folder.colorValue).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                folder.icon,
-                color: folder.color,
+                IconData(folder.iconCodePoint, fontFamily: 'MaterialIcons'),
+                color: Color(folder.colorValue),
                 size: 20,
               ),
             ),

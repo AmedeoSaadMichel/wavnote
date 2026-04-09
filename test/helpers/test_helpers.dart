@@ -1,5 +1,5 @@
 // File: test/helpers/test_helpers.dart
-// 
+//
 // Test Helpers - Testing Infrastructure
 // ====================================
 //
@@ -29,10 +29,10 @@ import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/core/enums/folder_type.dart';
 import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
-import 'package:wavnote/services/location/geolocation_service.dart';
-import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
-import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
-import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart';
+import 'package:wavnote/domain/repositories/i_location_repository.dart';
+
+import 'package:wavnote/domain/repositories/i_folder_repository.dart';
+import 'package:wavnote/domain/repositories/i_settings_repository.dart';
 
 /// Test helpers and utilities for WavNote testing
 class TestHelpers {
@@ -81,7 +81,7 @@ class TestHelpers {
   static FolderBloc createMockFolderBloc() {
     // For now, return a real FolderBloc
     // In the future, we'll create proper mocks
-    return FolderBloc();
+    return FolderBloc(folderRepository: MockFolderRepository());
   }
 
   /// Create a mock RecordingBloc for testing
@@ -89,24 +89,25 @@ class TestHelpers {
     // Create mocks for dependencies
     final mockAudioService = MockAudioServiceRepository();
     final mockRecordingRepository = MockRecordingRepository();
-    final mockGeolocationService = MockGeolocationService();
+    final mockLocationRepository = MockLocationRepository();
 
     // Setup default mock behaviors
     when(() => mockAudioService.initialize()).thenAnswer((_) async => true);
     when(() => mockAudioService.dispose()).thenAnswer((_) async {});
-    when(() => mockRecordingRepository.getAllRecordings())
-        .thenAnswer((_) async => <RecordingEntity>[]);
+    when(
+      () => mockRecordingRepository.getAllRecordings(),
+    ).thenAnswer((_) async => <RecordingEntity>[]);
 
     return RecordingBloc(
       audioService: mockAudioService,
       recordingRepository: mockRecordingRepository,
-      geolocationService: mockGeolocationService,
+      locationRepository: mockLocationRepository,
     );
   }
 
   /// Create a mock SettingsBloc for testing
   static SettingsBloc createMockSettingsBloc() {
-    return SettingsBloc();
+    return SettingsBloc(settingsRepository: MockSettingsRepository());
   }
 
   /// Create test recording entity
@@ -139,8 +140,8 @@ class TestHelpers {
   static FolderEntity createTestFolder({
     String? id,
     String? name,
-    IconData? icon,
-    Color? color,
+    int? iconCodePoint,
+    int? colorValue,
     int? recordingCount,
     FolderType? type,
     bool? isDeletable,
@@ -148,8 +149,8 @@ class TestHelpers {
     return FolderEntity(
       id: id ?? 'test_folder_1',
       name: name ?? 'Test Folder',
-      icon: icon ?? Icons.folder,
-      color: color ?? Colors.blue,
+      iconCodePoint: iconCodePoint ?? Icons.folder.codePoint,
+      colorValue: colorValue ?? Colors.blue.toARGB32(),
       recordingCount: recordingCount ?? 0,
       type: type ?? FolderType.customFolder,
       isDeletable: isDeletable ?? true,
@@ -217,11 +218,16 @@ class TestHelpers {
 }
 
 /// Mock classes for testing
-class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
+class MockAudioServiceRepository extends Mock
+    implements IAudioServiceRepository {}
 
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
 
-class MockGeolocationService extends Mock implements GeolocationService {}
+class MockLocationRepository extends Mock implements ILocationRepository {}
+
+class MockFolderRepository extends Mock implements IFolderRepository {}
+
+class MockSettingsRepository extends Mock implements ISettingsRepository {}
 
 /// Test constants
 class TestConstants {
@@ -252,9 +258,6 @@ class TestMatchers {
 
   /// Matcher for file size validation
   static Matcher isValidFileSize() {
-    return predicate<int>(
-      (size) => size >= 0,
-      'is a valid file size (>= 0)',
-    );
+    return predicate<int>((size) => size >= 0, 'is a valid file size (>= 0)');
   }
 }

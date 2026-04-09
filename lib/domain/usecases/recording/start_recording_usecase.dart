@@ -18,7 +18,7 @@ import '../../../core/enums/audio_format.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/errors/exceptions.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
-import '../../../services/location/geolocation_service.dart';
+import '../../../domain/repositories/i_location_repository.dart';
 
 /// Use case for starting a new audio recording.
 ///
@@ -31,13 +31,13 @@ class StartRecordingUseCase {
   final IAudioServiceRepository _audioService;
   // Mantenuto per retrocompatibilità; non più usato nell'avvio.
   // ignore: unused_field
-  final GeolocationService _geolocationService;
+  final ILocationRepository _locationRepository;
 
   StartRecordingUseCase({
     required IAudioServiceRepository audioService,
-    required GeolocationService geolocationService,
-  })  : _audioService = audioService,
-        _geolocationService = geolocationService;
+    required ILocationRepository locationRepository,
+  }) : _audioService = audioService,
+       _locationRepository = locationRepository;
 
   Future<Either<Failure, StartRecordingSuccess>> execute({
     required String folderId,
@@ -61,11 +61,13 @@ class StartRecordingUseCase {
       // 4. Validate configuration
       final configError = _validateConfig(format, sampleRate, bitRate);
       if (configError != null) {
-        return Left(AudioRecordingFailure(
-          message: configError,
-          errorType: AudioRecordingErrorType.unsupportedAudioFormat,
-          code: 'INVALID_CONFIG',
-        ));
+        return Left(
+          AudioRecordingFailure(
+            message: configError,
+            errorType: AudioRecordingErrorType.unsupportedAudioFormat,
+            code: 'INVALID_CONFIG',
+          ),
+        );
       }
 
       // 5. Start audio service
@@ -80,21 +82,25 @@ class StartRecordingUseCase {
         return Left(AudioRecordingFailure.startFailed());
       }
 
-      return Right(StartRecordingSuccess(
-        filePath: filePath,
-        title: title,
-        folderId: folderId,
-        format: format,
-        sampleRate: sampleRate,
-        bitRate: bitRate,
-        startTime: DateTime.now(),
-      ));
+      return Right(
+        StartRecordingSuccess(
+          filePath: filePath,
+          title: title,
+          folderId: folderId,
+          format: format,
+          sampleRate: sampleRate,
+          bitRate: bitRate,
+          startTime: DateTime.now(),
+        ),
+      );
     } catch (e, st) {
       debugPrint('❌ StartRecordingUseCase: $e\n$st');
-      return Left(UnexpectedFailure(
-        message: 'Unexpected error starting recording: $e',
-        code: 'START_RECORDING_UNEXPECTED',
-      ));
+      return Left(
+        UnexpectedFailure(
+          message: 'Unexpected error starting recording: $e',
+          code: 'START_RECORDING_UNEXPECTED',
+        ),
+      );
     }
   }
 

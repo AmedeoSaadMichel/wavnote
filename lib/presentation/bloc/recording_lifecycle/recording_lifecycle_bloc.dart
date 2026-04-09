@@ -13,17 +13,17 @@ part 'recording_lifecycle_state.dart';
 ///
 /// Handles recording start/stop/pause/resume, real-time updates, and recording state.
 /// Uses RecordingLifecycleUseCase for clean separation of business logic.
-class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLifecycleState> {
+class RecordingLifecycleBloc
+    extends Bloc<RecordingLifecycleEvent, RecordingLifecycleState> {
   final RecordingLifecycleUseCase _useCase;
 
   StreamSubscription<double>? _amplitudeSubscription;
   Timer? _durationTimer;
 
-  RecordingLifecycleBloc({
-    required RecordingLifecycleUseCase useCase,
-  }) : _useCase = useCase,
-        super(const RecordingLifecycleInitial()) {
-
+  RecordingLifecycleBloc({required RecordingLifecycleUseCase useCase})
+    : _useCase = useCase,
+      super(const RecordingLifecycleInitial()) {
+    on<InitializeRecordingService>(_onInitializeAudioService);
     on<StartRecording>(_onStartRecording);
     on<StopRecording>(_onStopRecording);
     on<PauseRecording>(_onPauseRecording);
@@ -33,11 +33,14 @@ class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLife
     on<UpdateRecordingDuration>(_onUpdateRecordingDuration);
     on<UpdateRecordingTitle>(_onUpdateRecordingTitle);
 
-    _initializeAudioService();
+    add(const InitializeRecordingService());
   }
 
   /// Initialize the audio service
-  Future<void> _initializeAudioService() async {
+  Future<void> _onInitializeAudioService(
+    InitializeRecordingService event,
+    Emitter<RecordingLifecycleState> emit,
+  ) async {
     final success = await _useCase.initializeAudioService();
     if (!success) {
       emit(const RecordingLifecycleError('Failed to initialize audio service'));
@@ -86,19 +89,20 @@ class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLife
       // Setup real-time updates
       _setupRealTimeUpdates();
 
-      emit(RecordingLifecycleInProgress(
-        filePath: event.filePath,
-        folderId: event.folderId,
-        folderName: event.folderName,
-        format: event.format,
-        sampleRate: event.sampleRate,
-        bitRate: event.bitRate,
-        duration: Duration.zero,
-        amplitude: 0.0,
-        startTime: DateTime.now(),
-        title: title,
-      ));
-
+      emit(
+        RecordingLifecycleInProgress(
+          filePath: event.filePath,
+          folderId: event.folderId,
+          folderName: event.folderName,
+          format: event.format,
+          sampleRate: event.sampleRate,
+          bitRate: event.bitRate,
+          duration: Duration.zero,
+          amplitude: 0.0,
+          startTime: DateTime.now(),
+          title: title,
+        ),
+      );
     } catch (e) {
       emit(RecordingLifecycleError('Failed to start recording: $e'));
     }
@@ -168,7 +172,6 @@ class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLife
       );
 
       emit(RecordingLifecycleCompleted(recording: recording));
-
     } catch (e) {
       emit(RecordingLifecycleError('Failed to stop recording: $e'));
     }
@@ -188,21 +191,23 @@ class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLife
     }
 
     final currentState = state as RecordingLifecycleInProgress;
-    
+
     // Cancel real-time updates
     await _amplitudeSubscription?.cancel();
     _durationTimer?.cancel();
 
-    emit(RecordingLifecyclePaused(
-      filePath: currentState.filePath,
-      folderId: currentState.folderId,
-      folderName: currentState.folderName,
-      format: currentState.format,
-      sampleRate: currentState.sampleRate,
-      bitRate: currentState.bitRate,
-      duration: currentState.duration,
-      startTime: currentState.startTime,
-    ));
+    emit(
+      RecordingLifecyclePaused(
+        filePath: currentState.filePath,
+        folderId: currentState.folderId,
+        folderName: currentState.folderName,
+        format: currentState.format,
+        sampleRate: currentState.sampleRate,
+        bitRate: currentState.bitRate,
+        duration: currentState.duration,
+        startTime: currentState.startTime,
+      ),
+    );
   }
 
   /// Resume recording
@@ -219,22 +224,24 @@ class RecordingLifecycleBloc extends Bloc<RecordingLifecycleEvent, RecordingLife
     }
 
     final currentState = state as RecordingLifecyclePaused;
-    
+
     // Resume real-time updates
     _setupRealTimeUpdates();
 
-    emit(RecordingLifecycleInProgress(
-      filePath: currentState.filePath,
-      folderId: currentState.folderId,
-      folderName: currentState.folderName,
-      format: currentState.format,
-      sampleRate: currentState.sampleRate,
-      bitRate: currentState.bitRate,
-      duration: currentState.duration,
-      amplitude: 0.0,
-      startTime: currentState.startTime,
-      title: null,
-    ));
+    emit(
+      RecordingLifecycleInProgress(
+        filePath: currentState.filePath,
+        folderId: currentState.folderId,
+        folderName: currentState.folderName,
+        format: currentState.format,
+        sampleRate: currentState.sampleRate,
+        bitRate: currentState.bitRate,
+        duration: currentState.duration,
+        amplitude: 0.0,
+        startTime: currentState.startTime,
+        title: null,
+      ),
+    );
   }
 
   /// Cancel recording

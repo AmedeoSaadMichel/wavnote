@@ -1,5 +1,5 @@
 // File: test/unit/blocs/settings_bloc_test.dart
-// 
+//
 // Settings BLoC Unit Tests - CORRECTED VERSION
 // =============================================
 //
@@ -23,8 +23,17 @@ void main() {
   group('SettingsBloc', () {
     late SettingsBloc bloc;
 
+    late MockSettingsRepository mockRepository;
+
     setUp(() {
-      bloc = SettingsBloc();
+      mockRepository = MockSettingsRepository();
+
+      when(() => mockRepository.loadAllSettings()).thenAnswer((_) async => {});
+      when(
+        () => mockRepository.saveSettings(any()),
+      ).thenAnswer((_) async => {});
+
+      bloc = SettingsBloc(settingsRepository: mockRepository);
     });
 
     tearDown(() async {
@@ -43,13 +52,41 @@ void main() {
         expect: () => [
           isA<SettingsLoading>(),
           isA<SettingsLoaded>()
-            .having((state) => state.settings.audioFormat, 'audioFormat', isA<AudioFormat>())
-            .having((state) => state.settings.sampleRate, 'sampleRate', greaterThan(0))
-            .having((state) => state.settings.bitRate, 'bitRate', greaterThan(0))
-            .having((state) => state.settings.enableHapticFeedback, 'hapticFeedback', isA<bool>())
-            .having((state) => state.settings.enableRealTimeWaveform, 'waveformVisualization', isA<bool>())
-            .having((state) => state.settings.enableAmplitudeVisualization, 'amplitudeMonitoring', isA<bool>())
-            .having((state) => state.settings.enableAnimations, 'animations', isA<bool>()),
+              .having(
+                (state) => state.settings.audioFormat,
+                'audioFormat',
+                isA<AudioFormat>(),
+              )
+              .having(
+                (state) => state.settings.sampleRate,
+                'sampleRate',
+                greaterThan(0),
+              )
+              .having(
+                (state) => state.settings.bitRate,
+                'bitRate',
+                greaterThan(0),
+              )
+              .having(
+                (state) => state.settings.enableHapticFeedback,
+                'hapticFeedback',
+                isA<bool>(),
+              )
+              .having(
+                (state) => state.settings.enableRealTimeWaveform,
+                'waveformVisualization',
+                isA<bool>(),
+              )
+              .having(
+                (state) => state.settings.enableAmplitudeVisualization,
+                'amplitudeMonitoring',
+                isA<bool>(),
+              )
+              .having(
+                (state) => state.settings.enableAnimations,
+                'animations',
+                isA<bool>(),
+              ),
         ],
       );
 
@@ -93,8 +130,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateAudioFormat(AudioFormat.wav)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.audioFormat, 'audioFormat', AudioFormat.wav),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.audioFormat,
+            'audioFormat',
+            AudioFormat.wav,
+          ),
         ],
       );
 
@@ -108,8 +148,11 @@ void main() {
         },
         skip: 2, // Skip loading states
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.audioFormat, 'audioFormat', AudioFormat.wav),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.audioFormat,
+            'audioFormat',
+            AudioFormat.wav,
+          ),
         ],
       );
     });
@@ -134,8 +177,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateAudioQuality(AudioQuality.high)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.audioQuality, 'audioQuality', AudioQuality.high),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.audioQuality,
+            'audioQuality',
+            AudioQuality.high,
+          ),
         ],
       );
 
@@ -158,8 +204,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateAudioQuality(AudioQuality.medium)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.audioQuality, 'audioQuality', AudioQuality.medium),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.audioQuality,
+            'audioQuality',
+            AudioQuality.medium,
+          ),
         ],
       );
 
@@ -182,8 +231,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateAudioQuality(AudioQuality.low)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.audioQuality, 'audioQuality', AudioQuality.low),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.audioQuality,
+            'audioQuality',
+            AudioQuality.low,
+          ),
         ],
       );
     });
@@ -208,8 +260,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateSampleRate(48000)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.sampleRate, 'sampleRate', 48000),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.sampleRate,
+            'sampleRate',
+            48000,
+          ),
         ],
       );
 
@@ -232,8 +287,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateBitRate(256000)),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.bitRate, 'bitRate', 256000),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.bitRate,
+            'bitRate',
+            256000,
+          ),
         ],
       );
     });
@@ -258,8 +316,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const ToggleHapticFeedback()),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.enableHapticFeedback, 'hapticFeedback', false),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.enableHapticFeedback,
+            'hapticFeedback',
+            false,
+          ),
         ],
       );
 
@@ -282,8 +343,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const ToggleRealTimeWaveform()),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.enableRealTimeWaveform, 'waveformVisualization', false),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.enableRealTimeWaveform,
+            'waveformVisualization',
+            false,
+          ),
         ],
       );
 
@@ -306,8 +370,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const ToggleAmplitudeVisualization()),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.enableAmplitudeVisualization, 'amplitudeMonitoring', false),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.enableAmplitudeVisualization,
+            'amplitudeMonitoring',
+            false,
+          ),
         ],
       );
 
@@ -330,8 +397,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const ToggleAnimations()),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.enableAnimations, 'animations', false),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.enableAnimations,
+            'animations',
+            false,
+          ),
         ],
       );
     });
@@ -356,8 +426,11 @@ void main() {
         ),
         act: (bloc) => bloc.add(const UpdateLastOpenedFolder('favorites')),
         expect: () => [
-          isA<SettingsLoaded>()
-            .having((state) => state.settings.lastOpenedFolderId, 'lastOpenedFolder', 'favorites'),
+          isA<SettingsLoaded>().having(
+            (state) => state.settings.lastOpenedFolderId,
+            'lastOpenedFolder',
+            'favorites',
+          ),
         ],
       );
     });
@@ -381,9 +454,7 @@ void main() {
         build: () => bloc,
         seed: () => SettingsLoaded(settings: testSettings),
         act: (bloc) => bloc.add(const ExportSettings()),
-        expect: () => [
-          isA<SettingsLoaded>(),
-        ],
+        expect: () => [isA<SettingsLoaded>()],
       );
 
       blocTest<SettingsBloc, SettingsState>(
@@ -403,17 +474,23 @@ void main() {
             lastModified: DateTime.now(),
           ),
         ),
-        act: (bloc) => bloc.add(ImportSettings(const {
-          'audioFormat': 1, // wav index
-          'sampleRate': 48000,
-          'bitRate': 256000,
-        })),
+        act: (bloc) => bloc.add(
+          ImportSettings(const {
+            'audioFormat': 1, // wav index
+            'sampleRate': 48000,
+            'bitRate': 256000,
+          }),
+        ),
         expect: () => [
           isA<SettingsLoading>(),
           isA<SettingsLoaded>()
-            .having((state) => state.settings.audioFormat, 'audioFormat', AudioFormat.wav)
-            .having((state) => state.settings.sampleRate, 'sampleRate', 48000)
-            .having((state) => state.settings.bitRate, 'bitRate', 256000),
+              .having(
+                (state) => state.settings.audioFormat,
+                'audioFormat',
+                AudioFormat.wav,
+              )
+              .having((state) => state.settings.sampleRate, 'sampleRate', 48000)
+              .having((state) => state.settings.bitRate, 'bitRate', 256000),
         ],
       );
 
@@ -437,10 +514,7 @@ void main() {
         act: (bloc) => bloc.add(const ImportSettings(<String, dynamic>{})),
         expect: () => [
           isA<SettingsLoading>(),
-          anyOf([
-            isA<SettingsLoaded>(),
-            isA<SettingsError>(),
-          ]),
+          anyOf([isA<SettingsLoaded>(), isA<SettingsError>()]),
         ],
       );
     });
@@ -467,15 +541,43 @@ void main() {
         expect: () => [
           isA<SettingsLoading>(),
           isA<SettingsLoaded>()
-            .having((state) => state.settings.audioFormat, 'audioFormat', AudioFormat.m4a)
-            .having((state) => state.settings.audioQuality, 'audioQuality', AudioQuality.high)
-            .having((state) => state.settings.sampleRate, 'sampleRate', 44100)
-            .having((state) => state.settings.bitRate, 'bitRate', 128000)
-            .having((state) => state.settings.enableHapticFeedback, 'hapticFeedback', true)
-            .having((state) => state.settings.enableRealTimeWaveform, 'waveformVisualization', true)
-            .having((state) => state.settings.enableAmplitudeVisualization, 'amplitudeMonitoring', true)
-            .having((state) => state.settings.enableAnimations, 'animations', true)
-            .having((state) => state.settings.lastOpenedFolderId, 'lastOpenedFolder', 'main'),
+              .having(
+                (state) => state.settings.audioFormat,
+                'audioFormat',
+                AudioFormat.m4a,
+              )
+              .having(
+                (state) => state.settings.audioQuality,
+                'audioQuality',
+                AudioQuality.high,
+              )
+              .having((state) => state.settings.sampleRate, 'sampleRate', 44100)
+              .having((state) => state.settings.bitRate, 'bitRate', 128000)
+              .having(
+                (state) => state.settings.enableHapticFeedback,
+                'hapticFeedback',
+                true,
+              )
+              .having(
+                (state) => state.settings.enableRealTimeWaveform,
+                'waveformVisualization',
+                true,
+              )
+              .having(
+                (state) => state.settings.enableAmplitudeVisualization,
+                'amplitudeMonitoring',
+                true,
+              )
+              .having(
+                (state) => state.settings.enableAnimations,
+                'animations',
+                true,
+              )
+              .having(
+                (state) => state.settings.lastOpenedFolderId,
+                'lastOpenedFolder',
+                'main',
+              ),
         ],
       );
     });
@@ -486,25 +588,28 @@ void main() {
         for (int i = 0; i < 3; i++) {
           bloc.add(const LoadSettings());
         }
-        
+
         // Wait a bit and check state is valid
         await Future.delayed(const Duration(milliseconds: 100));
-        
+
         final state = bloc.state;
-        expect(state, anyOf([
-          isA<SettingsLoaded>(),
-          isA<SettingsError>(),
-          isA<SettingsLoading>(),
-          isA<SettingsInitial>(),
-        ]));
+        expect(
+          state,
+          anyOf([
+            isA<SettingsLoaded>(),
+            isA<SettingsError>(),
+            isA<SettingsLoading>(),
+            isA<SettingsInitial>(),
+          ]),
+        );
       });
 
       test('ignores update operations on unloaded state', () {
         // When state is not loaded, updates should be ignored
         expect(bloc.state, isA<SettingsInitial>());
-        
+
         bloc.add(const UpdateAudioFormat(AudioFormat.wav));
-        
+
         // State should remain initial since settings not loaded
         expect(bloc.state, isA<SettingsInitial>());
       });
@@ -524,7 +629,7 @@ void main() {
           lastOpenedFolderId: 'all_recordings',
           lastModified: DateTime.now(),
         );
-        
+
         // Verify all audio formats are valid
         for (final format in AudioFormat.values) {
           final updatedSettings = testSettings.copyWith(audioFormat: format);

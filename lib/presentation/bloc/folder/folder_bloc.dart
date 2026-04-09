@@ -1,5 +1,5 @@
 // File: presentation/bloc/folder/folder_bloc.dart
-// 
+//
 // Folder BLoC - Presentation Layer
 // ===============================
 //
@@ -44,13 +44,13 @@
 
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter/material.dart';
+
+// Config imports
+import '../../../config/dependency_injection.dart';
 
 // Domain imports
-import '../../../domain/entities/folder_entity.dart';   // Folder business entity
-
-// Data layer imports
-import '../../../data/repositories/folder_repository.dart'; // Folder data access
+import '../../../domain/entities/folder_entity.dart'; // Folder business entity
+import '../../../domain/repositories/i_folder_repository.dart';
 
 // BLoC parts
 part 'folder_event.dart'; // Folder events (user actions)
@@ -72,14 +72,14 @@ part 'folder_state.dart'; // Folder states (app states)
 /// ```dart
 /// // Load folders
 /// context.read<FolderBloc>().add(const LoadFolders());
-/// 
+///
 /// // Create custom folder
 /// context.read<FolderBloc>().add(CreateFolder(
 ///   name: 'My Folder',
 ///   color: Colors.blue,
 ///   icon: Icons.folder,
 /// ));
-/// 
+///
 /// // Listen to state changes
 /// BlocBuilder<FolderBloc, FolderState>(
 ///   builder: (context, state) {
@@ -91,9 +91,11 @@ part 'folder_state.dart'; // Folder states (app states)
 /// );
 /// ```
 class FolderBloc extends Bloc<FolderEvent, FolderState> {
-  final FolderRepository _folderRepository = FolderRepository();
+  final IFolderRepository _folderRepository;
 
-  FolderBloc() : super(const FolderInitial()) {
+  FolderBloc({required IFolderRepository folderRepository})
+    : _folderRepository = folderRepository,
+      super(const FolderInitial()) {
     on<LoadFolders>(_onLoadFolders);
     on<RefreshFolders>(_onRefreshFolders);
     on<CreateFolder>(_onCreateFolder);
@@ -108,9 +110,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Load all folders (default + custom)
   Future<void> _onLoadFolders(
-      LoadFolders event,
-      Emitter<FolderState> emit,
-      ) async {
+    LoadFolders event,
+    Emitter<FolderState> emit,
+  ) async {
     emit(const FolderLoading());
 
     try {
@@ -121,13 +123,16 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
       final defaultFolders = allFolders.where((f) => f.isDefault).toList();
       final customFolders = allFolders.where((f) => f.isCustom).toList();
 
-      emit(FolderLoaded(
-        defaultFolders: defaultFolders,
-        customFolders: customFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: defaultFolders,
+          customFolders: customFolders,
+        ),
+      );
 
-      print('✅ Loaded ${defaultFolders.length} default and ${customFolders.length} custom folders');
-
+      print(
+        '✅ Loaded ${defaultFolders.length} default and ${customFolders.length} custom folders',
+      );
     } catch (e, stackTrace) {
       print('❌ Error loading folders: $e');
       print('Stack trace: $stackTrace');
@@ -137,9 +142,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Refresh folders without showing loading state
   Future<void> _onRefreshFolders(
-      RefreshFolders event,
-      Emitter<FolderState> emit,
-      ) async {
+    RefreshFolders event,
+    Emitter<FolderState> emit,
+  ) async {
     try {
       // Get all folders from repository
       final allFolders = await _folderRepository.getAllFolders();
@@ -148,13 +153,14 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
       final defaultFolders = allFolders.where((f) => f.isDefault).toList();
       final customFolders = allFolders.where((f) => f.isCustom).toList();
 
-      emit(FolderLoaded(
-        defaultFolders: defaultFolders,
-        customFolders: customFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: defaultFolders,
+          customFolders: customFolders,
+        ),
+      );
 
       print('🔄 Refreshed folders');
-
     } catch (e) {
       print('❌ Error refreshing folders: $e');
       emit(FolderError('Failed to refresh folders: ${e.toString()}'));
@@ -163,9 +169,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Create a new custom folder
   Future<void> _onCreateFolder(
-      CreateFolder event,
-      Emitter<FolderState> emit,
-      ) async {
+    CreateFolder event,
+    Emitter<FolderState> emit,
+  ) async {
     if (state is! FolderLoaded) {
       emit(const FolderError('Cannot create folder: folders not loaded'));
       return;
@@ -174,57 +180,65 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
     final currentState = state as FolderLoaded;
 
     // Show creating state
-    emit(FolderCreating(
-      defaultFolders: currentState.defaultFolders,
-      customFolders: currentState.customFolders,
-    ));
+    emit(
+      FolderCreating(
+        defaultFolders: currentState.defaultFolders,
+        customFolders: currentState.customFolders,
+      ),
+    );
 
     try {
       // Create new folder entity
       final newFolder = FolderEntity.customFolder(
         name: event.name,
-        icon: event.icon,
-        color: event.color,
+        iconCodePoint: event.iconCodePoint,
+        colorValue: event.colorValue,
       );
 
       // Save to repository (database)
       final createdFolder = await _folderRepository.createFolder(newFolder);
 
       // Update state with new folder
-      final updatedCustomFolders = List<FolderEntity>.from(currentState.customFolders)
-        ..add(createdFolder);
+      final updatedCustomFolders = List<FolderEntity>.from(
+        currentState.customFolders,
+      )..add(createdFolder);
 
-      emit(FolderLoaded(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+        ),
+      );
 
       // Emit success event
-      emit(FolderCreated(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-        createdFolder: createdFolder,
-      ));
+      emit(
+        FolderCreated(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+          createdFolder: createdFolder,
+        ),
+      );
 
       print('✅ Created and saved folder: ${createdFolder.name}');
-
     } catch (e) {
       print('❌ Error creating folder: $e');
       emit(FolderError('Failed to create folder: ${e.toString()}'));
 
       // Restore previous state
-      emit(FolderLoaded(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: currentState.customFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: currentState.customFolders,
+        ),
+      );
     }
   }
 
   /// Delete a custom folder
   Future<void> _onDeleteFolder(
-      DeleteFolder event,
-      Emitter<FolderState> emit,
-      ) async {
+    DeleteFolder event,
+    Emitter<FolderState> emit,
+  ) async {
     print('🗑️ [DEBUG] Delete folder requested: ${event.folderId}');
 
     if (state is! FolderLoaded) {
@@ -238,7 +252,10 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
     // Find the folder to delete
     final folderToDelete = currentState.customFolders
         .cast<FolderEntity?>()
-        .firstWhere((folder) => folder?.id == event.folderId, orElse: () => null);
+        .firstWhere(
+          (folder) => folder?.id == event.folderId,
+          orElse: () => null,
+        );
 
     if (folderToDelete == null) {
       print('❌ [DEBUG] Folder not found: ${event.folderId}');
@@ -268,22 +285,27 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
           .where((folder) => folder.id != event.folderId)
           .toList();
 
-      print('✅ [DEBUG] Folder deleted from database. New count: ${updatedCustomFolders.length}');
+      print(
+        '✅ [DEBUG] Folder deleted from database. New count: ${updatedCustomFolders.length}',
+      );
 
       // Emit the updated state
-      emit(FolderLoaded(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+        ),
+      );
 
       // Then emit the delete success state
-      emit(FolderDeleted(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-        deletedFolderId: event.folderId,
-        deletedFolderName: folderToDelete.name,
-      ));
-
+      emit(
+        FolderDeleted(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+          deletedFolderId: event.folderId,
+          deletedFolderName: folderToDelete.name,
+        ),
+      );
     } catch (e) {
       print('❌ [DEBUG] Error deleting folder: $e');
       emit(FolderError('Failed to delete folder: ${e.toString()}'));
@@ -292,9 +314,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Update folder recording count
   Future<void> _onUpdateFolderCount(
-      UpdateFolderCount event,
-      Emitter<FolderState> emit,
-      ) async {
+    UpdateFolderCount event,
+    Emitter<FolderState> emit,
+  ) async {
     if (state is! FolderLoaded) return;
 
     final currentState = state as FolderLoaded;
@@ -319,13 +341,14 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
         return folder;
       }).toList();
 
-      emit(FolderLoaded(
-        defaultFolders: updatedDefaultFolders,
-        customFolders: updatedCustomFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: updatedDefaultFolders,
+          customFolders: updatedCustomFolders,
+        ),
+      );
 
       print('✅ Updated folder count for ${event.folderId}: ${event.newCount}');
-
     } catch (e) {
       print('❌ Error updating folder count: $e');
       emit(FolderError('Failed to update folder count: ${e.toString()}'));
@@ -334,9 +357,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Rename a custom folder
   Future<void> _onRenameFolder(
-      RenameFolderEvent event,
-      Emitter<FolderState> emit,
-      ) async {
+    RenameFolderEvent event,
+    Emitter<FolderState> emit,
+  ) async {
     if (state is! FolderLoaded) {
       emit(const FolderError('Cannot rename folder: folders not loaded'));
       return;
@@ -347,7 +370,10 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
     // Find the folder to rename
     final folderToRename = currentState.customFolders
         .cast<FolderEntity?>()
-        .firstWhere((folder) => folder?.id == event.folderId, orElse: () => null);
+        .firstWhere(
+          (folder) => folder?.id == event.folderId,
+          orElse: () => null,
+        );
 
     if (folderToRename == null) {
       emit(const FolderError('Folder not found'));
@@ -361,7 +387,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
     try {
       // Validate new name
-      final nameValidationError = folderToRename.getNameValidationError(event.newName);
+      final nameValidationError = folderToRename.getNameValidationError(
+        event.newName,
+      );
       if (nameValidationError != null) {
         emit(FolderError(nameValidationError));
         return;
@@ -394,13 +422,14 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
         return folder;
       }).toList();
 
-      emit(FolderLoaded(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-      ));
+      emit(
+        FolderLoaded(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+        ),
+      );
 
       print('✅ Renamed folder ${folderToRename.name} to ${event.newName}');
-
     } catch (e) {
       print('❌ Error renaming folder: $e');
       emit(FolderError('Failed to rename folder: ${e.toString()}'));
@@ -409,28 +438,34 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Toggle edit mode for multi-selection
   void _onToggleFolderEditMode(
-      ToggleFolderEditMode event,
-      Emitter<FolderState> emit,
-      ) {
+    ToggleFolderEditMode event,
+    Emitter<FolderState> emit,
+  ) {
     if (state is FolderLoaded) {
       final currentState = state as FolderLoaded;
-      emit(currentState.copyWith(
-        isEditMode: !currentState.isEditMode,
-        selectedFolderIds: currentState.isEditMode ? <String>{} : currentState.selectedFolderIds,
-      ));
+      emit(
+        currentState.copyWith(
+          isEditMode: !currentState.isEditMode,
+          selectedFolderIds: currentState.isEditMode
+              ? <String>{}
+              : currentState.selectedFolderIds,
+        ),
+      );
       print('📝 Toggled edit mode: ${!currentState.isEditMode}');
     }
   }
 
   /// Toggle selection of a custom folder
   void _onToggleFolderSelection(
-      ToggleFolderSelection event,
-      Emitter<FolderState> emit,
-      ) {
+    ToggleFolderSelection event,
+    Emitter<FolderState> emit,
+  ) {
     if (state is FolderLoaded) {
       final currentState = state as FolderLoaded;
-      final selectedFolderIds = Set<String>.from(currentState.selectedFolderIds);
-      
+      final selectedFolderIds = Set<String>.from(
+        currentState.selectedFolderIds,
+      );
+
       if (selectedFolderIds.contains(event.folderId)) {
         selectedFolderIds.remove(event.folderId);
         print('➖ Deselected folder: ${event.folderId}');
@@ -438,7 +473,7 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
         selectedFolderIds.add(event.folderId);
         print('➕ Selected folder: ${event.folderId}');
       }
-      
+
       emit(currentState.copyWith(selectedFolderIds: selectedFolderIds));
       print('📋 Selected folders count: ${selectedFolderIds.length}');
     }
@@ -446,9 +481,9 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Clear all folder selections
   void _onClearFolderSelection(
-      ClearFolderSelection event,
-      Emitter<FolderState> emit,
-      ) {
+    ClearFolderSelection event,
+    Emitter<FolderState> emit,
+  ) {
     if (state is FolderLoaded) {
       final currentState = state as FolderLoaded;
       emit(currentState.copyWith(selectedFolderIds: <String>{}));
@@ -458,22 +493,24 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
 
   /// Delete multiple selected folders
   Future<void> _onDeleteSelectedFolders(
-      DeleteSelectedFolders event,
-      Emitter<FolderState> emit,
-      ) async {
+    DeleteSelectedFolders event,
+    Emitter<FolderState> emit,
+  ) async {
     if (state is! FolderLoaded) {
       emit(const FolderError('Cannot delete folders: folders not loaded'));
       return;
     }
 
     final currentState = state as FolderLoaded;
-    
+
     if (event.folderIds.isEmpty) {
       emit(const FolderError('No folders selected for deletion'));
       return;
     }
 
-    print('🗑️ [DEBUG] Bulk delete requested for ${event.folderIds.length} folders');
+    print(
+      '🗑️ [DEBUG] Bulk delete requested for ${event.folderIds.length} folders',
+    );
 
     try {
       // Verify all folders can be deleted
@@ -513,18 +550,21 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
           .where((folder) => !event.folderIds.contains(folder.id))
           .toList();
 
-      print('✅ [DEBUG] Bulk delete complete. Deleted: $deletedCount/${event.folderIds.length}');
+      print(
+        '✅ [DEBUG] Bulk delete complete. Deleted: $deletedCount/${event.folderIds.length}',
+      );
 
       // Emit the updated state with edit mode turned off and selections cleared
-      emit(FoldersDeleted(
-        defaultFolders: currentState.defaultFolders,
-        customFolders: updatedCustomFolders,
-        deletedFolderIds: event.folderIds,
-        deletedCount: deletedCount,
-        isEditMode: false,
-        selectedFolderIds: <String>{},
-      ));
-
+      emit(
+        FoldersDeleted(
+          defaultFolders: currentState.defaultFolders,
+          customFolders: updatedCustomFolders,
+          deletedFolderIds: event.folderIds,
+          deletedCount: deletedCount,
+          isEditMode: false,
+          selectedFolderIds: <String>{},
+        ),
+      );
     } catch (e) {
       print('❌ [DEBUG] Error during bulk folder deletion: $e');
       emit(FolderError('Failed to delete selected folders: ${e.toString()}'));

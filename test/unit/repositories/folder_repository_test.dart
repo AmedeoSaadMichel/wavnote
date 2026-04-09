@@ -1,5 +1,5 @@
 // File: test/unit/repositories/folder_repository_test.dart
-// 
+//
 // Folder Repository Unit Tests - CORRECTED VERSION
 // ================================================
 //
@@ -35,21 +35,28 @@ void main() {
       test('getAllFolders returns all folders', () async {
         // Arrange
         final allFolders = [
-          TestHelpers.createTestFolder(id: 'all_recordings', name: 'All Recordings'),
+          TestHelpers.createTestFolder(
+            id: 'all_recordings',
+            name: 'All Recordings',
+          ),
           TestHelpers.createTestFolder(id: 'favorites', name: 'Favorites'),
           TestHelpers.createTestFolder(id: 'custom_1', name: 'Work'),
           TestHelpers.createTestFolder(id: 'custom_2', name: 'Personal'),
         ];
 
-        when(() => repository.getAllFolders())
-            .thenAnswer((_) async => allFolders);
+        when(
+          () => repository.getAllFolders(),
+        ).thenAnswer((_) async => allFolders);
 
         // Act
         final result = await repository.getAllFolders();
 
         // Assert
         expect(result.length, equals(4));
-        expect(result.where((f) => f.type == FolderType.customFolder).length, equals(2));
+        expect(
+          result.where((f) => f.type == FolderType.customFolder).length,
+          equals(2),
+        );
       });
 
       test('createFolder creates new custom folder successfully', () async {
@@ -60,8 +67,9 @@ void main() {
           type: FolderType.customFolder,
         );
 
-        when(() => repository.createFolder(any()))
-            .thenAnswer((_) async => newFolder);
+        when(
+          () => repository.createFolder(any()),
+        ).thenAnswer((_) async => newFolder);
 
         // Act
         final result = await repository.createFolder(newFolder);
@@ -80,8 +88,9 @@ void main() {
           name: 'Updated Name',
         );
 
-        when(() => repository.updateFolder(any()))
-            .thenAnswer((_) async => updatedFolder);
+        when(
+          () => repository.updateFolder(any()),
+        ).thenAnswer((_) async => updatedFolder);
 
         // Act
         final result = await repository.updateFolder(updatedFolder);
@@ -93,8 +102,9 @@ void main() {
 
       test('deleteFolder removes custom folder successfully', () async {
         // Arrange
-        when(() => repository.deleteFolder('custom_folder_1'))
-            .thenAnswer((_) async => true);
+        when(
+          () => repository.deleteFolder('custom_folder_1'),
+        ).thenAnswer((_) async => true);
 
         // Act
         final result = await repository.deleteFolder('custom_folder_1');
@@ -111,8 +121,9 @@ void main() {
           name: 'Test Folder',
         );
 
-        when(() => repository.getFolderById('test_folder'))
-            .thenAnswer((_) async => testFolder);
+        when(
+          () => repository.getFolderById('test_folder'),
+        ).thenAnswer((_) async => testFolder);
 
         // Act
         final result = await repository.getFolderById('test_folder');
@@ -124,8 +135,9 @@ void main() {
 
       test('getFolderById returns null for non-existent folder', () async {
         // Arrange
-        when(() => repository.getFolderById('non_existent'))
-            .thenAnswer((_) async => null);
+        when(
+          () => repository.getFolderById('non_existent'),
+        ).thenAnswer((_) async => null);
 
         // Act
         final result = await repository.getFolderById('non_existent');
@@ -141,8 +153,9 @@ void main() {
           TestHelpers.createTestFolder(id: 'custom_2', name: 'Personal'),
         ];
 
-        when(() => repository.getCustomFolders())
-            .thenAnswer((_) async => customFolders);
+        when(
+          () => repository.getCustomFolders(),
+        ).thenAnswer((_) async => customFolders);
 
         // Act
         final result = await repository.getCustomFolders();
@@ -156,8 +169,9 @@ void main() {
     group('Folder Count Management', () {
       test('updateFolderCount updates folder recording count', () async {
         // Arrange
-        when(() => repository.updateFolderCount('folder_1', 5))
-            .thenAnswer((_) async => true);
+        when(
+          () => repository.updateFolderCount('folder_1', 5),
+        ).thenAnswer((_) async => true);
 
         // Act
         final result = await repository.updateFolderCount('folder_1', 5);
@@ -169,8 +183,9 @@ void main() {
 
       test('incrementFolderCount increases count by one', () async {
         // Arrange
-        when(() => repository.incrementFolderCount('folder_1'))
-            .thenAnswer((_) async => true);
+        when(
+          () => repository.incrementFolderCount('folder_1'),
+        ).thenAnswer((_) async => true);
 
         // Act
         final result = await repository.incrementFolderCount('folder_1');
@@ -182,8 +197,9 @@ void main() {
 
       test('decrementFolderCount decreases count by one', () async {
         // Arrange
-        when(() => repository.decrementFolderCount('folder_1'))
-            .thenAnswer((_) async => true);
+        when(
+          () => repository.decrementFolderCount('folder_1'),
+        ).thenAnswer((_) async => true);
 
         // Act
         final result = await repository.decrementFolderCount('folder_1');
@@ -197,10 +213,12 @@ void main() {
     group('Folder Validation', () {
       test('folderExistsByName checks for duplicate names', () async {
         // Arrange
-        when(() => repository.folderExistsByName('Existing Folder'))
-            .thenAnswer((_) async => true);
-        when(() => repository.folderExistsByName('New Folder'))
-            .thenAnswer((_) async => false);
+        when(
+          () => repository.folderExistsByName('Existing Folder'),
+        ).thenAnswer((_) async => true);
+        when(
+          () => repository.folderExistsByName('New Folder'),
+        ).thenAnswer((_) async => false);
 
         // Act & Assert
         expect(await repository.folderExistsByName('Existing Folder'), isTrue);
@@ -209,36 +227,60 @@ void main() {
 
       test('folderExistsByName with excludeId parameter', () async {
         // Arrange
-        when(() => repository.folderExistsByName('Test Folder', excludeId: 'folder_1'))
-            .thenAnswer((_) async => false);
+        when(
+          () => repository.folderExistsByName(
+            'Test Folder',
+            excludeId: 'folder_1',
+          ),
+        ).thenAnswer((_) async => false);
 
         // Act
-        final result = await repository.folderExistsByName('Test Folder', excludeId: 'folder_1');
+        final result = await repository.folderExistsByName(
+          'Test Folder',
+          excludeId: 'folder_1',
+        );
 
         // Assert
         expect(result, isFalse);
-        verify(() => repository.folderExistsByName('Test Folder', excludeId: 'folder_1')).called(1);
+        verify(
+          () => repository.folderExistsByName(
+            'Test Folder',
+            excludeId: 'folder_1',
+          ),
+        ).called(1);
       });
     });
 
     group('Advanced Folder Operations', () {
-      test('getFoldersWithRecordings returns folders containing recordings', () async {
-        // Arrange
-        final foldersWithRecordings = [
-          TestHelpers.createTestFolder(id: 'folder1', name: 'Work', recordingCount: 5),
-          TestHelpers.createTestFolder(id: 'folder2', name: 'Personal', recordingCount: 3),
-        ];
+      test(
+        'getFoldersWithRecordings returns folders containing recordings',
+        () async {
+          // Arrange
+          final foldersWithRecordings = [
+            TestHelpers.createTestFolder(
+              id: 'folder1',
+              name: 'Work',
+              recordingCount: 5,
+            ),
+            TestHelpers.createTestFolder(
+              id: 'folder2',
+              name: 'Personal',
+              recordingCount: 3,
+            ),
+          ];
 
-        when(() => repository.getFoldersWithRecordings())
-            .thenAnswer((_) async => foldersWithRecordings);
+          when(
+            () => repository.getFoldersWithRecordings(),
+          ).thenAnswer((_) async => foldersWithRecordings);
 
-        // Act
-        final result = await repository.getFoldersWithRecordings();
+          // Act
+          final result = await repository.getFoldersWithRecordings();
 
-        // Assert
-        expect(result.length, equals(2));
-        expect(result.every((f) => f.recordingCount > 0), isTrue);
-      });
+          // Assert
+          expect(result.length, equals(2));
+          expect(result.every((f) => f.recordingCount > 0), isTrue);
+        },
+      );
 
       test('searchFolders finds folders by name', () async {
         // Arrange
@@ -247,21 +289,26 @@ void main() {
           TestHelpers.createTestFolder(id: 'work2', name: 'Work Meetings'),
         ];
 
-        when(() => repository.searchFolders('work'))
-            .thenAnswer((_) async => searchResults);
+        when(
+          () => repository.searchFolders('work'),
+        ).thenAnswer((_) async => searchResults);
 
         // Act
         final result = await repository.searchFolders('work');
 
         // Assert
         expect(result.length, equals(2));
-        expect(result.every((f) => f.name.toLowerCase().contains('work')), isTrue);
+        expect(
+          result.every((f) => f.name.toLowerCase().contains('work')),
+          isTrue,
+        );
       });
 
       test('getTotalRecordingCount returns sum of all recordings', () async {
         // Arrange
-        when(() => repository.getTotalRecordingCount())
-            .thenAnswer((_) async => 42);
+        when(
+          () => repository.getTotalRecordingCount(),
+        ).thenAnswer((_) async => 42);
 
         // Act
         final result = await repository.getTotalRecordingCount();
@@ -282,8 +329,9 @@ void main() {
           'version': '1.0',
         };
 
-        when(() => repository.exportFolders())
-            .thenAnswer((_) async => exportData);
+        when(
+          () => repository.exportFolders(),
+        ).thenAnswer((_) async => exportData);
 
         // Act
         final result = await repository.exportFolders();
@@ -301,8 +349,9 @@ void main() {
           ],
         };
 
-        when(() => repository.importFolders(importData))
-            .thenAnswer((_) async => true);
+        when(
+          () => repository.importFolders(importData),
+        ).thenAnswer((_) async => true);
 
         // Act
         final result = await repository.importFolders(importData);
@@ -314,8 +363,9 @@ void main() {
 
       test('clearCustomFolders removes all user-created folders', () async {
         // Arrange
-        when(() => repository.clearCustomFolders())
-            .thenAnswer((_) async => true); // Successfully cleared folders
+        when(
+          () => repository.clearCustomFolders(),
+        ).thenAnswer((_) async => true); // Successfully cleared folders
 
         // Act
         final result = await repository.clearCustomFolders();
@@ -329,8 +379,9 @@ void main() {
     group('Error Handling', () {
       test('handles database errors gracefully', () async {
         // Arrange
-        when(() => repository.createFolder(any()))
-            .thenThrow(Exception('Database error'));
+        when(
+          () => repository.createFolder(any()),
+        ).thenThrow(Exception('Database error'));
 
         // Act & Assert
         expect(
@@ -341,8 +392,7 @@ void main() {
 
       test('handles invalid folder operations', () async {
         // Arrange
-        when(() => repository.deleteFolder(''))
-            .thenAnswer((_) async => false);
+        when(() => repository.deleteFolder('')).thenAnswer((_) async => false);
 
         // Act
         final result = await repository.deleteFolder('');
@@ -353,8 +403,9 @@ void main() {
 
       test('handles folder name validation errors', () async {
         // Arrange
-        when(() => repository.folderExistsByName(''))
-            .thenAnswer((_) async => false);
+        when(
+          () => repository.folderExistsByName(''),
+        ).thenAnswer((_) async => false);
 
         // Act
         final result = await repository.folderExistsByName('');
@@ -375,8 +426,9 @@ void main() {
           ),
         );
 
-        when(() => repository.getAllFolders())
-            .thenAnswer((_) async => largeFolderList);
+        when(
+          () => repository.getAllFolders(),
+        ).thenAnswer((_) async => largeFolderList);
 
         // Act
         final result = await repository.getAllFolders();
@@ -395,8 +447,9 @@ void main() {
           ),
         );
 
-        when(() => repository.searchFolders('test'))
-            .thenAnswer((_) async => searchResults);
+        when(
+          () => repository.searchFolders('test'),
+        ).thenAnswer((_) async => searchResults);
 
         // Act
         final result = await repository.searchFolders('test');
@@ -420,8 +473,8 @@ void main() {
         expect(folder.id, equals('test_id'));
         expect(folder.name, equals('Test Name'));
         expect(folder.type, equals(FolderType.customFolder));
-        expect(folder.icon, isA<IconData>());
-        expect(folder.color, isA<Color>());
+        expect(folder.iconCodePoint, isA<int>());
+        expect(folder.colorValue, isA<int>());
         expect(folder.createdAt, isA<DateTime>());
       });
 

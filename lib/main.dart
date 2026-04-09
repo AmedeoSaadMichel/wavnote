@@ -1,5 +1,5 @@
 // File: main.dart
-// 
+//
 // WavNote Voice Recording App - Main Entry Point
 // ============================================
 //
@@ -24,21 +24,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 // BLoC imports for state management
-import 'presentation/bloc/folder/folder_bloc.dart';      // Manages folder operations
+import 'presentation/bloc/folder/folder_bloc.dart'; // Manages folder operations
 import 'presentation/bloc/recording/recording_bloc.dart'; // Manages recording operations
-import 'presentation/bloc/settings/settings_bloc.dart';   // Manages app settings
+import 'presentation/bloc/settings/settings_bloc.dart'; // Manages app settings
 
 // Database imports
 import 'data/database/database_helper.dart'; // SQLite database helper
 
 // Dependency injection
-import 'config/dependency_injection.dart';                    // GetIt service locator setup
-import 'data/repositories/recording_repository.dart';        // Needed for sl<> type resolution
-import 'services/audio/audio_service_coordinator.dart';      // Needed for sl<> type resolution
-import 'services/location/geolocation_service.dart';         // Needed for sl<> type resolution
+import 'config/dependency_injection.dart'; // GetIt service locator setup
+import 'domain/repositories/i_folder_repository.dart';
+import 'domain/repositories/i_settings_repository.dart';
+import 'domain/repositories/i_audio_service_repository.dart';
+import 'domain/repositories/i_recording_repository.dart';
+import 'domain/repositories/i_location_repository.dart';
 
 // Core imports
-import 'core/routing/app_router.dart';                   // GoRouter configuration
+import 'core/routing/app_router.dart'; // GoRouter configuration
 import 'presentation/widgets/common/skeleton_screen.dart'; // Loading screen while app initializes
 
 // ============================================
@@ -52,13 +54,13 @@ import 'presentation/widgets/common/skeleton_screen.dart'; // Loading screen whi
 // ============================================
 
 /// Main entry point for the WavNote voice recording app
-/// 
+///
 /// This function performs the following initialization steps:
 /// 1. Initialize Flutter bindings
 /// 2. Set up high-performance database connection pool
 /// 3. Initialize core services (audio, location, repository)
 /// 4. Launch the main application widget
-/// 
+///
 /// The initialization order is critical for optimal performance:
 /// - Database pool first for fastest data access
 /// - Audio services second for recording capabilities
@@ -80,7 +82,6 @@ void main() async {
     // ========================================
     // Register all services and repositories via GetIt
     await setupDependencies();
-
   } catch (e) {
     // Log initialization errors but continue app startup
     // The app should still be functional even if some services fail
@@ -96,7 +97,7 @@ void main() async {
 // ============================================
 
 /// Root application widget that sets up BLoC providers and app lifecycle management
-/// 
+///
 /// This widget serves as the foundation of the entire application and is responsible for:
 /// - Setting up global BLoC providers for state management
 /// - Managing app lifecycle events (pause, resume, terminate)
@@ -115,7 +116,7 @@ class WavNoteApp extends StatefulWidget {
 class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
   // Store router future to prevent recreation on every build
   late final Future<GoRouter> _routerFuture;
-  
+
   @override
   void initState() {
     super.initState();
@@ -125,12 +126,12 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
     // This allows us to respond to app state changes (foreground, background, etc.)
     WidgetsBinding.instance.addObserver(this);
   }
-  
+
   /// Handle app lifecycle state changes for optimal resource management
-  /// 
+  ///
   /// This method is called whenever the app transitions between states:
   /// - paused: App goes to background (home button pressed, notification, etc.)
-  /// - resumed: App returns to foreground 
+  /// - resumed: App returns to foreground
   /// - detached: App is being terminated by the system
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -145,13 +146,13 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
         // Close database connection on app termination
         DatabaseHelper.closeDatabase();
         break;
-        
+
       default:
         // Handle other states (inactive, hidden) - no action needed
         break;
     }
   }
-  
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -159,7 +160,7 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
   }
 
   /// Build the root widget tree with BLoC providers and routing
-  /// 
+  ///
   /// This method sets up the entire application structure:
   /// 1. MultiBlocProvider - Provides global BLoCs to all child widgets
   /// 2. FutureBuilder - Handles async router creation
@@ -175,29 +176,33 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
       providers: [
         // FolderBloc: Manages folder operations (create, delete, organize)
         BlocProvider(
-          create: (context) => FolderBloc()..add(const LoadFolders()),
+          create: (context) =>
+              FolderBloc(folderRepository: sl<IFolderRepository>())
+                ..add(const LoadFolders()),
         ),
-        
+
         // RecordingBloc: Manages recording operations (record, play, save, delete)
         // Dependencies resolved via GetIt service locator
         BlocProvider(
           create: (context) => RecordingBloc(
-            audioService: sl<AudioServiceCoordinator>(),
-            recordingRepository: sl<RecordingRepository>(),
-            geolocationService: sl<GeolocationService>(),
+            audioService: sl<IAudioServiceRepository>(),
+            recordingRepository: sl<IRecordingRepository>(),
+            locationRepository: sl<ILocationRepository>(),
             folderBloc: context.read<FolderBloc>(),
           ),
         ),
-        
+
         // SettingsBloc: Manages app settings (audio format, quality, preferences)
         BlocProvider(
-          create: (context) => SettingsBloc()..add(const LoadSettings()),
+          create: (context) =>
+              SettingsBloc(settingsRepository: sl<ISettingsRepository>())
+                ..add(const LoadSettings()),
         ),
-        
+
         // Note: AudioPlayerBloc removed - using single AudioPlayer at screen level
         // This improves performance and reduces complexity
       ],
-      
+
       // ========================================
       // ROUTER SETUP
       // ========================================
@@ -205,16 +210,16 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
       child: FutureBuilder<GoRouter>(
         future: _routerFuture,
         builder: (context, snapshot) {
-          
           // Show loading screen while router is being created
           if (snapshot.connectionState == ConnectionState.waiting) {
             return MaterialApp(
               title: 'WavNote - Voice Memos',
               debugShowCheckedModeBanner: false,
-              home: const SimpleSkeletonScreen(), // Beautiful skeleton instead of spinner
+              home:
+                  const SimpleSkeletonScreen(), // Beautiful skeleton instead of spinner
             );
           }
-          
+
           // Show error screen if router creation fails
           if (snapshot.hasError) {
             print('❌ Router creation error: ${snapshot.error}');
@@ -256,7 +261,7 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
               ),
             );
           }
-          
+
           // ========================================
           // MAIN APPLICATION WITH ROUTER
           // ========================================
@@ -264,11 +269,11 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
           return MaterialApp.router(
             title: 'WavNote - Voice Memos',
             debugShowCheckedModeBanner: false,
-            
+
             // Development flags for debugging and performance monitoring
             showPerformanceOverlay: false, // Set to true to see FPS/GPU metrics
-            showSemanticsDebugger: false, // Set to true to see accessibility info
-            
+            showSemanticsDebugger:
+                false, // Set to true to see accessibility info
             // Use the router configuration created asynchronously
             routerConfig: snapshot.data!,
 
@@ -279,21 +284,21 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
             theme: ThemeData(
               // Base theme settings
               brightness: Brightness.dark,
-              scaffoldBackgroundColor: Colors.transparent, // Allow gradient backgrounds
+              scaffoldBackgroundColor:
+                  Colors.transparent, // Allow gradient backgrounds
               fontFamily: 'Roboto', // Clean, readable font
-              
               // Color scheme inspired by midnight gospel aesthetics
               colorScheme: const ColorScheme.dark(
-                primary: Colors.yellowAccent,      // Bright accent for CTAs
-                secondary: Colors.cyan,            // Cool accent for secondary actions
-                surface: Color(0xFF5A2B8C),       // Deep purple for surfaces
-                onSurface: Colors.white,          // White text on dark surfaces
+                primary: Colors.yellowAccent, // Bright accent for CTAs
+                secondary: Colors.cyan, // Cool accent for secondary actions
+                surface: Color(0xFF5A2B8C), // Deep purple for surfaces
+                onSurface: Colors.white, // White text on dark surfaces
               ),
-              
+
               // App bar styling - transparent to show gradient backgrounds
               appBarTheme: const AppBarTheme(
                 backgroundColor: Colors.transparent,
-                elevation: 0,                     // Flat design
+                elevation: 0, // Flat design
                 centerTitle: true,
                 titleTextStyle: TextStyle(
                   color: Colors.yellowAccent,
@@ -301,26 +306,25 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              
+
               // Primary button styling - bright yellow for important actions
               elevatedButtonTheme: ElevatedButtonThemeData(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.yellowAccent,
-                  foregroundColor: Colors.black,  // Black text on yellow background
+                  foregroundColor:
+                      Colors.black, // Black text on yellow background
                   shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.all(Radius.circular(20)),
                   ),
-                  elevation: 4,                   // Subtle shadow for depth
+                  elevation: 4, // Subtle shadow for depth
                 ),
               ),
-              
+
               // Secondary button styling - cyan for secondary actions
               textButtonTheme: TextButtonThemeData(
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.cyan,
-                ),
+                style: TextButton.styleFrom(foregroundColor: Colors.cyan),
               ),
-              
+
               // Input field styling - consistent with cosmic theme
               inputDecorationTheme: InputDecorationTheme(
                 hintStyle: TextStyle(
@@ -340,4 +344,3 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
     );
   }
 }
-

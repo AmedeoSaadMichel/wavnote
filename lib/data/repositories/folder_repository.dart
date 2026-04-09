@@ -1,11 +1,11 @@
 // File: data/repositories/folder_repository.dart
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../domain/entities/folder_entity.dart';
 import '../../domain/repositories/i_folder_repository.dart';
 import '../../core/enums/folder_type.dart';
 import '../database/database_helper.dart';
+import '../mappers/folder_sort_mapper.dart';
 import 'recording_repository_stats.dart';
 
 /// SQLite implementation of folder repository with debugging
@@ -20,20 +20,20 @@ class FolderRepository implements IFolderRepository {
       FolderEntity.defaultFolder(
         id: 'all_recordings',
         name: 'All Recordings',
-        icon: Icons.graphic_eq,
-        color: Colors.cyan,
+        iconCodePoint: Icons.graphic_eq.codePoint,
+        colorValue: Colors.cyan.value,
       ),
       FolderEntity.defaultFolder(
         id: 'favourites',
         name: 'Favourites',
-        icon: Icons.favorite,
-        color: Colors.red,
+        iconCodePoint: Icons.favorite.codePoint,
+        colorValue: Colors.red.value,
       ),
       FolderEntity.defaultFolder(
         id: 'recently_deleted',
         name: 'Recently Deleted',
-        icon: FontAwesomeIcons.skull,
-        color: Colors.yellow,
+        iconCodePoint: Icons.delete.codePoint,
+        colorValue: Colors.yellow.value,
       ),
     ];
   }
@@ -52,9 +52,11 @@ class FolderRepository implements IFolderRepository {
       // Get default folders and update their recording counts
       final defaultFolders = _getDefaultFolders();
       final updatedDefaultFolders = <FolderEntity>[];
-      
+
       for (final folder in defaultFolders) {
-        final recordingCount = await _recordingStats.getRecordingCountByFolder(folder.id);
+        final recordingCount = await _recordingStats.getRecordingCountByFolder(
+          folder.id,
+        );
         final updatedFolder = folder.copyWith(recordingCount: recordingCount);
         updatedDefaultFolders.add(updatedFolder);
         print('📊 ${folder.name}: $recordingCount recordings');
@@ -63,7 +65,9 @@ class FolderRepository implements IFolderRepository {
       // Update custom folder recording counts as well
       final updatedCustomFolders = <FolderEntity>[];
       for (final folder in customFolders) {
-        final recordingCount = await _recordingStats.getRecordingCountByFolder(folder.id);
+        final recordingCount = await _recordingStats.getRecordingCountByFolder(
+          folder.id,
+        );
         final updatedFolder = folder.copyWith(recordingCount: recordingCount);
         updatedCustomFolders.add(updatedFolder);
         print('📊 ${folder.name}: $recordingCount recordings');
@@ -72,7 +76,9 @@ class FolderRepository implements IFolderRepository {
       // Combine updated folders
       final allFolders = [...updatedDefaultFolders, ...updatedCustomFolders];
 
-      print('📂 Total folders: ${allFolders.length} (${updatedDefaultFolders.length} default, ${updatedCustomFolders.length} custom)');
+      print(
+        '📂 Total folders: ${allFolders.length} (${updatedDefaultFolders.length} default, ${updatedCustomFolders.length} custom)',
+      );
 
       return allFolders;
     } catch (e) {
@@ -165,7 +171,9 @@ class FolderRepository implements IFolderRepository {
       // Check if folder with same name already exists
       final exists = await folderExistsByName(folder.name);
       if (exists) {
-        throw Exception('A folder with the name "${folder.name}" already exists');
+        throw Exception(
+          'A folder with the name "${folder.name}" already exists',
+        );
       }
 
       final folderMap = _mapFromFolderEntity(folder);
@@ -206,7 +214,8 @@ class FolderRepository implements IFolderRepository {
       final db = await DatabaseHelper.database;
 
       final folderMap = _mapFromFolderEntity(folder);
-      folderMap[DatabaseHelper.folderUpdatedAtColumn] = DateTime.now().toIso8601String();
+      folderMap[DatabaseHelper.folderUpdatedAtColumn] = DateTime.now()
+          .toIso8601String();
 
       final rowsAffected = await db.update(
         DatabaseHelper.foldersTable,
@@ -268,7 +277,7 @@ class FolderRepository implements IFolderRepository {
     try {
       // Check default folders
       final defaultExists = _getDefaultFolders().any(
-            (folder) => folder.name.toLowerCase() == name.toLowerCase(),
+        (folder) => folder.name.toLowerCase() == name.toLowerCase(),
       );
 
       if (defaultExists) {
@@ -279,7 +288,8 @@ class FolderRepository implements IFolderRepository {
       // Check custom folders
       final db = await DatabaseHelper.database;
 
-      String whereClause = 'LOWER(${DatabaseHelper.folderNameColumn}) = LOWER(?)';
+      String whereClause =
+          'LOWER(${DatabaseHelper.folderNameColumn}) = LOWER(?)';
       List<dynamic> whereArgs = [name];
 
       if (excludeId != null) {
@@ -314,7 +324,8 @@ class FolderRepository implements IFolderRepository {
         DatabaseHelper.foldersTable,
         {
           DatabaseHelper.folderCountColumn: newCount,
-          DatabaseHelper.folderUpdatedAtColumn: DateTime.now().toIso8601String(),
+          DatabaseHelper.folderUpdatedAtColumn: DateTime.now()
+              .toIso8601String(),
         },
         where: '${DatabaseHelper.folderIdColumn} = ?',
         whereArgs: [folderId],
@@ -400,13 +411,15 @@ class FolderRepository implements IFolderRepository {
   }
 
   @override
-  Future<List<FolderEntity>> getFoldersSorted(FolderSortCriteria criteria) async {
+  Future<List<FolderEntity>> getFoldersSorted(
+    FolderSortCriteria criteria,
+  ) async {
     try {
       final db = await DatabaseHelper.database;
 
       final List<Map<String, dynamic>> maps = await db.query(
         DatabaseHelper.foldersTable,
-        orderBy: criteria.sqlOrderBy,
+        orderBy: FolderSortMapper.toSqlOrderBy(criteria),
       );
 
       final customFolders = maps.map((map) => _mapToFolderEntity(map)).toList();
@@ -566,8 +579,8 @@ class FolderRepository implements IFolderRepository {
     return {
       DatabaseHelper.folderIdColumn: folder.id,
       DatabaseHelper.folderNameColumn: folder.name,
-      DatabaseHelper.folderIconColumn: folder.icon.codePoint,
-      DatabaseHelper.folderColorColumn: folder.color.value,
+      DatabaseHelper.folderIconColumn: folder.iconCodePoint,
+      DatabaseHelper.folderColorColumn: folder.colorValue,
       DatabaseHelper.folderCountColumn: folder.recordingCount,
       DatabaseHelper.folderTypeColumn: folder.type.index,
       DatabaseHelper.folderIsDeletableColumn: folder.isDeletable ? 1 : 0,

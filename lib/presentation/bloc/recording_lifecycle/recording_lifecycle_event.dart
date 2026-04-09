@@ -9,6 +9,11 @@ abstract class RecordingLifecycleEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+/// Initialize the recording service
+class InitializeRecordingService extends RecordingLifecycleEvent {
+  const InitializeRecordingService();
+}
+
 /// Start recording event
 class StartRecording extends RecordingLifecycleEvent {
   final String filePath;
@@ -28,7 +33,14 @@ class StartRecording extends RecordingLifecycleEvent {
   });
 
   @override
-  List<Object?> get props => [filePath, folderId, folderName, format, sampleRate, bitRate];
+  List<Object?> get props => [
+    filePath,
+    folderId,
+    folderName,
+    format,
+    sampleRate,
+    bitRate,
+  ];
 }
 
 /// Stop recording event

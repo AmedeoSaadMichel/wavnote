@@ -19,6 +19,14 @@
 import 'package:get_it/get_it.dart';
 
 import '../data/repositories/recording_repository.dart';
+import '../data/repositories/folder_repository.dart';
+import '../data/repositories/settings_repository_impl.dart';
+import '../domain/repositories/i_audio_service_repository.dart';
+import '../domain/repositories/i_audio_trimmer_repository.dart';
+import '../domain/repositories/i_folder_repository.dart';
+import '../domain/repositories/i_location_repository.dart';
+import '../domain/repositories/i_recording_repository.dart';
+import '../domain/repositories/i_settings_repository.dart';
 import '../services/audio/audio_service_coordinator.dart';
 import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
@@ -32,28 +40,34 @@ final GetIt sl = GetIt.instance;
 /// Safe to call multiple times (GetIt will not re-register).
 Future<void> setupDependencies() async {
   // ── Services ──────────────────────────────────────────────
-  if (!sl.isRegistered<AudioServiceCoordinator>()) {
-    sl.registerLazySingleton<AudioServiceCoordinator>(
+  if (!sl.isRegistered<IAudioServiceRepository>()) {
+    sl.registerLazySingleton<IAudioServiceRepository>(
       () => AudioServiceCoordinator(),
     );
   }
 
-  if (!sl.isRegistered<GeolocationService>()) {
-    sl.registerLazySingleton<GeolocationService>(
-      () => GeolocationService(),
-    );
+  if (!sl.isRegistered<ILocationRepository>()) {
+    sl.registerLazySingleton<ILocationRepository>(() => GeolocationService());
   }
 
   // ── Repositories ──────────────────────────────────────────
-  if (!sl.isRegistered<RecordingRepository>()) {
-    sl.registerLazySingleton<RecordingRepository>(
-      () => RecordingRepository(),
+  if (!sl.isRegistered<IRecordingRepository>()) {
+    sl.registerLazySingleton<IRecordingRepository>(() => RecordingRepository());
+  }
+
+  if (!sl.isRegistered<IFolderRepository>()) {
+    sl.registerLazySingleton<IFolderRepository>(() => FolderRepository());
+  }
+
+  if (!sl.isRegistered<IAudioTrimmerRepository>()) {
+    sl.registerLazySingleton<IAudioTrimmerRepository>(
+      () => AudioTrimmerService(),
     );
   }
 
-  if (!sl.isRegistered<AudioTrimmerService>()) {
-    sl.registerLazySingleton<AudioTrimmerService>(
-      () => AudioTrimmerService(),
+  if (!sl.isRegistered<ISettingsRepository>()) {
+    sl.registerLazySingleton<ISettingsRepository>(
+      () => SettingsRepositoryImpl(),
     );
   }
 
@@ -61,7 +75,7 @@ Future<void> setupDependencies() async {
   // Initialize the audio coordinator eagerly so it is ready
   // before the first BLoC is created. The guard inside
   // AudioServiceCoordinator.initialize() makes this idempotent.
-  final audioInitialized = await sl<AudioServiceCoordinator>().initialize();
+  final audioInitialized = await sl<IAudioServiceRepository>().initialize();
   if (!audioInitialized) {
     // Non-fatal: app continues, recording will fail gracefully
     assert(false, 'AudioServiceCoordinator failed to initialize');

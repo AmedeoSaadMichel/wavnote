@@ -1,13 +1,13 @@
 // File: services/audio/audio_trimmer_service.dart
 import 'package:flutter/services.dart';
+import '../../domain/repositories/i_audio_trimmer_repository.dart';
 
 /// Flutter-side wrapper per il native audio trimmer platform channel.
 ///
 /// Channel: wavnote/audio_trimmer
 /// Methods: trimAudio, concatenateAudio
-class AudioTrimmerService {
-  static const MethodChannel _channel =
-      MethodChannel('wavnote/audio_trimmer');
+class AudioTrimmerService implements IAudioTrimmerRepository {
+  static const MethodChannel _channel = MethodChannel('wavnote/audio_trimmer');
 
   bool _isInitialized = false;
 
@@ -23,6 +23,7 @@ class AudioTrimmerService {
   /// il file originale viene sostituito atomicamente.
   ///
   /// Lancia [PlatformException] in caso di errore nativo.
+  @override
   Future<void> trimAudio({
     required String filePath,
     required int durationMs,
@@ -42,6 +43,7 @@ class AudioTrimmerService {
   /// Entrambi gli input devono essere nello stesso formato.
   /// Il risultato sostituisce [outputPath].
   /// Lancia [PlatformException] in caso di errore nativo.
+  @override
   Future<void> concatenateAudio({
     required String basePath,
     required String appendPath,

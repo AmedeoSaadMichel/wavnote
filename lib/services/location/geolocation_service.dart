@@ -4,15 +4,18 @@ import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 import 'dart:io';
 
+import '../../domain/repositories/i_location_repository.dart';
+
 /// Service for handling geolocation and address lookup
 ///
 /// Provides methods to get current location and convert coordinates
 /// to human-readable addresses for recording names.
-class GeolocationService {
+class GeolocationService implements ILocationRepository {
   static const String _tag = 'GeolocationService';
 
   /// Get current location and convert to address
   /// Returns address string like "Via Cerlini 19, Milano" or fallback
+  @override
   Future<String> getCurrentAddress() async {
     try {
       print('$_tag: 📍 Getting current location...');
@@ -215,6 +218,7 @@ class GeolocationService {
   }
 
   /// Get simplified address for recording names (street name + number only)
+  @override
   Future<String> getRecordingLocationName() async {
     try {
       final fullAddress = await getCurrentAddress();
@@ -235,6 +239,7 @@ class GeolocationService {
   }
 
   /// Check if location permissions are available
+  @override
   Future<bool> hasLocationPermission() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -247,6 +252,7 @@ class GeolocationService {
   }
 
   /// Request location permissions
+  @override
   Future<bool> requestLocationPermission() async {
     try {
       LocationPermission permission = await Geolocator.requestPermission();

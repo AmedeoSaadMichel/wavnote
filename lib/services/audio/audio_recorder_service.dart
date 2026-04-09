@@ -52,6 +52,9 @@ class AudioRecorderService implements IAudioServiceRepository {
   // ==== INITIALIZATION ====
 
   @override
+  bool get needsDisposal => true;
+
+  @override
   Future<bool> initialize() async {
     if (_isInitialized) return true;
 
@@ -67,7 +70,6 @@ class AudioRecorderService implements IAudioServiceRepository {
       _isInitialized = true;
       debugPrint('$_tag: ✅ Audio recorder initialized');
       return true;
-
     } catch (e) {
       _lastError = 'Failed to initialize audio recorder: $e';
       debugPrint('$_tag: ❌ Initialization failed: $e');
@@ -208,9 +210,10 @@ class AudioRecorderService implements IAudioServiceRepository {
       _startAmplitudeMonitoring();
       _startDurationMonitoring();
 
-      debugPrint('$_tag: ✅ Recording started — $fullPath ($format, ${sampleRate}Hz)');
+      debugPrint(
+        '$_tag: ✅ Recording started — $fullPath ($format, ${sampleRate}Hz)',
+      );
       return true;
-
     } catch (e) {
       _lastError = 'Failed to start recording: $e';
       debugPrint('$_tag: ❌ Recording start failed: $e');
@@ -261,9 +264,10 @@ class AudioRecorderService implements IAudioServiceRepository {
       _pausedDuration = Duration.zero;
       _lastError = null;
 
-      debugPrint('$_tag: ✅ Recording stopped — ${recording.name} (${finalDuration.inMilliseconds}ms, ${fileSize}B)');
+      debugPrint(
+        '$_tag: ✅ Recording stopped — ${recording.name} (${finalDuration.inMilliseconds}ms, ${fileSize}B)',
+      );
       return recording;
-
     } catch (e) {
       _lastError = 'Failed to stop recording: $e';
       debugPrint('$_tag: ❌ Recording stop failed: $e');
@@ -355,19 +359,35 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== PLAYBACK — delegated to AudioPlayerService via coordinator ====
 
-  @override Future<bool> startPlaying(String filePath, {Duration? initialPosition}) async => false;
-  @override Future<bool> stopPlaying() async => false;
-  @override Future<bool> pausePlaying() async => false;
-  @override Future<bool> resumePlaying() async => false;
-  @override Future<bool> seekTo(Duration position) async => false;
-  @override Future<bool> setPlaybackSpeed(double speed) async => false;
-  @override Future<bool> setVolume(double volume) async => false;
-  @override Future<bool> isPlaying() async => false;
-  @override Future<bool> isPlaybackPaused() async => false;
-  @override Future<Duration> getCurrentPlaybackPosition() async => Duration.zero;
-  @override Future<Duration> getCurrentPlaybackDuration() async => Duration.zero;
-  @override Stream<Duration> getPlaybackPositionStream() => const Stream.empty();
-  @override Stream<void> getPlaybackCompletionStream() => const Stream.empty();
+  @override
+  Future<bool> startPlaying(
+    String filePath, {
+    Duration? initialPosition,
+  }) async => false;
+  @override
+  Future<bool> stopPlaying() async => false;
+  @override
+  Future<bool> pausePlaying() async => false;
+  @override
+  Future<bool> resumePlaying() async => false;
+  @override
+  Future<bool> seekTo(Duration position) async => false;
+  @override
+  Future<bool> setPlaybackSpeed(double speed) async => false;
+  @override
+  Future<bool> setVolume(double volume) async => false;
+  @override
+  Future<bool> isPlaying() async => false;
+  @override
+  Future<bool> isPlaybackPaused() async => false;
+  @override
+  Future<Duration> getCurrentPlaybackPosition() async => Duration.zero;
+  @override
+  Future<Duration> getCurrentPlaybackDuration() async => Duration.zero;
+  @override
+  Stream<Duration> getPlaybackPositionStream() => const Stream.empty();
+  @override
+  Stream<void> getPlaybackCompletionStream() => const Stream.empty();
 
   // ==== DEVICE & FORMAT ====
 
@@ -422,35 +442,57 @@ class AudioRecorderService implements IAudioServiceRepository {
   // ==== ADVANCED (stubs) ====
 
   @override
-  Future<String?> convertAudioFile({required String inputPath, required String outputPath,
-      required AudioFormat targetFormat, int? targetSampleRate, int? targetBitRate}) async => null;
+  Future<String?> convertAudioFile({
+    required String inputPath,
+    required String outputPath,
+    required AudioFormat targetFormat,
+    int? targetSampleRate,
+    int? targetBitRate,
+  }) async => null;
 
   @override
-  Future<String?> trimAudioFile({required String inputPath, required String outputPath,
-      required Duration startTime, required Duration endTime}) async => null;
+  Future<String?> trimAudioFile({
+    required String inputPath,
+    required String outputPath,
+    required Duration startTime,
+    required Duration endTime,
+  }) async => null;
 
   @override
-  Future<String?> mergeAudioFiles({required List<String> inputPaths,
-      required String outputPath, required AudioFormat outputFormat}) async => null;
+  Future<String?> mergeAudioFiles({
+    required List<String> inputPaths,
+    required String outputPath,
+    required AudioFormat outputFormat,
+  }) async => null;
 
   @override
-  Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100}) async {
+  Future<List<double>> getWaveformData(
+    String filePath, {
+    int sampleCount = 100,
+  }) async {
     final random = math.Random(42);
     return List.generate(sampleCount, (_) => random.nextDouble());
   }
 
-  @override Future<bool> setAudioSessionCategory(AudioSessionCategory category) async => true;
-  @override Future<bool> enableBackgroundRecording() async => true;
-  @override Future<bool> disableBackgroundRecording() async => true;
+  @override
+  Future<bool> setAudioSessionCategory(AudioSessionCategory category) async =>
+      true;
+  @override
+  Future<bool> enableBackgroundRecording() async => true;
+  @override
+  Future<bool> disableBackgroundRecording() async => true;
 
   // ==== PRIVATE HELPERS ====
 
   /// Map [AudioFormat] to [record] package encoder
   AudioEncoder _getAudioEncoder(AudioFormat format) {
     switch (format) {
-      case AudioFormat.wav:  return AudioEncoder.wav;
-      case AudioFormat.m4a:  return AudioEncoder.aacLc;
-      case AudioFormat.flac: return AudioEncoder.flac;
+      case AudioFormat.wav:
+        return AudioEncoder.wav;
+      case AudioFormat.m4a:
+        return AudioEncoder.aacLc;
+      case AudioFormat.flac:
+        return AudioEncoder.flac;
     }
   }
 
@@ -523,9 +565,12 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   AudioFormat _getFormatFromPath(String path) {
     switch (path.toLowerCase().split('.').last) {
-      case 'wav':  return AudioFormat.wav;
-      case 'flac': return AudioFormat.flac;
-      default:     return AudioFormat.m4a;
+      case 'wav':
+        return AudioFormat.wav;
+      case 'flac':
+        return AudioFormat.flac;
+      default:
+        return AudioFormat.m4a;
     }
   }
 

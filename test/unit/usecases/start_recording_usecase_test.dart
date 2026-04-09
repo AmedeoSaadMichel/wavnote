@@ -12,14 +12,14 @@ import 'package:dartz/dartz.dart';
 
 import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
 import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
-import 'package:wavnote/services/location/geolocation_service.dart';
+import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/core/errors/failures.dart';
 
 import '../../helpers/test_helpers.dart';
 
 class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
-class MockGeolocationService extends Mock implements GeolocationService {}
+class MockLocationRepository extends Mock implements ILocationRepository {}
 
 void main() {
   setUpAll(() async {
@@ -29,11 +29,11 @@ void main() {
   group('StartRecordingUseCase', () {
     late StartRecordingUseCase useCase;
     late MockAudioServiceRepository mockAudioService;
-    late MockGeolocationService mockGeolocationService;
+    late MockLocationRepository mockLocationRepository;
 
     setUp(() {
       mockAudioService = MockAudioServiceRepository();
-      mockGeolocationService = MockGeolocationService();
+      mockLocationRepository = MockLocationRepository();
 
       when(() => mockAudioService.hasMicrophonePermission()).thenAnswer((_) async => true);
       when(() => mockAudioService.requestMicrophonePermission()).thenAnswer((_) async => true);
@@ -43,12 +43,12 @@ void main() {
         sampleRate: any(named: 'sampleRate'),
         bitRate: any(named: 'bitRate'),
       )).thenAnswer((_) async => true);
-      when(() => mockGeolocationService.getRecordingLocationName())
+      when(() => mockLocationRepository.getRecordingLocationName())
           .thenAnswer((_) async => 'Via Cerlini 19, Milano');
 
       useCase = StartRecordingUseCase(
         audioService: mockAudioService,
-        geolocationService: mockGeolocationService,
+        locationRepository: mockLocationRepository,
       );
     });
 
@@ -67,7 +67,7 @@ void main() {
         expect(success.startTime, isNotNull);
 
         verify(() => mockAudioService.hasMicrophonePermission()).called(1);
-        verify(() => mockGeolocationService.getRecordingLocationName()).called(1);
+        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
         verify(() => mockAudioService.startRecording(
           filePath: any(named: 'filePath'),
           format: AudioFormat.m4a,
@@ -163,7 +163,7 @@ void main() {
 
     group('Location-Based Title Generation', () {
       test('uses location service for title', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'Central Park, New York');
 
         final result = await useCase.execute(folderId: 'test_folder');
@@ -174,7 +174,7 @@ void main() {
       });
 
       test('falls back to timestamp when location service throws', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenThrow(Exception('Location service unavailable'));
 
         final result = await useCase.execute(folderId: 'test_folder');
@@ -185,7 +185,7 @@ void main() {
       });
 
       test('falls back to timestamp when location service returns empty string', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => '');
 
         final result = await useCase.execute(folderId: 'test_folder');
@@ -198,7 +198,7 @@ void main() {
 
     group('File Path Generation', () {
       test('sanitizes invalid characters from filename', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'Invalid<>:"/|?*Characters');
 
         final result = await useCase.execute(folderId: 'test_folder');
@@ -214,7 +214,7 @@ void main() {
       });
 
       test('replaces spaces with underscores', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'Recording with spaces');
 
         final result = await useCase.execute(folderId: 'test_folder');
@@ -225,7 +225,7 @@ void main() {
       });
 
       test('truncates very long filenames', () async {
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'A' * 100);
 
         final result = await useCase.execute(folderId: 'test_folder');

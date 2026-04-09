@@ -5,26 +5,29 @@ import 'package:flutter/foundation.dart';
 /// This prevents cascade rebuilds when audio position changes
 class AudioStateManager extends ChangeNotifier {
   // High-frequency updates (position, amplitude) - Use ValueNotifier
-  final ValueNotifier<Duration> _positionNotifier = ValueNotifier(Duration.zero);
-  final ValueNotifier<Duration> _durationNotifier = ValueNotifier(Duration.zero);
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier(
+    Duration.zero,
+  );
+  final ValueNotifier<Duration> _durationNotifier = ValueNotifier(
+    Duration.zero,
+  );
   final ValueNotifier<double> _amplitudeNotifier = ValueNotifier(0.0);
-  
+
   // Medium-frequency updates (playback state) - Use ValueNotifier
   final ValueNotifier<bool> _isPlayingNotifier = ValueNotifier(false);
   final ValueNotifier<bool> _isBufferingNotifier = ValueNotifier(false);
-  
+
   // Low-frequency updates (current file, errors) - Use ChangeNotifier
+  String? _expandedRecordingId;
   String? _currentRecordingId;
   String? _errorMessage;
-  
-  // Getters for high-frequency state (UI components listen directly)
-  ValueListenable<Duration> get positionNotifier => _positionNotifier;
-  ValueListenable<Duration> get durationNotifier => _durationNotifier;
-  ValueListenable<double> get amplitudeNotifier => _amplitudeNotifier;
-  ValueListenable<bool> get isPlayingNotifier => _isPlayingNotifier;
-  ValueListenable<bool> get isBufferingNotifier => _isBufferingNotifier;
-  
+
+  // Public ValueNotifier getters for ValueListenableBuilder in UI
+  ValueNotifier<Duration> get positionNotifier => _positionNotifier;
+  ValueNotifier<Duration> get durationNotifier => _durationNotifier;
+
   // Getters for low-frequency state (accessed via ChangeNotifier)
+  String? get expandedRecordingId => _expandedRecordingId;
   String? get currentRecordingId => _currentRecordingId;
   String? get errorMessage => _errorMessage;
   Duration get position => _positionNotifier.value;
@@ -32,41 +35,38 @@ class AudioStateManager extends ChangeNotifier {
   bool get isPlaying => _isPlayingNotifier.value;
   bool get isBuffering => _isBufferingNotifier.value;
   double get amplitude => _amplitudeNotifier.value;
-  
+
   // Computed properties
   double get progress {
     if (duration.inMilliseconds == 0) return 0.0;
     return position.inMilliseconds / duration.inMilliseconds;
   }
-  
+
   bool get hasCurrentRecording => _currentRecordingId != null;
-  
+
   /// Update audio position (high-frequency - ~10fps)
   void updatePosition(Duration newPosition) {
     if (_positionNotifier.value != newPosition) {
       _positionNotifier.value = newPosition;
     }
   }
-  
+
   /// Update audio duration (low-frequency)
   void updateDuration(Duration newDuration) {
     if (_durationNotifier.value != newDuration) {
       _durationNotifier.value = newDuration;
     }
   }
-  
+
   /// Update amplitude for waveform visualization (high-frequency)
   void updateAmplitude(double newAmplitude) {
     if (_amplitudeNotifier.value != newAmplitude) {
       _amplitudeNotifier.value = newAmplitude;
     }
   }
-  
+
   /// Update playback state (medium-frequency)
-  void updatePlaybackState({
-    bool? isPlaying,
-    bool? isBuffering,
-  }) {
+  void updatePlaybackState({bool? isPlaying, bool? isBuffering}) {
     if (isPlaying != null && _isPlayingNotifier.value != isPlaying) {
       _isPlayingNotifier.value = isPlaying;
     }
@@ -74,7 +74,15 @@ class AudioStateManager extends ChangeNotifier {
       _isBufferingNotifier.value = isBuffering;
     }
   }
-  
+
+  /// Update expanded recording (low-frequency - triggers ChangeNotifier)
+  void updateExpandedRecording(String? recordingId) {
+    if (_expandedRecordingId != recordingId) {
+      _expandedRecordingId = recordingId;
+      notifyListeners();
+    }
+  }
+
   /// Update current recording (low-frequency - triggers ChangeNotifier)
   void updateCurrentRecording(String? recordingId) {
     if (_currentRecordingId != recordingId) {
@@ -82,7 +90,7 @@ class AudioStateManager extends ChangeNotifier {
       notifyListeners(); // Only notify for significant state changes
     }
   }
-  
+
   /// Update error state (low-frequency - triggers ChangeNotifier)
   void updateError(String? error) {
     if (_errorMessage != error) {
@@ -90,7 +98,7 @@ class AudioStateManager extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Reset all audio state
   void reset() {
     _positionNotifier.value = Duration.zero;
@@ -99,17 +107,18 @@ class AudioStateManager extends ChangeNotifier {
     _isPlayingNotifier.value = false;
     _isBufferingNotifier.value = false;
     _currentRecordingId = null;
+    _expandedRecordingId = null;
     _errorMessage = null;
     notifyListeners();
   }
-  
+
   /// Seek to specific position
   void seekTo(Duration position) {
     if (position >= Duration.zero && position <= duration) {
       updatePosition(position);
     }
   }
-  
+
   @override
   void dispose() {
     _positionNotifier.dispose();
@@ -119,11 +128,11 @@ class AudioStateManager extends ChangeNotifier {
     _isBufferingNotifier.dispose();
     super.dispose();
   }
-  
+
   @override
   String toString() {
     return 'AudioStateManager{currentRecording: $_currentRecordingId, '
-           'position: ${position.inSeconds}s, duration: ${duration.inSeconds}s, '
-           'isPlaying: $isPlaying, isBuffering: $isBuffering}';
+        'position: ${position.inSeconds}s, duration: ${duration.inSeconds}s, '
+        'isPlaying: $isPlaying, isBuffering: $isBuffering}';
   }
 }

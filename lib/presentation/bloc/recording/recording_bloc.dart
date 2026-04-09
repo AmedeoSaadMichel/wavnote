@@ -22,7 +22,6 @@ import 'package:equatable/equatable.dart';
 // Domain imports
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
-import '../../../services/audio/audio_service_coordinator.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../core/enums/audio_format.dart';
 
@@ -33,8 +32,9 @@ import '../../../domain/usecases/recording/pause_recording_usecase.dart';
 import '../../../domain/usecases/recording/seek_and_resume_usecase.dart';
 
 // Service imports
-import '../../../services/location/geolocation_service.dart';
-import '../../../services/audio/audio_trimmer_service.dart';
+import '../../../config/dependency_injection.dart';
+import '../../../domain/repositories/i_location_repository.dart';
+import '../../../domain/repositories/i_audio_trimmer_repository.dart';
 import '../folder/folder_bloc.dart';
 
 // BLoC parts
@@ -50,12 +50,12 @@ part 'recording_bloc_management.dart';
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
-  final GeolocationService _geolocationService;
+  final ILocationRepository _locationRepository;
   final StartRecordingUseCase _startRecordingUseCase;
   final StopRecordingUseCase _stopRecordingUseCase;
   final PauseRecordingUseCase _pauseRecordingUseCase;
   final SeekAndResumeUseCase _seekAndResumeUseCase;
-  final AudioTrimmerService _trimmerService;
+  final IAudioTrimmerRepository _trimmerService;
   final FolderBloc? _folderBloc;
 
   StreamSubscription<double>? _amplitudeSubscription;
@@ -67,37 +67,41 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   RecordingBloc({
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
-    required GeolocationService geolocationService,
+    required ILocationRepository locationRepository,
     FolderBloc? folderBloc,
     StartRecordingUseCase? startRecordingUseCase,
     StopRecordingUseCase? stopRecordingUseCase,
     PauseRecordingUseCase? pauseRecordingUseCase,
     SeekAndResumeUseCase? seekAndResumeUseCase,
-    AudioTrimmerService? trimmerService,
-  })  : _audioService = audioService,
-        _recordingRepository = recordingRepository,
-        _geolocationService = geolocationService,
-        _folderBloc = folderBloc,
-        _trimmerService = trimmerService ?? AudioTrimmerService(),
-        _startRecordingUseCase = startRecordingUseCase ??
-            StartRecordingUseCase(
-              audioService: audioService,
-              geolocationService: geolocationService,
-            ),
-        _stopRecordingUseCase = stopRecordingUseCase ??
-            StopRecordingUseCase(
-              audioService: audioService,
-              recordingRepository: recordingRepository,
-              geolocationService: geolocationService,
-            ),
-        _pauseRecordingUseCase = pauseRecordingUseCase ??
-            PauseRecordingUseCase(audioService: audioService),
-        _seekAndResumeUseCase = seekAndResumeUseCase ??
-            SeekAndResumeUseCase(
-              audioService: audioService,
-              trimmerService: trimmerService ?? AudioTrimmerService(),
-            ),
-        super(const RecordingInitial()) {
+    IAudioTrimmerRepository? trimmerService,
+  }) : _audioService = audioService,
+       _recordingRepository = recordingRepository,
+       _locationRepository = locationRepository,
+       _folderBloc = folderBloc,
+       _trimmerService = trimmerService ?? sl<IAudioTrimmerRepository>(),
+       _startRecordingUseCase =
+           startRecordingUseCase ??
+           StartRecordingUseCase(
+             audioService: audioService,
+             locationRepository: locationRepository,
+           ),
+       _stopRecordingUseCase =
+           stopRecordingUseCase ??
+           StopRecordingUseCase(
+             audioService: audioService,
+             recordingRepository: recordingRepository,
+             locationRepository: locationRepository,
+           ),
+       _pauseRecordingUseCase =
+           pauseRecordingUseCase ??
+           PauseRecordingUseCase(audioService: audioService),
+       _seekAndResumeUseCase =
+           seekAndResumeUseCase ??
+           SeekAndResumeUseCase(
+             audioService: audioService,
+             trimmerService: trimmerService ?? sl<IAudioTrimmerRepository>(),
+           ),
+       super(const RecordingInitial()) {
     // Lifecycle handlers (recording_bloc_lifecycle.dart)
     on<StartRecording>(_onStartRecording);
     on<StopRecording>(_onStopRecording);
@@ -148,7 +152,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     await _previewPositionSubscription?.cancel();
     _durationTimer?.cancel();
 
-    if (_audioService is AudioServiceCoordinator) {
+    if (_audioService.needsDisposal) {
       try {
         await _audioService.dispose();
       } catch (e) {
@@ -173,14 +177,18 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   // ==== REAL-TIME UPDATE HANDLERS ====
 
   void _onUpdateRecordingAmplitude(
-      UpdateRecordingAmplitude event, Emitter<RecordingState> emit) {
+    UpdateRecordingAmplitude event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(amplitude: event.amplitude));
     }
   }
 
   void _onUpdateRecordingDuration(
-      UpdateRecordingDuration event, Emitter<RecordingState> emit) {
+    UpdateRecordingDuration event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(duration: event.duration));
     } else if (state is RecordingPaused) {
@@ -191,55 +199,80 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   // ==== PERMISSION HANDLERS ====
 
   Future<void> _onCheckRecordingPermissions(
-      CheckRecordingPermissions event, Emitter<RecordingState> emit) async {
+    CheckRecordingPermissions event,
+    Emitter<RecordingState> emit,
+  ) async {
     try {
       final hasPermission = await _audioService.hasMicrophonePermission();
       final hasMicrophone = await _audioService.hasMicrophone();
-      emit(RecordingPermissionStatus(
-        hasMicrophonePermission: hasPermission,
-        hasMicrophone: hasMicrophone,
-      ));
+      emit(
+        RecordingPermissionStatus(
+          hasMicrophonePermission: hasPermission,
+          hasMicrophone: hasMicrophone,
+        ),
+      );
     } catch (e) {
       print('❌ Error checking permissions: $e');
-      emit(const RecordingPermissionStatus(
-          hasMicrophonePermission: false, hasMicrophone: false));
+      emit(
+        const RecordingPermissionStatus(
+          hasMicrophonePermission: false,
+          hasMicrophone: false,
+        ),
+      );
     }
   }
 
   Future<void> _onRequestRecordingPermissions(
-      RequestRecordingPermissions event, Emitter<RecordingState> emit) async {
+    RequestRecordingPermissions event,
+    Emitter<RecordingState> emit,
+  ) async {
     try {
       emit(const RecordingPermissionRequesting());
       final granted = await _audioService.requestMicrophonePermission();
       final hasMicrophone = await _audioService.hasMicrophone();
-      emit(RecordingPermissionStatus(
-          hasMicrophonePermission: granted, hasMicrophone: hasMicrophone));
+      emit(
+        RecordingPermissionStatus(
+          hasMicrophonePermission: granted,
+          hasMicrophone: hasMicrophone,
+        ),
+      );
       if (!granted) {
-        emit(const RecordingError('Microphone permission denied',
-            errorType: RecordingErrorType.permission));
+        emit(
+          const RecordingError(
+            'Microphone permission denied',
+            errorType: RecordingErrorType.permission,
+          ),
+        );
       }
     } catch (e) {
       print('❌ Error requesting permissions: $e');
-      emit(const RecordingError('Failed to request permissions',
-          errorType: RecordingErrorType.permission));
+      emit(
+        const RecordingError(
+          'Failed to request permissions',
+          errorType: RecordingErrorType.permission,
+        ),
+      );
     }
   }
 
   // ==== UI STATE HANDLERS ====
 
-  void _onToggleEditMode(
-      ToggleEditMode event, Emitter<RecordingState> emit) {
+  void _onToggleEditMode(ToggleEditMode event, Emitter<RecordingState> emit) {
     if (state is RecordingLoaded) {
       final s = state as RecordingLoaded;
-      emit(s.copyWith(
-        isEditMode: !s.isEditMode,
-        selectedRecordings: s.isEditMode ? <String>{} : s.selectedRecordings,
-      ));
+      emit(
+        s.copyWith(
+          isEditMode: !s.isEditMode,
+          selectedRecordings: s.isEditMode ? <String>{} : s.selectedRecordings,
+        ),
+      );
     }
   }
 
   void _onToggleRecordingSelection(
-      ToggleRecordingSelection event, Emitter<RecordingState> emit) {
+    ToggleRecordingSelection event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingLoaded) {
       final s = state as RecordingLoaded;
       final selected = Set<String>.from(s.selectedRecordings);
@@ -253,30 +286,39 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   }
 
   void _onClearRecordingSelection(
-      ClearRecordingSelection event, Emitter<RecordingState> emit) {
+    ClearRecordingSelection event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingLoaded) {
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
     }
   }
 
   void _onSelectAllRecordings(
-      SelectAllRecordings event, Emitter<RecordingState> emit) {
+    SelectAllRecordings event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingLoaded) {
       final s = state as RecordingLoaded;
-      emit(s.copyWith(
-          selectedRecordings: s.recordings.map((r) => r.id).toSet()));
+      emit(
+        s.copyWith(selectedRecordings: s.recordings.map((r) => r.id).toSet()),
+      );
     }
   }
 
   void _onDeselectAllRecordings(
-      DeselectAllRecordings event, Emitter<RecordingState> emit) {
+    DeselectAllRecordings event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingLoaded) {
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
     }
   }
 
   void _onUpdateRecordingTitle(
-      UpdateRecordingTitle event, Emitter<RecordingState> emit) {
+    UpdateRecordingTitle event,
+    Emitter<RecordingState> emit,
+  ) {
     if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(title: event.title));
     }
@@ -288,7 +330,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   /// registrazione, senza bloccare l'UI. Aggiorna lo stato via [UpdateRecordingTitle].
   Future<void> _refreshTitleInBackground() async {
     try {
-      final loc = await _geolocationService.getRecordingLocationName();
+      final loc = await _locationRepository.getRecordingLocationName();
       if (loc.isNotEmpty && !isClosed && state is RecordingInProgress) {
         add(UpdateRecordingTitle(title: loc));
       }
@@ -303,8 +345,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   void _startAmplitudeUpdates() {
     _amplitudeSubscription?.cancel();
-    _amplitudeSubscription =
-        _audioService.getRecordingAmplitudeStream().listen(
+    _amplitudeSubscription = _audioService.getRecordingAmplitudeStream().listen(
       (amplitude) => add(UpdateRecordingAmplitude(amplitude)),
       onError: (e) => print('❌ Amplitude stream error: $e'),
     );
@@ -314,8 +355,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   void _startDurationUpdates() {
     _durationTimer?.cancel();
-    _durationTimer =
-        Timer.periodic(const Duration(milliseconds: 100), (timer) async {
+    _durationTimer = Timer.periodic(const Duration(milliseconds: 100), (
+      timer,
+    ) async {
       try {
         final duration = await _audioService.getCurrentRecordingDuration();
         add(UpdateRecordingDuration(duration));

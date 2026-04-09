@@ -8,7 +8,6 @@ import '../../core/enums/audio_format.dart';
 /// This interface allows for different implementations (SQLite, API, etc.)
 /// while keeping the domain layer independent of specific technologies.
 abstract class IRecordingRepository {
-
   // ==== RECORDING CRUD OPERATIONS ====
 
   /// Get all recordings across all folders
@@ -59,46 +58,46 @@ abstract class IRecordingRepository {
 
   /// Get recordings within date range
   Future<List<RecordingEntity>> getRecordingsByDateRange(
-      DateTime startDate,
-      DateTime endDate,
-      );
+    DateTime startDate,
+    DateTime endDate,
+  );
 
   /// Get recordings by duration range
   Future<List<RecordingEntity>> getRecordingsByDurationRange(
-      Duration minDuration,
-      Duration maxDuration,
-      );
+    Duration minDuration,
+    Duration maxDuration,
+  );
 
   /// Get recordings sorted by criteria
   Future<List<RecordingEntity>> getRecordingsSorted(
-      RecordingSortCriteria criteria,
-      );
+    RecordingSortCriteria criteria,
+  );
 
   // ==== BULK OPERATIONS ====
 
   /// Move multiple recordings to a different folder
   Future<bool> moveRecordingsToFolder(
-      List<String> recordingIds,
-      String folderId,
-      );
+    List<String> recordingIds,
+    String folderId,
+  );
 
   /// Delete multiple recordings
   Future<bool> deleteRecordings(List<String> recordingIds);
 
   /// Mark multiple recordings as favorite/unfavorite
   Future<bool> updateRecordingsFavoriteStatus(
-      List<String> recordingIds,
-      bool isFavorite,
-      );
+    List<String> recordingIds,
+    bool isFavorite,
+  );
 
   /// Toggle favorite status of a single recording
   Future<bool> toggleFavorite(String recordingId);
 
   /// Add tags to multiple recordings
   Future<bool> addTagsToRecordings(
-      List<String> recordingIds,
-      List<String> tags,
-      );
+    List<String> recordingIds,
+    List<String> tags,
+  );
 
   // ==== STATISTICS OPERATIONS ====
 
@@ -116,9 +115,9 @@ abstract class IRecordingRepository {
 
   /// Get recording statistics by date
   Future<Map<DateTime, int>> getRecordingCountsByDate(
-      DateTime startDate,
-      DateTime endDate,
-      );
+    DateTime startDate,
+    DateTime endDate,
+  );
 
   // ==== MAINTENANCE OPERATIONS ====
 
@@ -177,23 +176,6 @@ extension RecordingSortCriteriaExtension on RecordingSortCriteria {
         return 'Format';
     }
   }
-
-  String get sqlOrderBy {
-    switch (this) {
-      case RecordingSortCriteria.name:
-        return 'name COLLATE NOCASE ASC';
-      case RecordingSortCriteria.createdDate:
-        return 'created_at DESC';
-      case RecordingSortCriteria.duration:
-        return 'duration_seconds DESC';
-      case RecordingSortCriteria.fileSize:
-        return 'file_size DESC';
-      case RecordingSortCriteria.lastModified:
-        return 'updated_at DESC';
-      case RecordingSortCriteria.format:
-        return 'format_index ASC, name ASC';
-    }
-  }
 }
 
 /// Recording filter options
@@ -221,13 +203,13 @@ class RecordingFilter {
   /// Whether any filters are active
   bool get hasActiveFilters =>
       folderId != null ||
-          format != null ||
-          isFavorite != null ||
-          minDuration != null ||
-          maxDuration != null ||
-          startDate != null ||
-          endDate != null ||
-          (tags?.isNotEmpty ?? false);
+      format != null ||
+      isFavorite != null ||
+      minDuration != null ||
+      maxDuration != null ||
+      startDate != null ||
+      endDate != null ||
+      (tags?.isNotEmpty ?? false);
 
   /// Create copy with updated values
   RecordingFilter copyWith({

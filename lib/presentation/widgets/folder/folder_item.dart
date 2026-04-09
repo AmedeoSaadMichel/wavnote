@@ -29,7 +29,8 @@ class FolderItem extends StatefulWidget {
   State<FolderItem> createState() => _FolderItemState();
 }
 
-class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateMixin {
+class _FolderItemState extends State<FolderItem>
+    with SingleTickerProviderStateMixin {
   // Swipe animation controller
   late AnimationController _swipeController;
   late Animation<double> _swipeAnimation;
@@ -47,13 +48,13 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _swipeAnimation = Tween<double>(
-      begin: 0.0,
-      end: -80.0, // Width of delete button
-    ).animate(CurvedAnimation(
-      parent: _swipeController,
-      curve: Curves.easeInOut,
-    ));
+    _swipeAnimation =
+        Tween<double>(
+          begin: 0.0,
+          end: -80.0, // Width of delete button
+        ).animate(
+          CurvedAnimation(parent: _swipeController, curve: Curves.easeInOut),
+        );
 
     _swipeAnimation.addListener(() {
       setState(() {
@@ -115,9 +116,7 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
         clipBehavior: Clip.none,
         children: [
           // Delete button background (positioned to fill the entire space)
-          Positioned.fill(
-            child: _buildDeleteBackground(),
-          ),
+          Positioned.fill(child: _buildDeleteBackground()),
 
           // Main folder item with transform (covers background when not swiped)
           Transform.translate(
@@ -156,11 +155,7 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                FaIcon(
-                  FontAwesomeIcons.skull,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                FaIcon(FontAwesomeIcons.skull, color: Colors.white, size: 24),
                 SizedBox(height: 4),
                 Text(
                   'Delete',
@@ -185,7 +180,7 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF7B4CA8),  // Lighter purple, fully opaque
+        color: const Color(0xFF7B4CA8), // Lighter purple, fully opaque
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -206,9 +201,7 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
           const SizedBox(width: 16),
 
           // Folder Details
-          Expanded(
-            child: _buildFolderDetails(),
-          ),
+          Expanded(child: _buildFolderDetails()),
 
           // Recording Count
           _buildRecordingCount(),
@@ -237,16 +230,16 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: widget.folder.color.withValues(alpha: 0.2),
+        color: Color(widget.folder.colorValue).withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: widget.folder.color.withValues(alpha: 0.3),
+          color: Color(widget.folder.colorValue).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Icon(
-        widget.folder.icon,
-        color: widget.folder.color,
+        IconData(widget.folder.iconCodePoint, fontFamily: 'MaterialIcons'),
+        color: Color(widget.folder.colorValue),
         size: 24,
       ),
     );
@@ -284,10 +277,7 @@ class _FolderItemState extends State<FolderItem> with SingleTickerProviderStateM
       decoration: BoxDecoration(
         color: Colors.blue.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.blue.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1),
       ),
       child: Text(
         'CUSTOM',
@@ -362,8 +352,8 @@ class CompactFolderItem extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              folder.icon,
-              color: folder.color,
+              IconData(folder.iconCodePoint, fontFamily: 'MaterialIcons'),
+              color: Color(folder.colorValue),
               size: 18,
             ),
             const SizedBox(width: 8),

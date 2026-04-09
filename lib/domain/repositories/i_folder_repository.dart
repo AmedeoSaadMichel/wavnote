@@ -6,7 +6,6 @@ import '../entities/folder_entity.dart';
 /// This interface allows for different implementations (SQLite, API, etc.)
 /// while keeping the domain layer independent of specific technologies.
 abstract class IFolderRepository {
-
   // ==== FOLDER CRUD OPERATIONS ====
 
   /// Get all folders (default + custom)
@@ -68,12 +67,7 @@ abstract class IFolderRepository {
 }
 
 /// Criteria for sorting folders
-enum FolderSortCriteria {
-  name,
-  createdDate,
-  recordingCount,
-  lastModified,
-}
+enum FolderSortCriteria { name, createdDate, recordingCount, lastModified }
 
 /// Extension for sort criteria display names
 extension FolderSortCriteriaExtension on FolderSortCriteria {
@@ -87,19 +81,6 @@ extension FolderSortCriteriaExtension on FolderSortCriteria {
         return 'Recording Count';
       case FolderSortCriteria.lastModified:
         return 'Last Modified';
-    }
-  }
-
-  String get sqlOrderBy {
-    switch (this) {
-      case FolderSortCriteria.name:
-        return 'name COLLATE NOCASE ASC';
-      case FolderSortCriteria.createdDate:
-        return 'created_at DESC';
-      case FolderSortCriteria.recordingCount:
-        return 'recording_count DESC';
-      case FolderSortCriteria.lastModified:
-        return 'updated_at DESC';
     }
   }
 }

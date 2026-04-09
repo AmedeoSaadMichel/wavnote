@@ -4,8 +4,7 @@ import '../../../core/enums/audio_format.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
-import '../../../services/location/geolocation_service.dart';
-import '../../../services/audio/audio_service_coordinator.dart';
+import '../../../domain/repositories/i_location_repository.dart';
 
 /// Use case for managing recording lifecycle operations
 ///
@@ -14,22 +13,24 @@ import '../../../services/audio/audio_service_coordinator.dart';
 class RecordingLifecycleUseCase {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
-  final GeolocationService _geolocationService;
+  final ILocationRepository _locationRepository;
 
   RecordingLifecycleUseCase({
     required IAudioServiceRepository audioService,
     required IRecordingRepository recordingRepository,
-    required GeolocationService geolocationService,
+    required ILocationRepository locationRepository,
   }) : _audioService = audioService,
-        _recordingRepository = recordingRepository,
-        _geolocationService = geolocationService;
+       _recordingRepository = recordingRepository,
+       _locationRepository = locationRepository;
 
   /// Initialize audio service
   Future<bool> initializeAudioService() async {
     try {
       return await _audioService.initialize();
     } catch (e) {
-      print('❌ RecordingLifecycleUseCase: Error initializing audio service: $e');
+      print(
+        '❌ RecordingLifecycleUseCase: Error initializing audio service: $e',
+      );
       return false;
     }
   }
@@ -47,10 +48,12 @@ class RecordingLifecycleUseCase {
   /// Generate location-based recording title
   Future<String> generateRecordingTitle() async {
     try {
-      final locationName = await _geolocationService.getRecordingLocationName();
+      final locationName = await _locationRepository.getRecordingLocationName();
       return locationName.isNotEmpty ? locationName : 'New Recording';
     } catch (e) {
-      print('⚠️ RecordingLifecycleUseCase: Failed to get location for recording title: $e');
+      print(
+        '⚠️ RecordingLifecycleUseCase: Failed to get location for recording title: $e',
+      );
       return 'New Recording';
     }
   }
@@ -151,17 +154,19 @@ class RecordingLifecycleUseCase {
   /// Get amplitude stream for real-time updates
   Stream<double>? get amplitudeStream => _audioService.amplitudeStream;
 
-  /// Get duration stream for real-time updates  
+  /// Get duration stream for real-time updates
   Stream<Duration>? get durationStream => _audioService.durationStream;
 
   /// Dispose audio service (only if it's a coordinator, not a singleton)
   Future<void> dispose() async {
     try {
       // Only dispose if it's a coordinator (not a singleton like AudioPlayerService)
-      if (_audioService is AudioServiceCoordinator) {
+      if (_audioService.needsDisposal) {
         await _audioService.dispose();
       } else {
-        print('✅ RecordingLifecycleUseCase: Skipping disposal of singleton audio service');
+        print(
+          '✅ RecordingLifecycleUseCase: Skipping disposal of singleton audio service',
+        );
       }
     } catch (e) {
       print('⚠️ RecordingLifecycleUseCase: Error disposing audio service: $e');

@@ -15,9 +15,7 @@
 // - Support for both default (system) and custom (user-created) folders
 
 import 'package:equatable/equatable.dart';
-import 'package:flutter/material.dart';
 import '../../core/enums/folder_type.dart';
-import '../../core/constants/app_constants.dart';
 
 /// Pure business entity representing a voice memo folder
 ///
@@ -33,8 +31,8 @@ import '../../core/constants/app_constants.dart';
 class FolderEntity extends Equatable {
   final String id;
   final String name;
-  final IconData icon;
-  final Color color;
+  final int iconCodePoint;
+  final int colorValue;
   final int recordingCount;
   final FolderType type;
   final bool isDeletable;
@@ -44,8 +42,8 @@ class FolderEntity extends Equatable {
   const FolderEntity({
     required this.id,
     required this.name,
-    required this.icon,
-    required this.color,
+    required this.iconCodePoint,
+    required this.colorValue,
     this.recordingCount = 0,
     required this.type,
     this.isDeletable = false,
@@ -131,8 +129,8 @@ class FolderEntity extends Equatable {
   FolderEntity copyWith({
     String? id,
     String? name,
-    IconData? icon,
-    Color? color,
+    int? iconCodePoint,
+    int? colorValue,
     int? recordingCount,
     FolderType? type,
     bool? isDeletable,
@@ -142,8 +140,8 @@ class FolderEntity extends Equatable {
     return FolderEntity(
       id: id ?? this.id,
       name: name ?? this.name,
-      icon: icon ?? this.icon,
-      color: color ?? this.color,
+      iconCodePoint: iconCodePoint ?? this.iconCodePoint,
+      colorValue: colorValue ?? this.colorValue,
       recordingCount: recordingCount ?? this.recordingCount,
       type: type ?? this.type,
       isDeletable: isDeletable ?? this.isDeletable,
@@ -194,15 +192,15 @@ class FolderEntity extends Equatable {
   factory FolderEntity.defaultFolder({
     required String id,
     required String name,
-    required IconData icon,
-    required Color color,
+    required int iconCodePoint,
+    required int colorValue,
     int recordingCount = 0,
   }) {
     return FolderEntity(
       id: id,
       name: name,
-      icon: icon,
-      color: color,
+      iconCodePoint: iconCodePoint,
+      colorValue: colorValue,
       recordingCount: recordingCount,
       type: FolderType.defaultFolder,
       isDeletable: false,
@@ -213,16 +211,16 @@ class FolderEntity extends Equatable {
   /// Create a custom user folder
   factory FolderEntity.customFolder({
     required String name,
-    required IconData icon,
-    required Color color,
+    required int iconCodePoint,
+    required int colorValue,
     String? id,
   }) {
     // Validate name before creating
     final entity = FolderEntity(
       id: 'temp',
       name: name,
-      icon: icon,
-      color: color,
+      iconCodePoint: iconCodePoint,
+      colorValue: colorValue,
       recordingCount: 0,
       type: FolderType.customFolder,
       isDeletable: true,
@@ -236,8 +234,8 @@ class FolderEntity extends Equatable {
     return FolderEntity(
       id: id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim(),
-      icon: icon,
-      color: color,
+      iconCodePoint: iconCodePoint,
+      colorValue: colorValue,
       recordingCount: 0,
       type: FolderType.customFolder,
       isDeletable: true,
@@ -260,8 +258,8 @@ class FolderEntity extends Equatable {
     return FolderEntity(
       id: id,
       name: name,
-      icon: AppConstants.getIconFromCodePoint(iconCodePoint),
-      color: Color(colorValue),
+      iconCodePoint: iconCodePoint,
+      colorValue: colorValue,
       recordingCount: recordingCount,
       type: type,
       isDeletable: isDeletable,
@@ -277,8 +275,8 @@ class FolderEntity extends Equatable {
     return {
       'id': id,
       'name': name,
-      'iconCodePoint': icon.codePoint,
-      'colorValue': color.value,
+      'iconCodePoint': iconCodePoint,
+      'colorValue': colorValue,
       'recordingCount': recordingCount,
       'type': type.index,
       'isDeletable': isDeletable,
@@ -310,8 +308,8 @@ class FolderEntity extends Equatable {
   List<Object?> get props => [
     id,
     name,
-    icon,
-    color,
+    iconCodePoint,
+    colorValue,
     recordingCount,
     type,
     isDeletable,

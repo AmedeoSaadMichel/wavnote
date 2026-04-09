@@ -72,6 +72,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   // ==== INITIALIZATION ====
 
   @override
+  bool get needsDisposal => true;
+
+  @override
   Future<bool> initialize() async {
     if (_isInitialized) return true;
     try {

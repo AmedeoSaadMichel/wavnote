@@ -1,5 +1,5 @@
 // File: presentation/widgets/recording/recording_card/recording_card_main.dart
-// 
+//
 // Recording Card Widget - Presentation Layer
 // ==========================================
 //
@@ -47,9 +47,9 @@ import '../../../../domain/entities/recording_entity.dart'; // Recording busines
 import '../../../../services/audio/audio_state_manager.dart'; // Audio state management
 
 // Widget component imports
-import 'recording_card_info.dart';    // Recording metadata display
+import 'recording_card_info.dart'; // Recording metadata display
 import 'recording_card_actions.dart'; // Swipe action buttons
-import '../recording_controls.dart';  // Audio playback controls
+import '../recording_controls.dart'; // Audio playback controls
 
 /// Recording Card with Audio Slider and Interactive Features
 ///
@@ -78,50 +78,23 @@ class RecordingCard extends StatefulWidget {
   final bool isPlaying;
   final bool isLoading;
   final Duration currentPosition;
-  final Duration? actualDuration; // Actual duration from audio player (when expanded)
-  
+  final Duration?
+  actualDuration; // Actual duration from audio player (when expanded)
+
   // Audio control callbacks
   final VoidCallback onPlayPause;
   final Function(double) onSeek;
   final VoidCallback onSkipBackward;
   final VoidCallback onSkipForward;
-  
+
   // Tag display context
   final String currentFolderId; // The folder we're currently viewing
   final Map<String, String>? folderNames; // Map of folder ID to folder name
-  
+
   // Selection state
   final bool isEditMode; // Whether edit mode is active
   final bool isSelected; // Whether this recording is selected
   final VoidCallback? onSelectionToggle; // Callback for selection toggle
-  
-  // Performance optimization: Override operator == to enable better widget caching
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is RecordingCard &&
-        other.recording == recording && // Compare full RecordingEntity equality
-        other.isExpanded == isExpanded &&
-        other.isPlaying == isPlaying &&
-        other.isLoading == isLoading &&
-        other.isEditMode == isEditMode &&
-        other.isSelected == isSelected &&
-        // Only check position if expanded (to prevent constant rebuilds)
-        (!isExpanded || other.currentPosition == currentPosition) &&
-        other.actualDuration == actualDuration;
-  }
-  
-  @override
-  int get hashCode => Object.hash(
-    recording, // Use full RecordingEntity hashCode
-    isExpanded,
-    isPlaying,
-    isLoading,
-    isEditMode,
-    isSelected,
-    isExpanded ? currentPosition : null,
-    actualDuration,
-  );
 
   const RecordingCard({
     Key? key,
@@ -154,10 +127,11 @@ class RecordingCard extends StatefulWidget {
   State<RecordingCard> createState() => _RecordingCardState();
 }
 
-class _RecordingCardState extends State<RecordingCard> with TickerProviderStateMixin {
+class _RecordingCardState extends State<RecordingCard>
+    with TickerProviderStateMixin {
   double _sliderPosition = 0.0;
   bool _wasPlayingLastUpdate = false;
-  bool _isUserDragging = false;  // Track if user is dragging the slider
+  bool _isUserDragging = false; // Track if user is dragging the slider
 
   // Swipe animation controllers
   late AnimationController _swipeController;
@@ -182,32 +156,24 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _swipeAnimation = Tween<double>(
-      begin: 0.0,
-      end: -240.0,
-    ).animate(CurvedAnimation(
-      parent: _swipeController,
-      curve: Curves.easeInOut,
-    ));
-    
+    _swipeAnimation = Tween<double>(begin: 0.0, end: -240.0).animate(
+      CurvedAnimation(parent: _swipeController, curve: Curves.easeInOut),
+    );
+
     _swipeAnimation.addListener(() {
       setState(() {
         _swipeOffset = _swipeAnimation.value;
       });
     });
-    
+
     _favoriteController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _favoriteAnimation = Tween<double>(
-      begin: 0.0,
-      end: 80.0,
-    ).animate(CurvedAnimation(
-      parent: _favoriteController,
-      curve: Curves.easeInOut,
-    ));
-    
+    _favoriteAnimation = Tween<double>(begin: 0.0, end: 80.0).animate(
+      CurvedAnimation(parent: _favoriteController, curve: Curves.easeInOut),
+    );
+
     _favoriteAnimation.addListener(() {
       setState(() {
         _favoriteOffset = _favoriteAnimation.value;
@@ -237,7 +203,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     _wasPlayingLastUpdate = widget.isPlaying;
     _syncSliderWithAudio();
   }
-  
+
   void _syncSliderWithAudio() {
     // Don't update slider position while user is dragging
     if (_isUserDragging) {
@@ -246,7 +212,8 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     }
 
     // Always prioritize actual audio player duration when available
-    final effectiveDuration = widget.actualDuration ?? widget.recording.duration;
+    final effectiveDuration =
+        widget.actualDuration ?? widget.recording.duration;
     final totalDurationMs = effectiveDuration.inMilliseconds;
     final currentPositionMs = widget.currentPosition.inMilliseconds;
 
@@ -257,7 +224,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
 
       // Always update slider position to match audio precisely
       if ((clampedProgress - _sliderPosition).abs() > 0.001) {
-        print('🔄 SYNC: Updating slider from ${_sliderPosition.toStringAsFixed(3)} to ${clampedProgress.toStringAsFixed(3)}');
+        print(
+          '🔄 SYNC: Updating slider from ${_sliderPosition.toStringAsFixed(3)} to ${clampedProgress.toStringAsFixed(3)}',
+        );
         setState(() {
           _sliderPosition = clampedProgress;
         });
@@ -266,7 +235,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
   }
 
   void _handleSliderChangeStart(double position) {
-    print('👆 DRAG START: Setting drag flag to true at position ${position.toStringAsFixed(3)}');
+    print(
+      '👆 DRAG START: Setting drag flag to true at position ${position.toStringAsFixed(3)}',
+    );
     setState(() {
       _isUserDragging = true;
     });
@@ -280,7 +251,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
   }
 
   void _handleSliderChangeEnd(double position) {
-    print('👆 DRAG END: Releasing at ${position.toStringAsFixed(3)}, seeking...');
+    print(
+      '👆 DRAG END: Releasing at ${position.toStringAsFixed(3)}, seeking...',
+    );
     setState(() {
       _isUserDragging = false;
     });
@@ -289,14 +262,13 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     widget.onSeek(position);
   }
 
-
   /// Toggle swipe actions visibility
   void _toggleSwipeActions() {
     // Hide favorite actions first
     if (_isFavoriteActionVisible) {
       _hideFavoriteAction();
     }
-    
+
     if (_isSwipeActionsVisible) {
       _swipeController.reverse();
     } else {
@@ -304,7 +276,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     }
     _isSwipeActionsVisible = !_isSwipeActionsVisible;
   }
-  
+
   /// Hide swipe actions
   void _hideSwipeActions() {
     if (_isSwipeActionsVisible) {
@@ -319,7 +291,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     if (_isSwipeActionsVisible) {
       _hideSwipeActions();
     }
-    
+
     if (_isFavoriteActionVisible) {
       _favoriteController.reverse();
     } else {
@@ -327,7 +299,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     }
     _isFavoriteActionVisible = !_isFavoriteActionVisible;
   }
-  
+
   /// Hide favorite action
   void _hideFavoriteAction() {
     if (_isFavoriteActionVisible) {
@@ -348,15 +320,17 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
           }
         } else if (details.delta.dx > 5) {
           // Swipe LEFT to RIGHT - show favorite button (not in recently deleted)
-          if (!_isFavoriteActionVisible && 
+          if (!_isFavoriteActionVisible &&
               widget.currentFolderId != 'recently_deleted') {
             _toggleFavoriteAction();
           }
         }
       },
       onTap: () {
-        print('🎯 TAP: swipeVisible=$_isSwipeActionsVisible, favoriteVisible=$_isFavoriteActionVisible, editMode=${widget.isEditMode}');
-        
+        print(
+          '🎯 TAP: swipeVisible=$_isSwipeActionsVisible, favoriteVisible=$_isFavoriteActionVisible, editMode=${widget.isEditMode}',
+        );
+
         // SIMPLIFIED LOGIC: Always try expansion first, then hide actions
         if (!widget.isEditMode) {
           print('🎯 Calling onTap for recording: ${widget.recording.name}');
@@ -365,7 +339,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
           print('🎯 Edit mode - calling selection toggle');
           widget.onSelectionToggle?.call();
         }
-        
+
         // Hide any visible actions after handling main tap
         if (_isSwipeActionsVisible) {
           _hideSwipeActions();
@@ -405,12 +379,14 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
               },
             ),
           ),
-          
+
           Transform.translate(
             offset: Offset(_swipeOffset + _favoriteOffset, 0),
-            child: widget.isExpanded ? _buildExpandedCard() : _buildCollapsedCard(),
+            child: widget.isExpanded
+                ? _buildExpandedCard()
+                : _buildCollapsedCard(),
           ),
-          
+
           // Selection overlay - positioned last to be on top
           if (widget.isEditMode) _buildSelectionOverlay(),
         ],
@@ -431,7 +407,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
             height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: widget.isSelected 
+              gradient: widget.isSelected
                   ? const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -444,14 +420,20 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        const Color(0xFF2E1065).withValues(alpha: 0.9), // Midnight purple
-                        const Color(0xFF1E1B4B).withValues(alpha: 0.8), // Deep cosmic
+                        const Color(
+                          0xFF2E1065,
+                        ).withValues(alpha: 0.9), // Midnight purple
+                        const Color(
+                          0xFF1E1B4B,
+                        ).withValues(alpha: 0.8), // Deep cosmic
                       ],
                     ),
               border: Border.all(
-                color: widget.isSelected 
+                color: widget.isSelected
                     ? const Color(0xFFD8B4FE) // Light cosmic purple
-                    : const Color(0xFF6366F1).withValues(alpha: 0.6), // Mystic indigo
+                    : const Color(
+                        0xFF6366F1,
+                      ).withValues(alpha: 0.6), // Mystic indigo
                 width: 2,
               ),
               boxShadow: [
@@ -482,7 +464,9 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                     height: 12,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.7), // Mystic dot
+                      color: const Color(
+                        0xFF6366F1,
+                      ).withValues(alpha: 0.7), // Mystic dot
                     ),
                   ),
           ),
@@ -490,8 +474,6 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       ),
     );
   }
-
-
 
   Widget _buildCollapsedCard() {
     return Container(
@@ -509,7 +491,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: widget.isEditMode && widget.isSelected 
+          color: widget.isEditMode && widget.isSelected
               ? Colors.blue
               : Colors.white.withValues(alpha: 0.1),
           width: widget.isEditMode && widget.isSelected ? 2 : 1,
@@ -544,12 +526,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
               color: Color(0xFFD1C4E9), // Mystic light purple
               fontSize: 15,
               fontWeight: FontWeight.w400,
-              shadows: [
-                Shadow(
-                  color: Color(0xFF8B5CF6),
-                  blurRadius: 2,
-                ),
-              ],
+              shadows: [Shadow(color: Color(0xFF8B5CF6), blurRadius: 2)],
             ),
           ),
         ],
@@ -573,7 +550,7 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: widget.isEditMode && widget.isSelected 
+          color: widget.isEditMode && widget.isSelected
               ? Colors.blue
               : Colors.white.withValues(alpha: 0.2),
           width: widget.isEditMode && widget.isSelected ? 2 : 1.5,
@@ -610,11 +587,11 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Audio progress slider
           _buildAudioSlider(),
           const SizedBox(height: 16),
-          
+
           SizedBox(
             height: 50,
             child: RecordingControls(
@@ -631,11 +608,6 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
       ),
     );
   }
-
-
-
-
-
 
   SliderThemeData get _sliderTheme => SliderTheme.of(context).copyWith(
     trackHeight: 6.0,
@@ -671,17 +643,23 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                   final progress = _isUserDragging
                       ? _sliderPosition
                       : (duration.inMilliseconds > 0
-                          ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
-                          : 0.0);
+                            ? (position.inMilliseconds /
+                                      duration.inMilliseconds)
+                                  .clamp(0.0, 1.0)
+                            : 0.0);
                   return SliderTheme(
                     data: _sliderTheme,
                     child: Slider(
                       value: progress,
                       min: 0.0,
                       max: 1.0,
-                      onChangeStart: widget.isLoading ? null : _handleSliderChangeStart,
+                      onChangeStart: widget.isLoading
+                          ? null
+                          : _handleSliderChangeStart,
                       onChanged: widget.isLoading ? null : _handleSliderChanged,
-                      onChangeEnd: widget.isLoading ? null : _handleSliderChangeEnd,
+                      onChangeEnd: widget.isLoading
+                          ? null
+                          : _handleSliderChangeEnd,
                     ),
                   );
                 },
@@ -699,8 +677,20 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(_formatTime(position), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
-                        Text(_formatTime(duration), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
+                        Text(
+                          _formatTime(position),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          _formatTime(duration),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -734,8 +724,22 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_formatTime(widget.currentPosition), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
-                Text(_formatTime(widget.actualDuration ?? widget.recording.duration), style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12)),
+                Text(
+                  _formatTime(widget.currentPosition),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  _formatTime(
+                    widget.actualDuration ?? widget.recording.duration,
+                  ),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -750,4 +754,3 @@ class _RecordingCardState extends State<RecordingCard> with TickerProviderStateM
     return "$minutes:$seconds";
   }
 }
-

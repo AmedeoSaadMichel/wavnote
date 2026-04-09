@@ -5,13 +5,13 @@ import 'package:mocktail/mocktail.dart';
 import 'package:wavnote/domain/usecases/recording/recording_lifecycle_usecase.dart';
 import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
-import 'package:wavnote/services/location/geolocation_service.dart';
+import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
 
 class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
-class MockGeolocationService extends Mock implements GeolocationService {}
+class MockLocationRepository extends Mock implements ILocationRepository {}
 
 void main() {
   setUpAll(() {
@@ -36,17 +36,17 @@ void main() {
     late RecordingLifecycleUseCase useCase;
     late MockAudioServiceRepository mockAudioService;
     late MockRecordingRepository mockRecordingRepository;
-    late MockGeolocationService mockGeolocationService;
+    late MockLocationRepository mockLocationRepository;
 
     setUp(() {
       mockAudioService = MockAudioServiceRepository();
       mockRecordingRepository = MockRecordingRepository();
-      mockGeolocationService = MockGeolocationService();
-      
+      mockLocationRepository = MockLocationRepository();
+
       useCase = RecordingLifecycleUseCase(
         audioService: mockAudioService,
         recordingRepository: mockRecordingRepository,
-        geolocationService: mockGeolocationService,
+        locationRepository: mockLocationRepository,
       );
     });
 
@@ -129,7 +129,7 @@ void main() {
     group('generateRecordingTitle', () {
       test('returns location name when available', () async {
         // Arrange
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'Times Square, New York');
 
         // Act
@@ -137,12 +137,12 @@ void main() {
 
         // Assert
         expect(result, equals('Times Square, New York'));
-        verify(() => mockGeolocationService.getRecordingLocationName()).called(1);
+        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
       });
 
       test('returns "New Recording" when location name is empty', () async {
         // Arrange
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => '');
 
         // Act
@@ -150,12 +150,12 @@ void main() {
 
         // Assert
         expect(result, equals('New Recording'));
-        verify(() => mockGeolocationService.getRecordingLocationName()).called(1);
+        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
       });
 
       test('returns "New Recording" when location service throws exception', () async {
         // Arrange
-        when(() => mockGeolocationService.getRecordingLocationName())
+        when(() => mockLocationRepository.getRecordingLocationName())
             .thenThrow(Exception('Location error'));
 
         // Act
@@ -163,7 +163,7 @@ void main() {
 
         // Assert
         expect(result, equals('New Recording'));
-        verify(() => mockGeolocationService.getRecordingLocationName()).called(1);
+        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
       });
     });
 

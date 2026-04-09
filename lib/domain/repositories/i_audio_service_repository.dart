@@ -7,7 +7,6 @@ import '../../core/enums/audio_format.dart';
 /// Defines the contract for audio services while keeping the domain
 /// layer independent of specific audio library implementations.
 abstract class IAudioServiceRepository {
-
   // ==== RECORDING OPERATIONS ====
 
   /// Start recording audio with specified settings
@@ -120,7 +119,10 @@ abstract class IAudioServiceRepository {
   });
 
   /// Get audio file waveform data
-  Future<List<double>> getWaveformData(String filePath, {int sampleCount = 100});
+  Future<List<double>> getWaveformData(
+    String filePath, {
+    int sampleCount = 100,
+  });
 
   // ==== DEVICE & PERMISSIONS ====
 
@@ -149,6 +151,9 @@ abstract class IAudioServiceRepository {
 
   /// Initialize audio service
   Future<bool> initialize();
+
+  /// Whether the service requires explicit disposal via dispose() method
+  bool get needsDisposal;
 
   /// Release audio service resources
   Future<void> dispose();
@@ -188,7 +193,8 @@ class AudioFileInfo {
   /// File size in human-readable format
   String get fileSizeFormatted {
     if (fileSize < 1024) return '${fileSize}B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)}KB';
+    if (fileSize < 1024 * 1024)
+      return '${(fileSize / 1024).toStringAsFixed(1)}KB';
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
@@ -234,24 +240,10 @@ enum AudioSessionCategory {
 }
 
 /// Recording states for state management
-enum RecordingState {
-  idle,
-  recording,
-  paused,
-  stopping,
-  error,
-}
+enum RecordingState { idle, recording, paused, stopping, error }
 
 /// Playback states for state management
-enum PlaybackState {
-  idle,
-  loading,
-  playing,
-  paused,
-  stopped,
-  completed,
-  error,
-}
+enum PlaybackState { idle, loading, playing, paused, stopped, completed, error }
 
 /// Audio service events
 abstract class AudioServiceEvent {
