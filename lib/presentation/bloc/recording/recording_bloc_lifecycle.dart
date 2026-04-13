@@ -58,10 +58,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final finalWavPath =
           "${s.originalFilePathForOverwrite!}_final_${DateTime.now().millisecondsSinceEpoch}.wav";
 
-      final insertionDurationMs = event.waveformData != null
-          ? (event.waveformData!.length - (s.truncatedWaveData?.length ?? 0)) *
-                100
-          : s.duration.inMilliseconds;
+      final insertionDurationMs = part2ResultEntity.duration.inMilliseconds;
 
       try {
         await _trimmerService.overwriteAudioSegment(
@@ -263,9 +260,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final tempConcatPath =
           "${s.originalFilePathForOverwrite ?? s.filePath}_temp_concat_${DateTime.now().millisecondsSinceEpoch}.wav";
 
-      final insertionDurationMs = (s.truncatedWaveData != null)
-          ? (event.waveData.length - s.truncatedWaveData!.length) * 100
-          : s.duration.inMilliseconds;
+      final insertionDurationMs = baseRecordingEntity.duration.inMilliseconds;
 
       try {
         await _trimmerService.overwriteAudioSegment(
@@ -335,7 +330,19 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     CancelRecording event,
     Emitter<RecordingState> emit,
   ) async {
-    // ... implementazione ...
+    try {
+      _stopAmplitudeUpdates();
+      _stopDurationUpdates();
+      _previewPositionSubscription?.cancel();
+      _previewPositionSubscription = null;
+      _previewCompletionSubscription?.cancel();
+      _previewCompletionSubscription = null;
+      if (await _audioService.isPlaying()) await _audioService.stopPlaying();
+      await _audioService.cancelRecording();
+      emit(const RecordingCancelled());
+    } catch (e) {
+      print('❌ Error cancelling recording: $e');
+    }
   }
 
   void _deleteInsertionRecording(RecordingEntity insertion) {
@@ -359,18 +366,123 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     UpdateSeekBarIndex event,
     Emitter<RecordingState> emit,
   ) async {
-    // ... implementazione ...
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+    if (s.seekBarIndex == event.seekBarIndex) return;
+    debugPrint(
+      '📍 SeekBar → bar ${event.seekBarIndex} (${event.seekBarIndex * 100}ms)',
+    );
+    emit(s.copyWith(seekBarIndex: event.seekBarIndex));
   }
+
   Future<void> _onPlayRecordingPreview(
     PlayRecordingPreview event,
     Emitter<RecordingState> emit,
   ) async {
-    // ... implementazione ...
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    // Ferma eventuale playback in corso
+    if (await _audioService.isPlaying()) await _audioService.stopPlaying();
+
+    final seekMs = s.seekBarIndex * 100;
+    debugPrint('🔊 Play preview from bar ${s.seekBarIndex} (${seekMs}ms)');
+
+    String playbackPath = s.filePath;
+
+    // Se siamo in modalità overdub, l'audio completo è in s.seekBasePath + s.filePath
+    if (s.seekBasePath != null && s.originalFilePathForOverwrite != null) {
+      final tempPreviewPath =
+          "${s.originalFilePathForOverwrite}_preview_${DateTime.now().millisecondsSinceEpoch}.wav";
+      
+      try {
+        await _trimmerService.overwriteAudioSegment(
+          originalPath: s.seekBasePath!,
+          insertionPath: s.filePath,
+          startTime: s.overwriteStartTime ?? Duration.zero,
+          overwriteDuration: s.duration,
+          outputPath: tempPreviewPath,
+          format: 'wav',
+        );
+        playbackPath = tempPreviewPath;
+      } catch (e) {
+        debugPrint('❌ Errore creazione preview unita: $e');
+        return;
+      }
+    }
+
+    final initialPosition = seekMs > 0 ? Duration(milliseconds: seekMs) : null;
+    final started = await _audioService.startPlaying(
+      playbackPath,
+      initialPosition: initialPosition,
+    );
+    if (!started) {
+      debugPrint(
+        '❌ PlayRecordingPreview: impossibile avviare il playback di $playbackPath',
+      );
+      return;
+    }
+
+    emit(s.copyWith(isPlayingPreview: true));
+
+    // Aggiorna seekBarIndex durante il playback preview
+    _previewPositionSubscription?.cancel();
+    _previewPositionSubscription = _audioService
+        .getPlaybackPositionStream()
+        .listen((position) {
+          final newIndex = position.inMilliseconds ~/ 100;
+          if (state is RecordingPaused) {
+            final current = (state as RecordingPaused).seekBarIndex;
+            if (newIndex != current) {
+              add(UpdateSeekBarIndex(seekBarIndex: newIndex));
+            }
+          }
+        });
+
+    // Auto-stop quando il playback finisce naturalmente
+    _previewCompletionSubscription?.cancel();
+    _previewCompletionSubscription = _audioService
+        .getPlaybackCompletionStream()
+        .listen(
+          (_) => add(const StopRecordingPreview(isNaturalCompletion: true)),
+        );
   }
+
   Future<void> _onStopRecordingPreview(
     StopRecordingPreview event,
     Emitter<RecordingState> emit,
   ) async {
-    // ... implementazione ...
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    _previewPositionSubscription?.cancel();
+    _previewPositionSubscription = null;
+    _previewCompletionSubscription?.cancel();
+    _previewCompletionSubscription = null;
+    await _audioService.stopPlaying();
+
+    // Pulizia di eventuali file temporanei di preview
+    try {
+      final dir = File(s.filePath).parent;
+      final files = dir.listSync();
+      for (var f in files) {
+        if (f.path.contains('_preview_') && f.path.endsWith('.wav')) {
+          f.deleteSync();
+        }
+      }
+    } catch (_) {}
+
+    // Calcolo corretto della durata totale:
+    // Se c'è un base file (s.overwriteStartTime != null), sommiamo la durata del base file (fino all'inserzione)
+    // con la durata del nuovo frammento (s.duration). Altrimenti solo s.duration.
+    final int baseMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+    final int totalDurationMs = baseMs + s.duration.inMilliseconds;
+
+    // Completamento naturale → cursore all'ULTIMA barra della waveform.
+    final newSeekBarIndex = event.isNaturalCompletion
+        ? (totalDurationMs ~/ 100).clamp(0, 999999)
+        : s.seekBarIndex;
+
+    emit(s.copyWith(isPlayingPreview: false, seekBarIndex: newSeekBarIndex));
   }
 }
