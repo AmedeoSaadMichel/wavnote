@@ -1,4 +1,18 @@
 {
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/amedeosaadmichel/.claude/hooks/save_session_to_obsidian.py",
+            "async": true
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "WebSearch",
@@ -31,9 +45,20 @@
       "Bash(/Users/amedeosaadmichel/fvm/versions/3.29.3/bin/flutter test:*)",
       "Read(//Users/amedeosaadmichel/**)",
       "Read(//usr/local/**)",
-      "Bash(python3)"
+      "Bash(python3)",
+      "mcp__filesystem__create_directory",
+      "mcp__filesystem__write_file",
+      "Bash(curl:*)",
+      "Bash(mcp-obsidian /Users/amedeosaadmichel/Documents/GitHub/wavnote/Wavnotes_brain)",
+      "Bash(node:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "obsidian",
+    "filesystem",
+    "git"
+  ]
 }

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "obsidian": {
+      "type": "local",
+      "command": ["mcp-obsidian", "/Users/amedeosaadmichel/Documents/GitHub/wavnote/Wavnotes_brain"],
+      "environment": {
+        "OBSIDIAN_API_KEY": "f3b86490b90afafb97281b72ea8d49c816210a878b4233ee4113627d00077815",
+        "OBSIDIAN_HOST": "https://127.0.0.1:27124",
+        "PATH": "/Users/amedeosaadmichel/.nvm/versions/node/v22.20.0/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["mcp-server-filesystem", "/Users/amedeosaadmichel/Documents/GitHub/wavnote"]
+    },
+    "git": {
+      "type": "local",
+      "command": ["git-mcp-server"],
+      "environment": {
+        "GIT_REPO_PATH": "/Users/amedeosaadmichel/Documents/GitHub/wavnote"
+      }
+    }
+  }
+}

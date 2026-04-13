@@ -5,6 +5,22 @@
 - **Non invocare mai skill o tool superpowers prima di rispondere o agire.** Rispondi e agisci direttamente senza verificare skill.
 - **Non eseguire mai `git commit` o `git push` autonomamente.** Chiedi sempre esplicitamente l'autorizzazione prima di fare qualsiasi commit o push. Esegui solo se l'utente lo conferma esplicitamente.
 
+## CRITICO: Second Brain Obsidian (Wavnotes_brain/)
+
+**All'inizio di ogni sessione**, prima di leggere qualsiasi file di codice, leggi in questo ordine:
+1. `Wavnotes_brain/_index.md` — mappa di navigazione
+2. `Wavnotes_brain/project/CLAUDE.md` — stack, struttura, pattern architetturali
+3. `Wavnotes_brain/project/tech-debt.md` — TODO aperti e workaround noti
+4. `Wavnotes_brain/project/features.md` — solo se la sessione riguarda una feature specifica
+
+Questo ti permette di capire il contesto del progetto senza rileggere i file sorgente.
+
+**A fine sessione** (se la sessione dura >20 min o produce decisioni architetturali):
+- Aggiorna `Wavnotes_brain/project/features.md` se hai toccato una feature
+- Aggiorna `Wavnotes_brain/project/tech-debt.md` se hai aggiunto/risolto un workaround
+- Crea `Wavnotes_brain/log/sessions/YYYY-MM-DD-topic.md` dal template `templates/session.md`
+- Per decisioni architetturali significative, crea `Wavnotes_brain/project/adr/YYYY-MM-DD-titolo.md`
+
 ## CRITICO: Conformità alla Struttura dei File
 
 - **Scrivi sempre in italiano.**

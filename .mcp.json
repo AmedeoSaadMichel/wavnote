@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "obsidian": {
+      "command": "mcp-obsidian",
+      "args": [
+        "/Users/amedeosaadmichel/Documents/GitHub/wavnote/Wavnotes_brain"
+      ],
+      "env": {
+        "OBSIDIAN_API_KEY": "f3b86490b90afafb97281b72ea8d49c816210a878b4233ee4113627d00077815",
+        "OBSIDIAN_HOST": "https://127.0.0.1:27124"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": [
+        "/Users/amedeosaadmichel/Documents/GitHub/wavnote",
+        "/Users/amedeosaadmichel/Documents/GitHub/wavnote/Wavnotes_brain"
+      ]
+    },
+    "git": {
+      "command": "git-mcp-server",
+      "env": {
+        "GIT_REPO_PATH": "/Users/amedeosaadmichel/Documents/GitHub/wavnote"
+      }
+    }
+  }
+}
+
