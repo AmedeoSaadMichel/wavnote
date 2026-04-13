@@ -16,6 +16,7 @@ class RecordingCompactView extends StatelessWidget {
   final bool isRecording;
   final double amplitude;
   final List<double> waveData;
+  final List<int> waveSegments;
   final Animation<double> pulseAnimation;
   final VoidCallback onToggle;
 
@@ -26,6 +27,7 @@ class RecordingCompactView extends StatelessWidget {
     required this.isRecording,
     required this.amplitude,
     required this.waveData,
+    this.waveSegments = const [],
     required this.pulseAnimation,
     required this.onToggle,
   });
@@ -134,6 +136,7 @@ class RecordingCompactView extends StatelessWidget {
                 return RecordingWaveform(
                   amplitude: amplitude,
                   waveData: waveData,
+                  waveSegments: waveSegments,
                   size: Size(constraints.maxWidth, constraints.maxHeight),
                   waveColor: Colors.cyan,
                   spacing: 1.5,

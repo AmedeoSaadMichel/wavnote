@@ -24,6 +24,7 @@ class RecordingFullscreenView extends StatefulWidget {
   final bool isPaused;
   final double amplitude;
   final List<double> waveData;
+  final List<int> waveSegments;
   final VoidCallback onToggle;
   final VoidCallback? onPause;
   final VoidCallback? onDone;
@@ -51,6 +52,7 @@ class RecordingFullscreenView extends StatefulWidget {
     this.isPaused = false,
     required this.amplitude,
     required this.waveData,
+    this.waveSegments = const [],
     required this.onToggle,
     required this.pulseAnimation,
     this.onPause,
@@ -239,6 +241,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
               return RecordingWaveform(
                 amplitude: widget.amplitude,
                 waveData: widget.waveData,
+                waveSegments: widget.waveSegments,
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 waveColor: Colors.cyan,
                 spacing: 2.0,

@@ -88,9 +88,15 @@ class RecordingInProgress extends RecordingState {
   final double amplitude;
   final DateTime startTime;
   final String? title;
-  final String? seekBasePath; // path del file base tagliato se è avvenuto un seek-trim
+  final String? originalFilePathForOverwrite;
+  final Duration? overwriteStartTime;
+  final String?
+  seekBasePath; // path del file base tagliato se è avvenuto un seek-trim
   /// Dati waveform troncati dopo un seek-and-resume; null per registrazioni normali.
   final List<double>? truncatedWaveData;
+
+  /// Dati waveform completi per il player, non vengono mai troncati.
+  final List<double>? waveformDataForPlayer;
 
   const RecordingInProgress({
     required this.filePath,
@@ -103,14 +109,30 @@ class RecordingInProgress extends RecordingState {
     required this.amplitude,
     required this.startTime,
     this.title,
+    this.originalFilePathForOverwrite,
+    this.overwriteStartTime,
     this.seekBasePath,
     this.truncatedWaveData,
+    this.waveformDataForPlayer,
   });
 
   @override
   List<Object?> get props => [
-    filePath, folderId, folderName, format, sampleRate, bitRate,
-    duration, amplitude, startTime, title, seekBasePath, truncatedWaveData,
+    filePath,
+    folderId,
+    folderName,
+    format,
+    sampleRate,
+    bitRate,
+    duration,
+    amplitude,
+    startTime,
+    title,
+    originalFilePathForOverwrite,
+    overwriteStartTime,
+    seekBasePath,
+    truncatedWaveData,
+    waveformDataForPlayer,
   ];
 
   RecordingInProgress copyWith({
@@ -124,6 +146,8 @@ class RecordingInProgress extends RecordingState {
     double? amplitude,
     DateTime? startTime,
     String? title,
+    String? originalFilePathForOverwrite,
+    Duration? overwriteStartTime,
     String? seekBasePath,
     List<double>? truncatedWaveData,
   }) {
@@ -138,6 +162,9 @@ class RecordingInProgress extends RecordingState {
       amplitude: amplitude ?? this.amplitude,
       startTime: startTime ?? this.startTime,
       title: title ?? this.title,
+      originalFilePathForOverwrite:
+          originalFilePathForOverwrite ?? this.originalFilePathForOverwrite,
+      overwriteStartTime: overwriteStartTime ?? this.overwriteStartTime,
       seekBasePath: seekBasePath ?? this.seekBasePath,
       truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
     );
@@ -155,10 +182,17 @@ class RecordingPaused extends RecordingState {
   final int bitRate;
   final Duration duration;
   final DateTime startTime;
+
   /// true mentre il playback di anteprima è attivo (ascolto del registrato).
   final bool isPlayingPreview;
+
   /// Indice della barra di seek nella waveform (single source of truth).
   final int seekBarIndex;
+
+  final String? seekBasePath;
+  final String? originalFilePathForOverwrite;
+  final Duration? overwriteStartTime;
+  final List<double>? truncatedWaveData;
 
   const RecordingPaused({
     required this.filePath,
@@ -172,12 +206,29 @@ class RecordingPaused extends RecordingState {
     required this.startTime,
     this.isPlayingPreview = false,
     this.seekBarIndex = 0,
+    this.seekBasePath,
+    this.originalFilePathForOverwrite,
+    this.overwriteStartTime,
+    this.truncatedWaveData,
   });
 
   @override
   List<Object?> get props => [
-    filePath, folderId, folderName, title, format, sampleRate, bitRate,
-    duration, startTime, isPlayingPreview, seekBarIndex,
+    filePath,
+    folderId,
+    folderName,
+    title,
+    format,
+    sampleRate,
+    bitRate,
+    duration,
+    startTime,
+    isPlayingPreview,
+    seekBarIndex,
+    seekBasePath,
+    originalFilePathForOverwrite,
+    overwriteStartTime,
+    truncatedWaveData,
   ];
 
   RecordingPaused copyWith({
@@ -192,6 +243,10 @@ class RecordingPaused extends RecordingState {
     DateTime? startTime,
     bool? isPlayingPreview,
     int? seekBarIndex,
+    String? seekBasePath,
+    String? originalFilePathForOverwrite,
+    Duration? overwriteStartTime,
+    List<double>? truncatedWaveData,
   }) {
     return RecordingPaused(
       filePath: filePath ?? this.filePath,
@@ -205,6 +260,11 @@ class RecordingPaused extends RecordingState {
       startTime: startTime ?? this.startTime,
       isPlayingPreview: isPlayingPreview ?? this.isPlayingPreview,
       seekBarIndex: seekBarIndex ?? this.seekBarIndex,
+      seekBasePath: seekBasePath ?? this.seekBasePath,
+      originalFilePathForOverwrite:
+          originalFilePathForOverwrite ?? this.originalFilePathForOverwrite,
+      overwriteStartTime: overwriteStartTime ?? this.overwriteStartTime,
+      truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
     );
   }
 }
@@ -249,7 +309,12 @@ class RecordingLoaded extends RecordingState {
   }) : timestamp = timestamp ?? DateTime.now();
 
   @override
-  List<Object?> get props => [recordings, isEditMode, selectedRecordings, timestamp];
+  List<Object?> get props => [
+    recordings,
+    isEditMode,
+    selectedRecordings,
+    timestamp,
+  ];
 
   RecordingLoaded copyWith({
     List<RecordingEntity>? recordings,
@@ -294,9 +359,9 @@ class RecordingError extends RecordingState {
   final RecordingErrorType errorType;
 
   const RecordingError(
-      this.message, {
-        this.errorType = RecordingErrorType.unknown,
-      });
+    this.message, {
+    this.errorType = RecordingErrorType.unknown,
+  });
 
   @override
   List<Object> get props => [message, errorType];
@@ -306,9 +371,4 @@ class RecordingError extends RecordingState {
 }
 
 /// Types of recording errors
-enum RecordingErrorType {
-  permission,
-  recording,
-  state,
-  unknown,
-}
+enum RecordingErrorType { permission, recording, state, unknown }

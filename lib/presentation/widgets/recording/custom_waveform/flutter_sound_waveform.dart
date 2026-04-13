@@ -12,6 +12,7 @@ class RecordingWaveform extends StatefulWidget {
   final double
   amplitude; // Current amplitude (0.0-1.0) from AudioRecorderService
   final List<double> waveData; // Waveform data from parent
+  final List<int> waveSegments; // Segment index per bar (colori overwrite)
   final Size size;
   final Color waveColor;
   final double spacing;
@@ -48,6 +49,7 @@ class RecordingWaveform extends StatefulWidget {
     super.key,
     required this.amplitude,
     required this.waveData,
+    this.waveSegments = const [],
     required this.size,
     this.waveColor = Colors.cyan,
     this.spacing = 4.0,
@@ -261,6 +263,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
               child: CustomPaint(
                 painter: CustomRecorderWavePainter(
                   waveData: widget.waveData.isEmpty ? [0.0] : widget.waveData,
+                  waveSegments: widget.waveSegments,
                   waveColor: widget.waveColor,
                   showMiddleLine: widget.showMiddleLine,
                   spacing: widget.spacing,

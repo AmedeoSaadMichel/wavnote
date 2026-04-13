@@ -16,6 +16,7 @@ import 'waveform_utils.dart';
 /// -totalBackDistance.dx + dragOffset.dx
 class CustomRecorderWavePainter extends CustomPainter {
   final List<double> waveData;
+  final List<int> waveSegments;
   final Color waveColor;
   final bool showMiddleLine;
   final double spacing;
@@ -54,8 +55,26 @@ class CustomRecorderWavePainter extends CustomPainter {
   /// Barre future da erosione progressiva: ancora a 0.3 opacity anche durante recording.
   final int futureBarsCount;
 
+  /// Palette dei segmenti: indice 0 = colore base, 1..N = colori overwrite.
+  static const List<Color> _kSegmentPalette = [
+    Color(0xFF00BCD4), // 0 — cyan (base)
+    Color(0xFFFF6B6B), // 1 — coral
+    Color(0xFF81C784), // 2 — verde morbido
+    Color(0xFFFFD54F), // 3 — ambra
+    Color(0xFFBA68C8), // 4 — viola morbido
+    Color(0xFF4FC3F7), // 5 — azzurro chiaro
+  ];
+
+  /// Restituisce il colore della barra [i] in base al suo segmento.
+  /// Se [waveSegments] è vuoto o [i] è fuori range, usa [waveColor].
+  Color _getBarColor(int i) {
+    if (waveSegments.isEmpty || i >= waveSegments.length) return waveColor;
+    return _kSegmentPalette[waveSegments[i] % _kSegmentPalette.length];
+  }
+
   CustomRecorderWavePainter({
     required this.waveData,
+    required this.waveSegments,
     required this.waveColor,
     required this.showMiddleLine,
     required this.spacing,
@@ -161,7 +180,11 @@ class CustomRecorderWavePainter extends CustomPainter {
         oldDelegate.dragOffset != dragOffset ||
         oldDelegate.waveColor != waveColor ||
         oldDelegate.isPaused != isPaused ||
-        oldDelegate.futureBarsCount != futureBarsCount;
+        oldDelegate.futureBarsCount != futureBarsCount ||
+        oldDelegate.waveSegments.length != waveSegments.length ||
+        (waveSegments.isNotEmpty &&
+            oldDelegate.waveSegments.isNotEmpty &&
+            oldDelegate.waveSegments.last != waveSegments.last);
   }
 
   void _drawTextInRange(Canvas canvas, int i, Size size) {
@@ -243,21 +266,26 @@ class CustomRecorderWavePainter extends CustomPainter {
     if (dx > -halfWidth && dx < halfWidth * 2) {
       // Barra futura = ancora da sovrascrivere durante erosione progressiva
       final isFutureBar = futureBarsCount > 0 && i >= waveData.length - futureBarsCount;
+      final barColor = _getBarColor(i);
       if (isPaused) {
         final opacity = dx < halfWidth ? 1.0 : 0.3;
         final paint = Paint()
-          ..color = waveColor.withValues(alpha: opacity)
+          ..color = barColor.withValues(alpha: opacity)
           ..strokeWidth = waveThickness
           ..strokeCap = waveCap;
         canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);
       } else if (isFutureBar) {
         final paint = Paint()
-          ..color = waveColor.withValues(alpha: 0.3)
+          ..color = barColor.withValues(alpha: 0.3)
           ..strokeWidth = waveThickness
           ..strokeCap = waveCap;
         canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);
       } else {
-        canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), _wavePaint);
+        final paint = Paint()
+          ..color = barColor
+          ..strokeWidth = waveThickness
+          ..strokeCap = waveCap;
+        canvas.drawLine(Offset(dx, upperDy), Offset(dx, lowerDy), paint);
       }
     }
   }

@@ -15,6 +15,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/recording_entity.dart';
@@ -26,6 +27,9 @@ import 'audio_player_service.dart';
 import 'audio_engine_service.dart';
 
 class AudioServiceCoordinator implements IAudioServiceRepository {
+  static const MethodChannel _audioTrimmerChannel = MethodChannel(
+    'wavnote/audio_trimmer',
+  );
   // package record — mantenuto ma non usato su iOS per la registrazione
   late final AudioRecorderService _recordingService;
   late final AudioPlayerService _playbackService;
@@ -58,8 +62,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   StreamController<void>? _completionController;
 
   StreamSubscription<double>? _engineAmplitudeSubscription;
-  // StreamSubscription<double>? _recordingAmplitudeSubscription; // record fallback
-  // StreamSubscription<Duration>? _recordingPositionSubscription;
+  StreamSubscription<double>?
+  _recordingAmplitudeSubscription; // record fallback
+  StreamSubscription<Duration>? _recordingPositionSubscription;
   // StreamSubscription<void>? _recordingCompletionSubscription;
   StreamSubscription<Duration>? _playbackPositionSubscription;
   StreamSubscription<void>? _playbackCompletionSubscription;
@@ -182,17 +187,16 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     }
 
     // ── Fallback package record (non-iOS) ──────────────────────────
-    // final success = await _recordingService.startRecording(
-    //   filePath: filePath,
-    //   format: format,
-    //   sampleRate: sampleRate,
-    //   bitRate: bitRate,
-    // );
-    // if (success) {
-    //   _setupRecordingStreams();
-    // }
-    // return success;
-    return false;
+    final success = await _recordingService.startRecording(
+      filePath: filePath,
+      format: format,
+      sampleRate: sampleRate,
+      bitRate: bitRate,
+    );
+    if (success) {
+      _setupRecordingStreams();
+    }
+    return success;
   }
 
   @override
@@ -242,8 +246,9 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     }
 
     // Fallback non-iOS
-    // return await _recordingService.stopRecording();
-    return null;
+    final result = await _recordingService.stopRecording(raw: raw);
+    _cleanupRecordingStreams();
+    return result;
   }
 
   @override
@@ -256,8 +261,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       }
       return result;
     }
-    // return await _recordingService.pauseRecording();
-    return false;
+    // Fallback non-iOS
+    return await _recordingService.pauseRecording();
   }
 
   @override
@@ -273,8 +278,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       }
       return result;
     }
-    // return await _recordingService.resumeRecording();
-    return false;
+    // Fallback non-iOS
+    return await _recordingService.resumeRecording();
   }
 
   @override
@@ -289,8 +294,10 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       _iosPauseStartTime = null;
       return true;
     }
-    // return await _recordingService.cancelRecording();
-    return false;
+    // Fallback non-iOS
+    final result = await _recordingService.cancelRecording();
+    _cleanupRecordingStreams();
+    return result;
   }
 
   @override
@@ -300,22 +307,22 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
           (_engineService?.isRecording ?? false) &&
           !(_engineService?.isRecordingPaused ?? false);
     }
-    // return await _recordingService.isRecording();
-    return false;
+    // Fallback non-iOS
+    return await _recordingService.isRecording();
   }
 
   @override
   Future<bool> isRecordingPaused() async {
     if (_useNativeEngine) return _engineService?.isRecordingPaused ?? false;
-    // return await _recordingService.isRecordingPaused();
-    return false;
+    // Fallback non-iOS
+    return await _recordingService.isRecordingPaused();
   }
 
   @override
   Future<Duration> getCurrentRecordingDuration() async {
     if (_useNativeEngine && _iosNativeActive) return _calculateIosDuration();
-    // return await _recordingService.getCurrentRecordingDuration();
-    return Duration.zero;
+    // Fallback non-iOS
+    return await _recordingService.getCurrentRecordingDuration();
   }
 
   @override
@@ -333,8 +340,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     if (_useNativeEngine && _iosNativeActive && _engineService != null) {
       return await _engineService!.getCurrentAmplitude();
     }
-    // return await _recordingService.getCurrentAmplitude();
-    return 0.0;
+    // Fallback non-iOS
+    return await _recordingService.getCurrentAmplitude();
   }
 
   // ==== PLAYBACK OPERATIONS ====
@@ -505,12 +512,41 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     required String outputPath,
     required Duration startTime,
     required Duration endTime,
-  }) => _recordingService.trimAudioFile(
-    inputPath: inputPath,
-    outputPath: outputPath,
-    startTime: startTime,
-    endTime: endTime,
-  );
+  }) async {
+    // Su iOS/macOS usiamo il plugin nativo custom
+    if (_useNativeEngine) {
+      try {
+        final durationMs = (endTime - startTime).inMilliseconds;
+        if (durationMs <= 0) {
+          debugPrint('❌ AudioServiceCoordinator: Invalid trim duration.');
+          return null;
+        }
+
+        await _audioTrimmerChannel.invokeMethod('trimAudio', {
+          'filePath': inputPath,
+          'startTimeMs': startTime.inMilliseconds,
+          'durationMs': durationMs,
+          'outputPath': outputPath,
+          'format': 'm4a', // o basato sul file di input
+        });
+        debugPrint('✅ Audio trim nativo completato con successo: $outputPath');
+        return outputPath;
+      } on PlatformException catch (e) {
+        debugPrint(
+          '❌ AudioServiceCoordinator: Errore trim audio nativo: ${e.message}',
+        );
+        return null;
+      }
+    }
+
+    // Fallback per altre piattaforme
+    return _recordingService.trimAudioFile(
+      inputPath: inputPath,
+      outputPath: outputPath,
+      startTime: startTime,
+      endTime: endTime,
+    );
+  }
 
   @override
   Future<String?> mergeAudioFiles({
@@ -528,6 +564,16 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     String filePath, {
     int sampleCount = 100,
   }) => _recordingService.getWaveformData(filePath, sampleCount: sampleCount);
+
+  @override
+  Future<Duration> getAudioDuration(String filePath) async {
+    if (_useNativeEngine && _engineService != null) {
+      final resolvedPath = await _resolvePath(filePath);
+      return await _engineService!.getAudioDuration(resolvedPath);
+    }
+    // Fallback per altre piattaforme
+    return await _playbackService.getAudioDuration(filePath);
+  }
 
   // ==== DEVICE & PERMISSIONS ====
 
@@ -601,9 +647,25 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     _amplitudeController?.add(0.0);
   }
 
-  // // package record stream helpers — mantenuti commentati
-  // void _setupRecordingStreams() { ... }
-  // void _cleanupRecordingStreams() { ... }
+  // package record stream helpers
+  void _setupRecordingStreams() {
+    _recordingAmplitudeSubscription?.cancel();
+    _recordingAmplitudeSubscription = _recordingService
+        .getRecordingAmplitudeStream()
+        .listen((amp) => _amplitudeController?.add(amp));
+
+    _recordingPositionSubscription?.cancel();
+    _recordingPositionSubscription = _recordingService.durationStream?.listen(
+      (pos) => _positionController?.add(pos),
+    );
+  }
+
+  void _cleanupRecordingStreams() {
+    _recordingAmplitudeSubscription?.cancel();
+    _recordingAmplitudeSubscription = null;
+    _recordingPositionSubscription?.cancel();
+    _recordingPositionSubscription = null;
+  }
 
   /// Configura gli stream di posizione e completion per il playback nativo
   /// (durante registrazione in pausa su iOS/macOS).

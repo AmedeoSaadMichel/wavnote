@@ -502,6 +502,7 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     print('📍 Current recording state: ${currentState.runtimeType}');
     print('📍 Can start recording: ${currentState.canStartRecording}');
     print('📍 Can stop recording: ${currentState.canStopRecording}');
+    print('📍 Can resume recording: ${currentState.canResumeRecording}');
 
     if (currentState.canStartRecording) {
       print('🚀 Starting recording...');
@@ -526,9 +527,12 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
           format: selectedFormat,
         ),
       );
+    } else if (currentState.canResumeRecording) {
+      print('▶️ Resuming recording from paused state...');
+      resumeRecording();
     } else if (currentState.canStopRecording) {
       print('🛑 Stopping recording - waveform will be extracted from file...');
-      recordingBloc.add(const StopRecording()); // No synthetic waveform data
+      recordingBloc.add(const StopRecording());
     } else {
       print(
         '❌ Cannot start or stop recording in current state: ${currentState.runtimeType}',

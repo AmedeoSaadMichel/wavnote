@@ -341,6 +341,17 @@ class AudioEngineService {
     }
   }
 
+  Future<Duration> getAudioDuration(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<int>('getAudioDuration', {
+        'path': filePath,
+      });
+      return Duration(milliseconds: result ?? 0);
+    } catch (e) {
+      return Duration.zero;
+    }
+  }
+
   /// Interroga il layer nativo per sapere se il player sta ancora ripproducendo.
   /// Usato per rilevare il completamento naturale del playback (Swift imposta
   /// isPlaying = false nel completion callback di scheduleFile).

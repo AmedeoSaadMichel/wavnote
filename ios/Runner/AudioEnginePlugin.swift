@@ -4,8 +4,12 @@
 
 import Flutter
 import AVFoundation
+import Logging
 
 public class AudioEnginePlugin: NSObject, FlutterPlugin {
+
+    private let logger = Logger(label: "com.wavnote.audio_engine")
+
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
     private var audioFile: AVAudioFile?
@@ -144,19 +148,19 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     // MARK: - Initialize
 
     private func initialize(result: @escaping FlutterResult) {
-        NSLog("🔧 [NATIVE] initialize — isRecording=\(isRecording) isPaused=\(isPaused)")
+        self.logger.debug("🔧 [NATIVE] initialize — isRecording=\(isRecording) isPaused=\(isPaused)")
         if isRecording || isPaused {
-            NSLog("🔧 [NATIVE] initialize: motore già attivo, skip")
+            self.logger.debug("🔧 [NATIVE] initialize: motore già attivo, skip")
             result(true)
             return
         }
 
         AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
             guard let self = self else { return }
-            NSLog("🔧 [NATIVE] requestRecordPermission: granted=\(granted)")
+            self.logger.debug("🔧 [NATIVE] requestRecordPermission: granted=\(granted)")
 
             guard granted else {
-                NSLog("🔧 [NATIVE] initialize ERROR: permesso microfono negato")
+                self.logger.error("🔧 [NATIVE] initialize ERROR: permesso microfono negato")
                 result(FlutterError(code: "PERMISSION_DENIED",
                     message: "Microphone permission denied", details: nil))
                 return
@@ -166,8 +170,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 try session.setCategory(self.sessionCategory, mode: .default, options: self.sessionOptions)
                 try session.setActive(true)
 
-                NSLog("🔧 [NATIVE] initialize: session configurata — category=\(session.category.rawValue)")
-                NSLog("🔧 [NATIVE]   isInputAvailable=\(session.isInputAvailable) availableInputs=\(session.availableInputs?.count ?? 0)")
+                self.logger.debug("🔧 [NATIVE] initialize: session configurata — category=\(session.category.rawValue)")
+                self.logger.debug("🔧 [NATIVE]   isInputAvailable=\(session.isInputAvailable) availableInputs=\(session.availableInputs?.count ?? 0)")
 
                 self.audioEngine = AVAudioEngine()
                 self.inputNode = self.audioEngine?.inputNode
@@ -176,15 +180,15 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
                 if let input = self.inputNode {
                     let format = input.outputFormat(forBus: 0)
-                    NSLog("🔧 [NATIVE]   inputNode sampleRate=\(format.sampleRate) ch=\(format.channelCount)")
+                    self.logger.debug("🔧 [NATIVE]   inputNode sampleRate=\(format.sampleRate) ch=\(format.channelCount)")
                 } else {
-                    NSLog("🔧 [NATIVE]   ⚠️ inputNode è nil!")
+                    self.logger.warning("🔧 [NATIVE]   ⚠️ inputNode è nil!")
                 }
 
-                NSLog("🔧 [NATIVE] initialize: OK")
+                self.logger.info("🔧 [NATIVE] initialize: OK")
                 result(true)
             } catch {
-                NSLog("🔧 [NATIVE] initialize ERROR: \(error)")
+                self.logger.error("🔧 [NATIVE] initialize ERROR: \(error)")
                 result(FlutterError(code: "INIT_ERROR", message: error.localizedDescription, details: nil))
             }
         }
@@ -195,9 +199,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private func startRecording(path: String, sampleRate: Int, bitRate: Int, format: String, result: @escaping FlutterResult) {
         // Cap sample rate a 48kHz (come fa il package record)
         let cappedSampleRate = min(sampleRate, AudioEnginePlugin.maxSampleRate)
-        NSLog("🎙️ [NATIVE] startRecording — path=\(path) format=\(format) sr=\(cappedSampleRate) br=\(bitRate)")
+        self.logger.debug("🎙️ [NATIVE] startRecording — path=\(path) format=\(format) sr=\(cappedSampleRate) br=\(bitRate)")
         guard audioEngine != nil, inputNode != nil else {
-            NSLog("🎙️ [NATIVE] startRecording ERROR: motore non inizializzato")
+            self.logger.error("🎙️ [NATIVE] startRecording ERROR: motore non inizializzato")
             result(FlutterError(code: "NOT_INITIALIZED", message: "AudioEngine not initialized", details: nil))
             return
         }
@@ -207,7 +211,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(sessionCategory, mode: .default, options: sessionOptions)
             try session.setActive(true)
-            NSLog("🎙️ [NATIVE] startRecording: AVAudioSession riconfigurata")
+            self.logger.debug("🎙️ [NATIVE] startRecording: AVAudioSession riconfigurata")
             let fileURL = URL(fileURLWithPath: path)
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(),
@@ -241,18 +245,18 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             // Cambia estensione a .wav per il file interno
             let wavURL = fileURL.deletingPathExtension().appendingPathExtension("wav")
             let wavPath = wavURL.path
-            NSLog("🎙️ [NATIVE] startRecording: interno WAV → \(wavPath) (formato finale: \(format))")
+            self.logger.debug("🎙️ [NATIVE] startRecording: interno WAV → \(wavPath) (formato finale: \(format))")
 
             audioFile = try AVAudioFile(forWriting: wavURL, settings: wavSettings)
             recordingFilePath = wavPath
 
             let rawFormat = input.outputFormat(forBus: 0)
-            NSLog("🎙️ [NATIVE] startRecording: rawFormat — sampleRate=\(rawFormat.sampleRate) channels=\(rawFormat.channelCount)")
+            self.logger.debug("🎙️ [NATIVE] startRecording: rawFormat — sampleRate=\(rawFormat.sampleRate) channels=\(rawFormat.channelCount)")
 
             // Sul simulatore senza permesso macOS il formato ha 0 canali / 0 Hz.
             let inputFormat: AVAudioFormat
             if rawFormat.channelCount == 0 || rawFormat.sampleRate == 0 {
-                NSLog("🎙️ [NATIVE] startRecording: formato invalido, ricreo engine...")
+                self.logger.debug("🎙️ [NATIVE] startRecording: formato invalido, ricreo engine...")
                 audioEngine?.stop()
                 audioEngine = AVAudioEngine()
                 inputNode = audioEngine?.inputNode
@@ -261,9 +265,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     return
                 }
                 let retryFormat = newInput.outputFormat(forBus: 0)
-                NSLog("🎙️ [NATIVE] startRecording: retryFormat — sampleRate=\(retryFormat.sampleRate) channels=\(retryFormat.channelCount)")
+                self.logger.debug("🎙️ [NATIVE] startRecording: retryFormat — sampleRate=\(retryFormat.sampleRate) channels=\(retryFormat.channelCount)")
                 if retryFormat.channelCount == 0 || retryFormat.sampleRate == 0 {
-                    NSLog("🎙️ [NATIVE] startRecording ERROR: microfono non accessibile")
+                    self.logger.error("🎙️ [NATIVE] startRecording ERROR: microfono non accessibile")
                     result(FlutterError(code: "NO_MIC_ACCESS",
                         message: "Microphone not accessible. On Simulator: grant mic permission to Simulator.app in macOS System Settings",
                         details: nil))
@@ -277,10 +281,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let outputFormat = audioFile!.processingFormat
             var converter: AVAudioConverter? = nil
             if !inputFormat.isEqual(outputFormat) {
-                NSLog("🎙️ [NATIVE] startRecording: converter — \(inputFormat.sampleRate)Hz → \(outputFormat.sampleRate)Hz")
+                self.logger.debug("🎙️ [NATIVE] startRecording: converter — \(inputFormat.sampleRate)Hz → \(outputFormat.sampleRate)Hz")
                 converter = AVAudioConverter(from: inputFormat, to: outputFormat)
                 if converter == nil {
-                    NSLog("🎙️ [NATIVE] startRecording ERROR: impossibile creare AVAudioConverter")
+                    self.logger.error("🎙️ [NATIVE] startRecording ERROR: impossibile creare AVAudioConverter")
                     result(FlutterError(code: "FORMAT_ERROR", message: "Cannot create audio format converter", details: nil))
                     return
                 }
@@ -299,7 +303,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 let shouldLog = bufferCount % 100 == 1
 
                 if shouldLog {
-                    NSLog("🎙️ [NATIVE] tap buffer #\(bufferCount) — frames=\(buffer.frameLength)")
+                    self.logger.trace("🎙️ [NATIVE] tap buffer #\(bufferCount) — frames=\(buffer.frameLength)")
                 }
 
                 do {
@@ -311,7 +315,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                             return buffer
                         }
                         if let err = error {
-                            NSLog("🎙️ [NATIVE] converter ERROR: \(err)")
+                            self.logger.error("🎙️ [NATIVE] converter ERROR: \(err)")
                         } else if let pcmBuffer = pcmBuffer {
                             try self.audioFile?.write(from: pcmBuffer)
                         }
@@ -319,7 +323,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         try self.audioFile?.write(from: buffer)
                     }
                 } catch {
-                    NSLog("🎙️ [NATIVE] tap write ERROR: \(error)")
+                    self.logger.error("🎙️ [NATIVE] tap write ERROR: \(error)")
                 }
                 // Calcola amplitude
                 if let ch = buffer.floatChannelData?[0] {
@@ -328,32 +332,32 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     for i in 0..<n { sq += ch[i] * ch[i] }
                     let amp = min(sqrt(sq / Float(max(n, 1))) * 10.0, 1.0)
                     self.currentAmplitude = amp
-                    if shouldLog { NSLog("🎙️ [NATIVE]   amplitude=\(amp)") }
+                    if shouldLog { self.logger.trace("🎙️ [NATIVE]   amplitude=\(amp)") }
                 }
             }
             // Voice processing (echo cancellation + noise suppression)
             if voiceProcessingEnabled {
                 if #available(iOS 13.0, *) {
                     try tapInput.setVoiceProcessingEnabled(true)
-                    NSLog("🎙️ [NATIVE] voice processing abilitato")
+                    self.logger.debug("🎙️ [NATIVE] voice processing abilitato")
                 }
             }
 
             try audioEngine!.start()
             isRecording = true
             isPaused = false
-            NSLog("🎙️ [NATIVE] startRecording: OK — engine running")
+            self.logger.info("🎙️ [NATIVE] startRecording: OK — engine running")
             result(true)
         } catch {
-            NSLog("🎙️ [NATIVE] startRecording ERROR: \(error)")
+            self.logger.error("🎙️ [NATIVE] startRecording ERROR: \(error)")
             result(FlutterError(code: "RECORD_ERROR", message: error.localizedDescription, details: nil))
         }
     }
 
     private func pauseRecording(result: @escaping FlutterResult) {
-        NSLog("⏸️ [NATIVE] pauseRecording — isRecording=\(isRecording) isPaused=\(isPaused)")
+        self.logger.debug("⏸️ [NATIVE] pauseRecording — isRecording=\(isRecording) isPaused=\(isPaused)")
         guard isRecording, !isPaused else {
-            NSLog("⏸️ [NATIVE] pauseRecording ERROR: stato invalido")
+            self.logger.error("⏸️ [NATIVE] pauseRecording ERROR: stato invalido")
             result(FlutterError(code: "INVALID_STATE", message: "Not recording or already paused", details: nil))
             return
         }
@@ -361,7 +365,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         if let file = audioFile {
             let sr = file.processingFormat.sampleRate
             let frames = file.length
-            NSLog("⏸️ [NATIVE] pauseRecording: PRIMA chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms)")
+            self.logger.debug("⏸️ [NATIVE] pauseRecording: PRIMA chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms)")
         }
         audioEngine?.pause()
         if let path = recordingFilePath {
@@ -371,10 +375,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             if let readFile = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) {
                 let sr = readFile.processingFormat.sampleRate
                 let frames = readFile.length
-                NSLog("⏸️ [NATIVE] pauseRecording: DOPO chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms) segmenti=\(recordingSegments.count)")
+                self.logger.debug("⏸️ [NATIVE] pauseRecording: DOPO chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms) segmenti=\(recordingSegments.count)")
             }
             if let attrs = try? FileManager.default.attributesOfItem(atPath: path) {
-                NSLog("⏸️ [NATIVE] pauseRecording: size=\(attrs[.size] ?? 0) bytes")
+                self.logger.debug("⏸️ [NATIVE] pauseRecording: size=\(attrs[.size] ?? 0) bytes")
             }
         }
         isPaused = true
@@ -383,9 +387,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     }
 
     private func resumeRecording(result: @escaping FlutterResult) {
-        NSLog("▶️ [NATIVE] resumeRecording — isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
+        self.logger.debug("▶️ [NATIVE] resumeRecording — isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
         guard isRecording, isPaused else {
-            NSLog("▶️ [NATIVE] resumeRecording ERROR: stato invalido")
+            self.logger.error("▶️ [NATIVE] resumeRecording ERROR: stato invalido")
             result(FlutterError(code: "INVALID_STATE", message: "Not paused", details: nil))
             return
         }
@@ -393,31 +397,31 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(sessionCategory, mode: .default, options: sessionOptions)
             try session.setActive(true)
-            NSLog("▶️ [NATIVE] resumeRecording: AVAudioSession riconfigurata")
+            self.logger.debug("▶️ [NATIVE] resumeRecording: AVAudioSession riconfigurata")
             guard let settings = recordingSettings, let first = recordingSegments.first else {
-                NSLog("▶️ [NATIVE] resumeRecording ERROR: nessun settings o segmento")
+                self.logger.error("▶️ [NATIVE] resumeRecording ERROR: nessun settings o segmento")
                 result(FlutterError(code: "RESUME_ERROR", message: "No recording settings available", details: nil))
                 return
             }
             let baseURL = URL(fileURLWithPath: first)
             let contPath = baseURL.deletingPathExtension().path + "_cnt\(recordingSegments.count)." + baseURL.pathExtension
-            NSLog("▶️ [NATIVE] resumeRecording: nuovo file → \(contPath)")
+            self.logger.debug("▶️ [NATIVE] resumeRecording: nuovo file → \(contPath)")
             audioFile = try AVAudioFile(forWriting: URL(fileURLWithPath: contPath), settings: settings)
             recordingFilePath = contPath
             try audioEngine?.start()
             isPaused = false
-            NSLog("▶️ [NATIVE] resumeRecording: OK — engine riavviato")
+            self.logger.info("▶️ [NATIVE] resumeRecording: OK — engine riavviato")
             result(true)
         } catch {
-            NSLog("▶️ [NATIVE] resumeRecording ERROR: \(error)")
+            self.logger.error("▶️ [NATIVE] resumeRecording ERROR: \(error)")
             result(FlutterError(code: "RESUME_ERROR", message: error.localizedDescription, details: nil))
         }
     }
 
     private func stopRecording(raw: Bool = false, result: @escaping FlutterResult) {
-        NSLog("⏹️ [NATIVE] stopRecording — raw=\(raw) isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
+        self.logger.debug("⏹️ [NATIVE] stopRecording — raw=\(raw) isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
         guard isRecording else {
-            NSLog("⏹️ [NATIVE] stopRecording ERROR: non in registrazione")
+            self.logger.error("⏹️ [NATIVE] stopRecording ERROR: non in registrazione")
             result(FlutterError(code: "INVALID_STATE", message: "Not recording", details: nil))
             return
         }
@@ -426,16 +430,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         if let path = recordingFilePath, audioFile != nil {
             audioFile = nil
             recordingSegments.append(path)
-            NSLog("⏹️ [NATIVE] stopRecording: segmento finale → \(path)")
+            self.logger.debug("⏹️ [NATIVE] stopRecording: segmento finale → \(path)")
         } else {
             audioFile = nil
-            NSLog("⏹️ [NATIVE] stopRecording: audioFile già nil (era in pausa)")
+            self.logger.debug("⏹️ [NATIVE] stopRecording: audioFile già nil (era in pausa)")
         }
         recordingFilePath = nil
         isRecording = false
         isPaused = false
         currentAmplitude = 0.0
-        NSLog("⏹️ [NATIVE] stopRecording: \(recordingSegments.count) segmenti da processare")
+        self.logger.debug("⏹️ [NATIVE] stopRecording: \(recordingSegments.count) segmenti da processare")
 
         guard !recordingSegments.isEmpty else {
             recordingSettings = nil
@@ -459,7 +463,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
             // raw=true: restituisci il WAV grezzo senza conversione (per seek-and-resume)
             if raw {
-                NSLog("⏹️ [NATIVE] stopRecording: raw mode — restituisco WAV: \(wavPath)")
+                self.logger.debug("⏹️ [NATIVE] stopRecording: raw mode — restituisco WAV: \(wavPath)")
                 self.finishWithFile(wavPath, outputPath: wavPath, segments: all, result: result)
                 return
             }
@@ -468,14 +472,14 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             if finalFormat == "wav" {
                 self.finishWithFile(wavPath, outputPath: finalOutputPath, segments: all, result: result)
             } else {
-                NSLog("⏹️ [NATIVE] stopRecording: conversione WAV → \(finalFormat)")
+                self.logger.debug("⏹️ [NATIVE] stopRecording: conversione WAV → \(finalFormat)")
                 self.convertWAVToFormat(wavPath: wavPath, outputPath: finalOutputPath,
                     format: finalFormat, settings: self.requestedFormatSettings) { error in
                     if let error = error {
-                        NSLog("⏹️ [NATIVE] stopRecording: conversione FALLITA — \(error)")
+                        self.logger.error("⏹️ [NATIVE] stopRecording: conversione FALLITA — \(error)")
                         self.finishWithFile(wavPath, outputPath: wavPath, segments: all, result: result)
                     } else {
-                        NSLog("⏹️ [NATIVE] stopRecording: conversione OK → \(finalOutputPath)")
+                        self.logger.debug("⏹️ [NATIVE] stopRecording: conversione OK → \(finalOutputPath)")
                         try? FileManager.default.removeItem(atPath: wavPath)
                         self.finishWithFile(finalOutputPath, outputPath: finalOutputPath, segments: all, result: result)
                     }
@@ -518,18 +522,18 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 if fm.fileExists(atPath: outputPath) { try fm.removeItem(atPath: outputPath) }
                 try fm.moveItem(atPath: path, toPath: outputPath)
             } catch {
-                NSLog("⏹️ [NATIVE] finishWithFile: move ERROR — \(error)")
+                self.logger.error("⏹️ [NATIVE] finishWithFile: move ERROR — \(error)")
             }
         }
         let dur = durationOf(path: outputPath)
         requestedFormatSettings = nil
         requestedOutputPath = nil
-        NSLog("⏹️ [NATIVE] stopRecording: COMPLETATO — path=\(outputPath) dur=\(dur * 1000)ms")
+        self.logger.info("⏹️ [NATIVE] stopRecording: COMPLETATO — path=\(outputPath) dur=\(dur * 1000)ms")
         result(["path": outputPath, "duration": dur * 1000])
     }
 
     private func cancelRecording(result: @escaping FlutterResult) {
-        NSLog("❌ [NATIVE] cancelRecording")
+        self.logger.error("❌ [NATIVE] cancelRecording")
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
         audioFile = nil
@@ -558,7 +562,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     /// Converte un file WAV al formato richiesto (standalone, chiamabile da Flutter).
     /// Usato dal BLoC dopo seek-and-resume per la conversione finale unica.
     private func convertAudio(wavPath: String, outputPath: String, format: String, result: @escaping FlutterResult) {
-        NSLog("🔄 [NATIVE] convertAudio — \(wavPath) → \(outputPath) formato=\(format)")
+        self.logger.debug("🔄 [NATIVE] convertAudio — \(wavPath) → \(outputPath) formato=\(format)")
 
         if format == "wav" {
             // Nessuna conversione, sposta/copia se necessario
@@ -591,7 +595,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "CONVERT_ERROR", message: error.localizedDescription, details: nil))
             } else {
                 let dur = self?.durationOf(path: outputPath) ?? 0
-                NSLog("🔄 [NATIVE] convertAudio: OK — \(outputPath) dur=\(dur * 1000)ms")
+                self.logger.info("🔄 [NATIVE] convertAudio: OK — \(outputPath) dur=\(dur * 1000)ms")
                 result(["path": outputPath, "duration": dur * 1000])
             }
         }
@@ -600,7 +604,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     // MARK: - Playback
 
     private func startPlayback(path: String, position: Int?, result: @escaping FlutterResult) {
-        NSLog("▶️ [NATIVE] startPlayback — isRecording=\(isRecording) isPaused=\(isPaused)")
+        self.logger.debug("▶️ [NATIVE] startPlayback — isRecording=\(isRecording) isPaused=\(isPaused)")
         if isRecording && !isPaused {
             exportForPlayback(sourcePath: path) { [weak self] tempPath, error in
                 guard let self = self else { return }
@@ -636,7 +640,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             concatenatePCMFiles(segs, into: tempPath, settings: savedSettings) { [weak self] error in
                 guard let self = self else { return }
                 if let error = error {
-                    NSLog("▶️ [NATIVE] startPlaybackFromSegments CONCAT ERROR: \(error)")
+                    self.logger.error("▶️ [NATIVE] startPlaybackFromSegments CONCAT ERROR: \(error)")
                     self.startPlaybackInternal(path: self.recordingSegments[0], position: position, result: result)
                 } else {
                     self.playbackTempPath = tempPath
@@ -673,7 +677,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     }
 
     private func startPlaybackInternal(path: String, position: Int?, result: @escaping FlutterResult) {
-        NSLog("🔊 [NATIVE] startPlaybackInternal — path=\(path)")
+        self.logger.debug("🔊 [NATIVE] startPlaybackInternal — path=\(path)")
         do {
             if playbackEngine != nil {
                 audioPlayer?.stop()
@@ -686,7 +690,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 return
             }
             let sr = file.processingFormat.sampleRate
-            NSLog("🔊 [NATIVE] startPlaybackInternal: file.length=\(file.length) (\(Double(file.length)/sr)s ≈ \(Int((Double(file.length)/sr)*10)) bars@100ms)")
+            self.logger.debug("🔊 [NATIVE] startPlaybackInternal: file.length=\(file.length) (\(Double(file.length)/sr)s ≈ \(Int((Double(file.length)/sr)*10)) bars@100ms)")
             audioPlayer = AVAudioPlayerNode()
             playbackEngine = AVAudioEngine()
             guard let player = audioPlayer, let engine = playbackEngine else {
@@ -705,7 +709,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 let frameCount = max(1, AVAudioFrameCount(file.length - framePosition))
                 
                 if frameCount < 4410 {
-                    NSLog("🔊 [NATIVE] startPlaybackInternal: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
+                    self.logger.debug("🔊 [NATIVE] startPlaybackInternal: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
                     self.isPlaying = false
                     result(true)
                     return
@@ -721,7 +725,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
                             guard self.playbackGeneration == gen else { return }
-                            NSLog("🔊 [NATIVE] playback completato naturalmente")
+                            self.logger.info("🔊 [NATIVE] playback completato naturalmente")
                             self.isPlaying = false
                         }
                     }
@@ -737,7 +741,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
                             guard self.playbackGeneration == gen else { return }
-                            NSLog("🔊 [NATIVE] playback completato naturalmente")
+                            self.logger.info("🔊 [NATIVE] playback completato naturalmente")
                             self.isPlaying = false
                         }
                     }
@@ -750,16 +754,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             
             isPlaying = true
             isPlaybackPaused = false
-            NSLog("🔊 [NATIVE] startPlaybackInternal: OK")
+            self.logger.info("🔊 [NATIVE] startPlaybackInternal: OK")
             result(true)
         } catch {
-            NSLog("🔊 [NATIVE] startPlaybackInternal ERROR: \(error)")
+            self.logger.error("🔊 [NATIVE] startPlaybackInternal ERROR: \(error)")
             result(FlutterError(code: "PLAYBACK_ERROR", message: error.localizedDescription, details: nil))
         }
     }
 
     private func stopPlayback(result: @escaping FlutterResult) {
-        NSLog("⏹️ [NATIVE] stopPlayback")
+        self.logger.debug("⏹️ [NATIVE] stopPlayback")
         audioPlayer?.stop()
         playbackEngine?.stop()
         playbackEngine = nil
@@ -774,14 +778,14 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     }
 
     private func pausePlayback(result: @escaping FlutterResult) {
-        NSLog("⏸️ [NATIVE] pausePlayback")
+        self.logger.debug("⏸️ [NATIVE] pausePlayback")
         audioPlayer?.pause()
         isPlaying = false
         result(true)
     }
 
     private func resumePlayback(result: @escaping FlutterResult) {
-        NSLog("▶️ [NATIVE] resumePlayback")
+        self.logger.debug("▶️ [NATIVE] resumePlayback")
         audioPlayer?.play()
         isPlaying = true
         result(true)
@@ -804,13 +808,13 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         // Se mancano pochissimi frame (es. <0.1s a 44.1kHz), restituiamo subito fine playback
         // perché scheduleSegment con valori esigui può causare hang in AVAudioEngine
         if frameCount < 4410 {
-            NSLog("🔊 [NATIVE] seekTo: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
+            self.logger.debug("🔊 [NATIVE] seekTo: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
             self.isPlaying = false
             result(true)
             return
         }
 
-        NSLog("🔊 [NATIVE] seekTo: file.length=\(file.length) (\(Double(file.length)/sampleRate)s) framePos=\(framePosition) frameCount=\(frameCount) → suonerà \(Double(frameCount)/sampleRate)s")
+        self.logger.debug("🔊 [NATIVE] seekTo: file.length=\(file.length) (\(Double(file.length)/sampleRate)s) framePos=\(framePosition) frameCount=\(frameCount) → suonerà \(Double(frameCount)/sampleRate)s")
         playbackGeneration += 1
         let gen = playbackGeneration
         seekOffsetFrames = Int64(framePosition)
@@ -825,7 +829,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
                     guard self.playbackGeneration == gen else { return }
-                    NSLog("🔊 [NATIVE] playback completato naturalmente")
+                    self.logger.info("🔊 [NATIVE] playback completato naturalmente")
                     self.isPlaying = false
                 }
             }
@@ -837,65 +841,6 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         
         isPlaying = true
         isPlaybackPaused = false
-        result(true)
-    }
-
-    private func getPlaybackPosition(result: @escaping FlutterResult) {
-        guard let p = audioPlayer, let f = audioFileForPlayback else { result(0); return }
-        
-        let sampleRate = f.processingFormat.sampleRate
-        var renderedFrames: Int64 = 0
-        
-        if let nodeTime = p.lastRenderTime, let playerTime = p.playerTime(forNodeTime: nodeTime) {
-            let outputLatency = playbackEngine?.outputNode.presentationLatency ?? 0
-            let frameLatency = Int64(outputLatency * sampleRate)
-            
-            let adjustedSampleTime = max(0, Int64(playerTime.sampleTime) - frameLatency)
-            renderedFrames = adjustedSampleTime
-        }
-        
-        let totalFrames = seekOffsetFrames + renderedFrames
-        let clampedFrames = min(totalFrames, f.length)
-        
-        result(Int(Double(clampedFrames) / sampleRate * 1000))
-    }
-            }
-        }
-        
-        // Forza il pre-buffering prima del play per evitare starvation e interruzione anticipata
-        player.prepare(withFrameCount: 8192)
-        player.play()
-        
-        isPlaying = true
-        isPlaybackPaused = false
-        result(true)
-    }
-        let sampleRate = file.processingFormat.sampleRate
-        let rawFramePosition = AVAudioFramePosition(Double(position) / 1000.0 * sampleRate)
-        guard rawFramePosition >= 0 else {
-            result(FlutterError(code: "INVALID_POSITION", message: "Position out of range", details: nil))
-            return
-        }
-        // Clamp: l'ultima barra waveform può mappare esattamente a file.length frame.
-        // Riduciamo al frame precedente per evitare il reject del guard originale.
-        let framePosition = min(rawFramePosition, file.length > 0 ? file.length - 1 : 0)
-        let frameCount = max(1, AVAudioFrameCount(file.length - framePosition))
-        NSLog("🔊 [NATIVE] seekTo: file.length=\(file.length) (\(Double(file.length)/sampleRate)s) framePos=\(framePosition) frameCount=\(frameCount) → suonerà \(Double(frameCount)/sampleRate)s")
-        // Incrementa la generazione prima di stop(): il completion handler orfano
-        // del vecchio segmento (triggerato da player.stop()) confronterà la propria
-        // generazione con quella corrente e la troverà diversa → verrà ignorato.
-        playbackGeneration += 1
-        let gen = playbackGeneration
-        seekOffsetFrames = Int64(framePosition)
-        player.stop()
-        player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil) { [weak self] in
-            DispatchQueue.main.async {
-                guard let self = self, self.playbackGeneration == gen else { return }
-                self.isPlaying = false
-            }
-        }
-        player.play()
-        isPlaying = true
         result(true)
     }
 
@@ -974,7 +919,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             convertWAVToFLAC(wavPath: wavPath, outputPath: outputPath, settings: settings ?? [:], completion: completion)
         default:
             // Formato sconosciuto — restituisci il WAV così com'è
-            NSLog("⚠️ [NATIVE] convertWAVToFormat: formato sconosciuto '\(format)', skip conversione")
+            self.logger.warning("⚠️ [NATIVE] convertWAVToFormat: formato sconosciuto '\(format)', skip conversione")
             completion(nil)
         }
     }
@@ -994,11 +939,11 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         session.outputFileType = .m4a
         session.exportAsynchronously {
             if session.status == .completed {
-                NSLog("✅ [NATIVE] WAV → M4A completato: \(outputPath)")
+                self.logger.info("✅ [NATIVE] WAV → M4A completato: \(outputPath)")
                 completion(nil)
             } else {
                 let msg = session.error?.localizedDescription ?? "M4A export failed"
-                NSLog("❌ [NATIVE] WAV → M4A FALLITO: \(msg)")
+                self.logger.error("❌ [NATIVE] WAV → M4A FALLITO: \(msg)")
                 completion(session.error ?? NSError(domain: "WavNote", code: -11,
                     userInfo: [NSLocalizedDescriptionKey: msg]))
             }
@@ -1051,10 +996,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     remaining -= Int64(toRead)
                 }
 
-                NSLog("✅ [NATIVE] WAV → FLAC completato: \(outputPath)")
+                self.logger.info("✅ [NATIVE] WAV → FLAC completato: \(outputPath)")
                 DispatchQueue.main.async { completion(nil) }
             } catch {
-                NSLog("❌ [NATIVE] WAV → FLAC FALLITO: \(error)")
+                self.logger.error("❌ [NATIVE] WAV → FLAC FALLITO: \(error)")
                 DispatchQueue.main.async { completion(error) }
             }
         }
@@ -1119,7 +1064,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             selector: #selector(handleAudioInterruption),
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance())
-        NSLog("🔔 [NATIVE] Interruption observer registrato")
+        self.logger.debug("🔔 [NATIVE] Interruption observer registrato")
     }
 
     @objc private func handleAudioInterruption(_ notification: Notification) {
@@ -1129,14 +1074,14 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
         switch type {
         case .began:
-            NSLog("🔔 [NATIVE] Interruzione INIZIATA — isRecording=\(isRecording) isPaused=\(isPaused)")
+            self.logger.info("🔔 [NATIVE] Interruzione INIZIATA — isRecording=\(isRecording) isPaused=\(isPaused)")
             if isRecording && !isPaused {
                 // Pausa automatica: chiudi il file corrente come in pauseRecording
                 audioEngine?.pause()
                 if let path = recordingFilePath {
                     audioFile = nil
                     recordingSegments.append(path)
-                    NSLog("🔔 [NATIVE] Auto-pausa per interruzione: file chiuso → \(path)")
+                    self.logger.info("🔔 [NATIVE] Auto-pausa per interruzione: file chiuso → \(path)")
                 }
                 isPaused = true
                 currentAmplitude = 0.0
@@ -1145,21 +1090,21 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 audioPlayer?.pause()
                 isPlaying = false
                 isPlaybackPaused = true
-                NSLog("🔔 [NATIVE] Playback pausato per interruzione")
+                self.logger.info("🔔 [NATIVE] Playback pausato per interruzione")
             }
 
         case .ended:
-            NSLog("🔔 [NATIVE] Interruzione TERMINATA")
+            self.logger.info("🔔 [NATIVE] Interruzione TERMINATA")
             let shouldResume = (info[AVAudioSessionInterruptionOptionKey] as? UInt)
                 .map { AVAudioSession.InterruptionOptions(rawValue: $0).contains(.shouldResume) } ?? false
             if shouldResume {
-                NSLog("🔔 [NATIVE] Sistema suggerisce resume — riattivo session")
+                self.logger.info("🔔 [NATIVE] Sistema suggerisce resume — riattivo session")
                 try? AVAudioSession.sharedInstance().setActive(true)
             }
             // Non fa auto-resume della registrazione: l'utente decide quando riprendere.
 
         @unknown default:
-            NSLog("🔔 [NATIVE] Interruzione tipo sconosciuto: \(typeValue)")
+            self.logger.debug("🔔 [NATIVE] Interruzione tipo sconosciuto: \(typeValue)")
         }
     }
 
@@ -1168,12 +1113,12 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private func setAudioSessionCategory(category: String, options: [String], result: @escaping FlutterResult) {
         sessionCategory = parseCategory(category)
         sessionOptions = parseOptions(options)
-        NSLog("🔧 [NATIVE] setAudioSessionCategory: \(sessionCategory.rawValue) options=\(sessionOptions.rawValue)")
+        self.logger.debug("🔧 [NATIVE] setAudioSessionCategory: \(sessionCategory.rawValue) options=\(sessionOptions.rawValue)")
         do {
             try AVAudioSession.sharedInstance().setCategory(sessionCategory, mode: .default, options: sessionOptions)
             result(true)
         } catch {
-            NSLog("🔧 [NATIVE] setAudioSessionCategory ERROR: \(error)")
+            self.logger.error("🔧 [NATIVE] setAudioSessionCategory ERROR: \(error)")
             result(FlutterError(code: "SESSION_ERROR", message: error.localizedDescription, details: nil))
         }
     }
@@ -1199,7 +1144,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
     private func setVoiceProcessing(enabled: Bool, result: @escaping FlutterResult) {
         voiceProcessingEnabled = enabled
-        NSLog("🎤 [NATIVE] Voice processing: \(enabled ? "ON" : "OFF")")
+        self.logger.debug("🎤 [NATIVE] Voice processing: \(enabled ? "ON" : "OFF")")
         if let input = inputNode, isRecording {
             guard #available(iOS 13.0, *) else {
                 result(FlutterError(code: "VP_UNSUPPORTED", message: "Requires iOS 13+", details: nil)); return

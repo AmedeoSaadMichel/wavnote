@@ -29,7 +29,7 @@ import '../../../core/enums/audio_format.dart';
 import '../../../domain/usecases/recording/start_recording_usecase.dart';
 import '../../../domain/usecases/recording/stop_recording_usecase.dart';
 import '../../../domain/usecases/recording/pause_recording_usecase.dart';
-import '../../../domain/usecases/recording/seek_and_resume_usecase.dart';
+import '../../../domain/usecases/recording/overwrite_recording_usecase.dart';
 
 // Service imports
 import '../../../config/dependency_injection.dart';
@@ -54,7 +54,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final StartRecordingUseCase _startRecordingUseCase;
   final StopRecordingUseCase _stopRecordingUseCase;
   final PauseRecordingUseCase _pauseRecordingUseCase;
-  final SeekAndResumeUseCase _seekAndResumeUseCase;
+  final OverwriteRecordingUseCase _overwriteRecordingUseCase;
   final IAudioTrimmerRepository _trimmerService;
   final FolderBloc? _folderBloc;
 
@@ -72,7 +72,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     StartRecordingUseCase? startRecordingUseCase,
     StopRecordingUseCase? stopRecordingUseCase,
     PauseRecordingUseCase? pauseRecordingUseCase,
-    SeekAndResumeUseCase? seekAndResumeUseCase,
+    OverwriteRecordingUseCase? overwriteRecordingUseCase,
     IAudioTrimmerRepository? trimmerService,
   }) : _audioService = audioService,
        _recordingRepository = recordingRepository,
@@ -95,10 +95,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
        _pauseRecordingUseCase =
            pauseRecordingUseCase ??
            PauseRecordingUseCase(audioService: audioService),
-       _seekAndResumeUseCase =
-           seekAndResumeUseCase ??
-           SeekAndResumeUseCase(
-             audioService: audioService,
+       _overwriteRecordingUseCase =
+           overwriteRecordingUseCase ??
+           OverwriteRecordingUseCase(
              trimmerService: trimmerService ?? sl<IAudioTrimmerRepository>(),
            ),
        super(const RecordingInitial()) {
@@ -108,7 +107,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<PauseRecording>(_onPauseRecording);
     on<ResumeRecording>(_onResumeRecording);
     on<CancelRecording>(_onCancelRecording);
-    on<SeekAndResumeRecording>(_onSeekAndResumeRecording);
+    on<StartOverwrite>(_onStartOverwrite);
     on<UpdateSeekBarIndex>(_onUpdateSeekBarIndex);
     on<PlayRecordingPreview>(_onPlayRecordingPreview);
     on<StopRecordingPreview>(_onStopRecordingPreview);

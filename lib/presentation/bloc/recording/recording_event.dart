@@ -26,15 +26,21 @@ class StartRecording extends RecordingEvent {
   });
 
   @override
-  List<Object?> get props => [folderId, folderName, format, sampleRate, bitRate];
+  List<Object?> get props => [
+    folderId,
+    folderName,
+    format,
+    sampleRate,
+    bitRate,
+  ];
 }
 
 /// Event to stop recording
 class StopRecording extends RecordingEvent {
   final List<double>? waveformData;
-  
+
   const StopRecording({this.waveformData});
-  
+
   @override
   List<Object?> get props => [waveformData];
 }
@@ -199,9 +205,9 @@ class DeselectAllRecordings extends RecordingEvent {
 /// Event to delete selected recordings
 class DeleteSelectedRecordings extends RecordingEvent {
   final String folderId; // Context to determine delete type
-  
+
   const DeleteSelectedRecordings({required this.folderId});
-  
+
   @override
   List<Object> get props => [folderId];
 }
@@ -209,9 +215,9 @@ class DeleteSelectedRecordings extends RecordingEvent {
 /// Event to toggle favorite status of a recording
 class ToggleFavoriteRecording extends RecordingEvent {
   final String recordingId;
-  
+
   const ToggleFavoriteRecording({required this.recordingId});
-  
+
   @override
   List<Object> get props => [recordingId];
 }
@@ -221,13 +227,13 @@ class MoveRecordingToFolder extends RecordingEvent {
   final String recordingId;
   final String targetFolderId;
   final String currentFolderId; // Context for UI refresh
-  
+
   const MoveRecordingToFolder({
     required this.recordingId,
     required this.targetFolderId,
     required this.currentFolderId,
   });
-  
+
   @override
   List<Object> get props => [recordingId, targetFolderId, currentFolderId];
 }
@@ -271,26 +277,13 @@ class StopRecordingPreview extends RecordingEvent {
   List<Object> get props => [isNaturalCompletion];
 }
 
-/// Event per cercare una posizione nella waveform e riprendere la registrazione da lì.
-/// Triggera il trim audio al punto di seek, poi riavvia il recorder.
-class SeekAndResumeRecording extends RecordingEvent {
+/// Event to start an overwrite operation.
+class StartOverwrite extends RecordingEvent {
   final int seekBarIndex;
-  final String filePath;
-  final AudioFormat format;
-  final int sampleRate;
-  final int bitRate;
   final List<double> waveData;
 
-  const SeekAndResumeRecording({
-    required this.seekBarIndex,
-    required this.filePath,
-    required this.format,
-    required this.sampleRate,
-    required this.bitRate,
-    required this.waveData,
-  });
+  const StartOverwrite({required this.seekBarIndex, required this.waveData});
 
   @override
-  List<Object?> get props =>
-      [seekBarIndex, filePath, format, sampleRate, bitRate, waveData];
+  List<Object?> get props => [seekBarIndex, waveData];
 }

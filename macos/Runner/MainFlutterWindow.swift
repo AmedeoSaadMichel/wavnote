@@ -10,6 +10,10 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Registra SwiftLogPlugin PRIMA degli altri plugin: bootstrap swift-log
+    // prima che i Logger di AudioEngine/AudioTrimmer vengano creati.
+    SwiftLogPlugin.setup(messenger: flutterViewController.engine.binaryMessenger)
+
     // Registra i plugin nativi audio
     let trimmerRegistrar = flutterViewController.registrar(forPlugin: "AudioTrimmerPlugin")
     AudioTrimmerPlugin.register(with: trimmerRegistrar)

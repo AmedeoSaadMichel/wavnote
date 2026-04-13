@@ -48,7 +48,6 @@ import '../../widgets/dialogs/audio_format_dialog.dart'; // Audio format selecti
 
 // Core imports
 import '../../../core/routing/app_router.dart'; // Navigation routing
-import '../../../data/database/database_helper.dart'; // Database access
 
 // Domain imports
 import '../../../domain/entities/folder_entity.dart'; // Folder business entity
@@ -165,14 +164,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _selectedFolder = folder;
     });
 
-    // Save folder choice using ultra-fast database pool
     print(
       '📁 MainScreen: User selected folder ${folder.name}, saving with pool',
     );
-    DatabaseHelper.saveLastFolderId(folder.id);
     context.read<SettingsBloc>().add(
       UpdateLastOpenedFolder(folder.id),
-    ); // Also update BLoC
+    );
 
     // Navigate to folder
     context.goToFolderEntity(folder);

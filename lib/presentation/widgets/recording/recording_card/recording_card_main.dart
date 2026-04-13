@@ -310,87 +310,86 @@ class _RecordingCardState extends State<RecordingCard>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onHorizontalDragUpdate: (details) {
-        // Allow swipe on both collapsed and expanded cards
-        if (details.delta.dx < -5) {
-          // Swipe RIGHT to LEFT - show three action buttons
-          if (!_isSwipeActionsVisible) {
-            _toggleSwipeActions();
-          }
-        } else if (details.delta.dx > 5) {
-          // Swipe LEFT to RIGHT - show favorite button (not in recently deleted)
-          if (!_isFavoriteActionVisible &&
-              widget.currentFolderId != 'recently_deleted') {
-            _toggleFavoriteAction();
-          }
-        }
-      },
-      onTap: () {
-        print(
-          '🎯 TAP: swipeVisible=$_isSwipeActionsVisible, favoriteVisible=$_isFavoriteActionVisible, editMode=${widget.isEditMode}',
-        );
-
-        // SIMPLIFIED LOGIC: Always try expansion first, then hide actions
-        if (!widget.isEditMode) {
-          print('🎯 Calling onTap for recording: ${widget.recording.name}');
-          widget.onTap?.call();
-        } else {
-          print('🎯 Edit mode - calling selection toggle');
-          widget.onSelectionToggle?.call();
-        }
-
-        // Hide any visible actions after handling main tap
-        if (_isSwipeActionsVisible) {
-          _hideSwipeActions();
-        }
-        if (_isFavoriteActionVisible) {
-          _hideFavoriteAction();
-        }
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: RecordingCardActions(
-              isSwipeActionsVisible: _isSwipeActionsVisible,
-              isFavoriteActionVisible: _isFavoriteActionVisible,
-              isFavorite: widget.recording.isFavorite,
-              currentFolderId: widget.currentFolderId,
-              onRestore: () {
-                _hideFavoriteAction();
-                widget.onRestore?.call();
-              },
-              onDelete: () {
-                _hideSwipeActions();
-                widget.onDelete();
-              },
-              onMoreActions: () {
-                _hideSwipeActions();
-                widget.onMoreActions();
-              },
-              onMoveToFolder: () {
-                _hideSwipeActions();
-                widget.onMoveToFolder();
-              },
-              onToggleFavorite: () {
-                _hideFavoriteAction();
-                widget.onToggleFavorite?.call();
-              },
-            ),
+    // NOTA: il rilevamento tap/drag deve stare *solo* sulla card, non sullo
+    // sfondo delle azioni. Altrimenti il GestureDetector padre compete con gli
+    // InkWell dei pulsanti (favorite/delete/move/...) e i tap possono non arrivare.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(
+          child: RecordingCardActions(
+            isSwipeActionsVisible: _isSwipeActionsVisible,
+            isFavoriteActionVisible: _isFavoriteActionVisible,
+            isFavorite: widget.recording.isFavorite,
+            currentFolderId: widget.currentFolderId,
+            onRestore: () {
+              _hideFavoriteAction();
+              widget.onRestore?.call();
+            },
+            onDelete: () {
+              _hideSwipeActions();
+              widget.onDelete();
+            },
+            onMoreActions: () {
+              _hideSwipeActions();
+              widget.onMoreActions();
+            },
+            onMoveToFolder: () {
+              _hideSwipeActions();
+              widget.onMoveToFolder();
+            },
+            onToggleFavorite: () {
+              _hideFavoriteAction();
+              widget.onToggleFavorite?.call();
+            },
           ),
+        ),
+        Transform.translate(
+          offset: Offset(_swipeOffset + _favoriteOffset, 0),
+          child: GestureDetector(
+            onHorizontalDragUpdate: (details) {
+              // Allow swipe on both collapsed and expanded cards
+              if (details.delta.dx < -5) {
+                // Swipe RIGHT to LEFT - show three action buttons
+                if (!_isSwipeActionsVisible) {
+                  _toggleSwipeActions();
+                }
+              } else if (details.delta.dx > 5) {
+                // Swipe LEFT to RIGHT - show favorite button (not in recently deleted)
+                if (!_isFavoriteActionVisible &&
+                    widget.currentFolderId != 'recently_deleted') {
+                  _toggleFavoriteAction();
+                }
+              }
+            },
+            onTap: () {
+              print(
+                '🎯 TAP: swipeVisible=$_isSwipeActionsVisible, favoriteVisible=$_isFavoriteActionVisible, editMode=${widget.isEditMode}',
+              );
 
-          Transform.translate(
-            offset: Offset(_swipeOffset + _favoriteOffset, 0),
-            child: widget.isExpanded
-                ? _buildExpandedCard()
-                : _buildCollapsedCard(),
+              if (!widget.isEditMode) {
+                print('🎯 Calling onTap for recording: ${widget.recording.name}');
+                widget.onTap?.call();
+              } else {
+                print('🎯 Edit mode - calling selection toggle');
+                widget.onSelectionToggle?.call();
+              }
+
+              if (_isSwipeActionsVisible) {
+                _hideSwipeActions();
+              }
+              if (_isFavoriteActionVisible) {
+                _hideFavoriteAction();
+              }
+            },
+            child:
+                widget.isExpanded ? _buildExpandedCard() : _buildCollapsedCard(),
           ),
+        ),
 
-          // Selection overlay - positioned last to be on top
-          if (widget.isEditMode) _buildSelectionOverlay(),
-        ],
-      ),
+        // Selection overlay - positioned last to be on top
+        if (widget.isEditMode) _buildSelectionOverlay(),
+      ],
     );
   }
 

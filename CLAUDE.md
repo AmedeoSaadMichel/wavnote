@@ -9,7 +9,6 @@
 
 - **Scrivi sempre in italiano.**
 - **Quando chiedo di correggere gli errori, puoi cambiare la logica ma devi chiedere prima di fare qualsiasi modifica logica.**
-- **Segui sempre la struttura esatta definita in idea_project_structure.txt**
 - Non è necessario creare tutti i file in idea_project_structure.txt; servono solo quelli essenziali.
 - Le modifiche alla struttura sono consentite SOLO quando è impossibile mantenere i file sotto le 800 righe
 - Quando vengono apportate modifiche alla struttura a causa dei limiti di dimensione del file:

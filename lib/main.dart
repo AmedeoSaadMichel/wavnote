@@ -23,6 +23,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+// Debug: log nativi Swift via EventChannel
+import 'services/logging/swift_log_channel_service.dart';
+
 // BLoC imports for state management
 import 'presentation/bloc/folder/folder_bloc.dart'; // Manages folder operations
 import 'presentation/bloc/recording/recording_bloc.dart'; // Manages recording operations
@@ -82,6 +85,12 @@ void main() async {
     // ========================================
     // Register all services and repositories via GetIt
     await setupDependencies();
+
+    // TODO(debug): rimuovere prima del rilascio in produzione
+    await SwiftLogChannelService.instance.initialize();
+    SwiftLogChannelService.instance.logs.listen(
+      (e) => debugPrint('SWIFT LOG: $e'),
+    );
   } catch (e) {
     // Log initialization errors but continue app startup
     // The app should still be functional even if some services fail

@@ -1,4 +1,4 @@
-// File: domain/usecases/recording/stop_recording_usecase.dart
+// File: lib/domain/usecases/recording/stop_recording_usecase.dart
 //
 // Stop Recording Use Case - Domain Layer
 // ========================================
@@ -187,22 +187,25 @@ class StopRecordingUseCase {
     List<double>? waveformData,
     Duration? overrideDuration,
   ) {
-    // Use override duration if provided, otherwise keep original
-    final finalDuration = overrideDuration ?? recording.duration;
-
-    // Add waveform data if provided and not empty
     if (waveformData != null && waveformData.isNotEmpty) {
       debugPrint(
         '🎵 StopRecordingUseCase: Adding ${waveformData.length} waveform data points',
       );
+      // La durata viene CALCOLATA dalla lunghezza della waveform (100ms per punto)
+      // per garantire la sincronizzazione con la visualizzazione
+      final durationFromWaveform =
+          Duration(milliseconds: waveformData.length * 100);
+
       return recording.copyWith(
         waveformData: waveformData,
-        duration: finalDuration,
+        duration: durationFromWaveform,
       );
-    } else {
-      debugPrint('🎵 StopRecordingUseCase: No waveform data provided');
-      return recording.copyWith(duration: finalDuration);
     }
+
+    // Se non c'è waveform, usa l'override o la durata del recording
+    final finalDuration = overrideDuration ?? recording.duration;
+    debugPrint('🎵 StopRecordingUseCase: No waveform data provided');
+    return recording.copyWith(duration: finalDuration);
   }
 
   /// Validate recording before saving

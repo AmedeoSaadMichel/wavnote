@@ -48,6 +48,9 @@ abstract class IAudioServiceRepository {
   /// Get current recording duration stream (direct access)
   Stream<Duration>? get durationStream;
 
+  /// Get current amplitude
+  Future<double> getCurrentAmplitude();
+
   // ==== PLAYBACK OPERATIONS ====
 
   /// Start playing an audio file
@@ -123,6 +126,9 @@ abstract class IAudioServiceRepository {
     String filePath, {
     int sampleCount = 100,
   });
+
+  /// Get audio file duration
+  Future<Duration> getAudioDuration(String filePath);
 
   // ==== DEVICE & PERMISSIONS ====
 

@@ -1,3 +1,4 @@
+// File: services/audio/audio_player_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -60,6 +61,8 @@ class AudioPlayerService implements IAudioServiceRepository {
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<PlayerState>? _stateSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
+  StreamSubscription<Duration>? _uiPositionSubscription;
+  StreamSubscription<void>? _uiCompletionSubscription;
 
   // Amplitude simulation
   Timer? _amplitudeSimulationTimer;
@@ -115,6 +118,11 @@ class AudioPlayerService implements IAudioServiceRepository {
 
     _stopAmplitudeSimulation();
 
+    await _uiPositionSubscription?.cancel();
+    await _uiCompletionSubscription?.cancel();
+    _uiPositionSubscription = null;
+    _uiCompletionSubscription = null;
+
     // Close stream controllers
     await _positionStreamController?.close();
     await _completionStreamController?.close();
@@ -128,10 +136,14 @@ class AudioPlayerService implements IAudioServiceRepository {
     await _positionSubscription?.cancel();
     await _stateSubscription?.cancel();
     await _durationSubscription?.cancel();
+    await _uiPositionSubscription?.cancel();
+    await _uiCompletionSubscription?.cancel();
 
     _positionSubscription = null;
     _stateSubscription = null;
     _durationSubscription = null;
+    _uiPositionSubscription = null;
+    _uiCompletionSubscription = null;
 
     // Dispose audio player
     try {
@@ -180,8 +192,12 @@ class AudioPlayerService implements IAudioServiceRepository {
         // Handle natural completion
         if (state.processingState == ProcessingState.completed) {
           debugPrint('🔚 Audio completed naturally');
+          _playbackActive = false;
+          _playbackPaused = false;
+          _hasCompletedCurrentPlayback = true;
           _playbackPosition = Duration.zero;
           _completionStreamController?.add(null);
+          _onExpansionChanged?.call();
         }
       }, onError: (error) => debugPrint('❌ Player state error: $error'));
     } catch (e) {
@@ -520,9 +536,11 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   /// Set callback for expansion state changes
   void setExpansionCallback(VoidCallback? callback) {
+    final previousCallback = _onExpansionChanged;
     _onExpansionChanged = callback;
-    if (_audioStateManager == null) {
-      _audioStateManager = AudioStateManager();
+    _audioStateManager ??= AudioStateManager();
+    if (previousCallback != null) {
+      _audioStateManager!.removeListener(previousCallback);
     }
     if (callback != null) {
       _audioStateManager!.addListener(callback);
@@ -543,6 +561,10 @@ class AudioPlayerService implements IAudioServiceRepository {
 
   /// Reset expansion state
   void resetExpansionState() {
+    _uiPositionSubscription?.cancel();
+    _uiCompletionSubscription?.cancel();
+    _uiPositionSubscription = null;
+    _uiCompletionSubscription = null;
     _expandedRecordingId = null;
     _isLoading = false;
     _hasCompletedCurrentPlayback = false;
@@ -581,7 +603,8 @@ class AudioPlayerService implements IAudioServiceRepository {
       _onExpansionChanged?.call();
 
       // Listen for position updates to AudioStateManager
-      _positionStreamController?.stream.listen((pos) {
+      await _uiPositionSubscription?.cancel();
+      _uiPositionSubscription = _positionStreamController?.stream.listen((pos) {
         _audioStateManager?.updatePosition(pos);
         _audioStateManager?.updatePlaybackState(
           isPlaying: _playbackActive && !_playbackPaused,
@@ -589,7 +612,10 @@ class AudioPlayerService implements IAudioServiceRepository {
       });
 
       // Listen for completion
-      _completionStreamController?.stream.listen((_) {
+      await _uiCompletionSubscription?.cancel();
+      _uiCompletionSubscription = _completionStreamController?.stream.listen((
+        _,
+      ) {
         _hasCompletedCurrentPlayback = true;
         _audioStateManager?.updatePlaybackState(isPlaying: false);
         _audioStateManager?.updatePosition(Duration.zero);
@@ -614,9 +640,16 @@ class AudioPlayerService implements IAudioServiceRepository {
       await resumePlaying();
       _audioStateManager?.updatePlaybackState(isPlaying: true);
     } else if (_hasCompletedCurrentPlayback && _currentlyPlayingFile != null) {
-      // Restart from beginning after completion
+      // Restart from beginning after completion (non dipendere da _playbackPaused)
       await seekTo(Duration.zero);
-      await resumePlaying();
+      try {
+        await _audioPlayer?.play();
+        _playbackActive = true;
+        _playbackPaused = false;
+        _startAmplitudeSimulation();
+      } catch (e) {
+        debugPrint('❌ Failed to restart playback: $e');
+      }
       _hasCompletedCurrentPlayback = false;
       _audioStateManager?.updatePlaybackState(isPlaying: true);
     }
@@ -644,8 +677,9 @@ class AudioPlayerService implements IAudioServiceRepository {
   /// Skip forward by 10 seconds
   void skipForward() {
     final newPosition = _playbackPosition + const Duration(seconds: 10);
-    final clamped =
-        newPosition > _playbackDuration ? _playbackDuration : newPosition;
+    final clamped = newPosition > _playbackDuration
+        ? _playbackDuration
+        : newPosition;
     seekTo(clamped);
     _audioStateManager?.updatePosition(clamped);
   }
@@ -689,6 +723,7 @@ class AudioPlayerService implements IAudioServiceRepository {
   @override
   Stream<Duration>? get durationStream => null;
 
+  @override
   Future<double> getCurrentAmplitude() async => 0.0;
 
   @override
@@ -723,6 +758,19 @@ class AudioPlayerService implements IAudioServiceRepository {
     String filePath, {
     int sampleCount = 100,
   }) async => [];
+
+  @override
+  Future<Duration> getAudioDuration(String filePath) async {
+    final player = AudioPlayer();
+    try {
+      final duration = await player.setFilePath(filePath);
+      return duration ?? Duration.zero;
+    } catch (e) {
+      return Duration.zero;
+    } finally {
+      player.dispose();
+    }
+  }
 
   @override
   Future<bool> hasMicrophonePermission() async => false;

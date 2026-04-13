@@ -357,6 +357,9 @@ class AudioRecorderService implements IAudioServiceRepository {
   @override
   Stream<Duration>? get durationStream => _positionController?.stream;
 
+  @override
+  Future<double> getCurrentAmplitude() async => 0.0;
+
   // ==== PLAYBACK — delegated to AudioPlayerService via coordinator ====
 
   @override
@@ -473,6 +476,9 @@ class AudioRecorderService implements IAudioServiceRepository {
     final random = math.Random(42);
     return List.generate(sampleCount, (_) => random.nextDouble());
   }
+
+  @override
+  Future<Duration> getAudioDuration(String filePath) async => Duration.zero;
 
   @override
   Future<bool> setAudioSessionCategory(AudioSessionCategory category) async =>

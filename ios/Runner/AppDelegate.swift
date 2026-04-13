@@ -20,6 +20,16 @@ import UIKit
       AudioEnginePlugin.register(with: registrar)
     }
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    // super.application crea il FlutterViewController e avvia il motore Flutter.
+    // Deve essere chiamato PRIMA di accedere a window.rootViewController.
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    // A questo punto window.rootViewController è il FlutterViewController.
+    // Usiamo il suo binaryMessenger — l'unico che corrisponde al canale Dart.
+    if let controller = window?.rootViewController as? FlutterViewController {
+      SwiftLogPlugin.setup(messenger: controller.binaryMessenger)
+    }
+
+    return result
   }
 }
