@@ -575,12 +575,14 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   // Se la seekbar è stata spostata indietro → seek-and-resume (trim).
                   // Se è all'ultima barra → resume semplice.
                   onResume: () {
-                    // Tolleranza di 1 barra (100ms) per la fine:
+                    // Tolleranza di 1 barra (100ms) per la fine della parte registrata.
                     // Se siamo sull'ultima o penultima barra (o se waveData è vuoto),
-                    // è considerata la fine della registrazione.
+                    // è considerata la fine della registrazione corrente (anche durante un overdub).
+                    final currentRecordedBars =
+                        _waveData.length - _futureBarsCount;
                     final isAtEnd =
                         _waveData.isEmpty ||
-                        _seekBarIndex >= _waveData.length - 2;
+                        _seekBarIndex >= currentRecordedBars - 2;
                     if (isAtEnd) {
                       widget.onResume?.call();
                     } else {
