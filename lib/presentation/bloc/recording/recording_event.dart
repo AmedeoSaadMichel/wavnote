@@ -55,6 +55,21 @@ class ResumeRecording extends RecordingEvent {
   const ResumeRecording();
 }
 
+/// Event to resume recording with auto-stop of preview if playing.
+/// Used by RecordPupilButton when user taps resume during preview playback.
+class ResumeWithAutoStop extends RecordingEvent {
+  final int seekBarIndex;
+  final List<double> waveData;
+
+  const ResumeWithAutoStop({
+    required this.seekBarIndex,
+    required this.waveData,
+  });
+
+  @override
+  List<Object?> get props => [seekBarIndex, waveData];
+}
+
 /// Event to cancel recording
 class CancelRecording extends RecordingEvent {
   const CancelRecording();
@@ -252,12 +267,20 @@ class MoveSelectedRecordingsToFolder extends RecordingEvent {
   List<Object> get props => [targetFolderId, currentFolderId];
 }
 
-/// Event per aggiornare la posizione della seek bar nella waveform (drag).
+/// Event per aggiornare la posizione della seek bar nella waveform (drag o rewind/forward).
 class UpdateSeekBarIndex extends RecordingEvent {
   final int seekBarIndex;
-  const UpdateSeekBarIndex({required this.seekBarIndex});
+  final bool stopPreview;
+  final bool isFromPlayback;
+
+  const UpdateSeekBarIndex({
+    required this.seekBarIndex,
+    this.stopPreview = true,
+    this.isFromPlayback = false,
+  });
+
   @override
-  List<Object> get props => [seekBarIndex];
+  List<Object> get props => [seekBarIndex, stopPreview, isFromPlayback];
 }
 
 /// Event per riprodurre in anteprima la registrazione dal punto del playhead.

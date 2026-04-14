@@ -130,7 +130,8 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     // sul playhead, così da eliminare l'effetto "spazio vuoto finale".
     if (widget.isPaused && !oldWidget.isPaused && widget.waveData.isNotEmpty) {
       final halfWidth = widget.size.width / 2;
-      final lastIndex = widget.waveData.length - 1;
+      final lastIndex =
+          widget.externalSeekBarIndex ?? (widget.waveData.length - 1);
       setState(() {
         _totalBackDistance = Offset(
           (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),

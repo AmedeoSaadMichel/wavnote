@@ -62,7 +62,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   StreamSubscription<Duration>? _durationSubscription;
   StreamSubscription<void>? _previewCompletionSubscription;
   StreamSubscription<Duration>? _previewPositionSubscription;
-  Timer? _durationTimer;
 
   RecordingBloc({
     required IAudioServiceRepository audioService,
@@ -106,6 +105,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<StopRecording>(_onStopRecording);
     on<PauseRecording>(_onPauseRecording);
     on<ResumeRecording>(_onResumeRecording);
+    on<ResumeWithAutoStop>(_onResumeWithAutoStop);
     on<CancelRecording>(_onCancelRecording);
     on<StartOverwrite>(_onStartOverwrite);
     on<UpdateSeekBarIndex>(_onUpdateSeekBarIndex);
@@ -149,7 +149,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     await _durationSubscription?.cancel();
     await _previewCompletionSubscription?.cancel();
     await _previewPositionSubscription?.cancel();
-    _durationTimer?.cancel();
 
     if (_audioService.needsDisposal) {
       try {
@@ -353,20 +352,17 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   void _stopAmplitudeUpdates() => _amplitudeSubscription?.cancel();
 
   void _startDurationUpdates() {
-    _durationTimer?.cancel();
-    _durationTimer = Timer.periodic(const Duration(milliseconds: 100), (
-      timer,
-    ) async {
-      try {
-        final duration = await _audioService.getCurrentRecordingDuration();
-        add(UpdateRecordingDuration(duration));
-      } catch (e) {
-        print('❌ Duration update error: $e');
-      }
-    });
+    _durationSubscription?.cancel();
+    _durationSubscription = _audioService.durationStream?.listen(
+      (duration) => add(UpdateRecordingDuration(duration)),
+      onError: (e) => print('❌ Duration stream error: $e'),
+    );
   }
 
-  void _stopDurationUpdates() => _durationTimer?.cancel();
+  void _stopDurationUpdates() {
+    _durationSubscription?.cancel();
+    _durationSubscription = null;
+  }
 
   bool _needsReloadAfterFavoriteToggle(List<RecordingEntity> recordings) {
     if (recordings.isEmpty) return false;

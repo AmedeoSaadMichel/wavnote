@@ -1,7 +1,6 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../../../core/extensions/duration_extensions.dart';
 import 'control_buttons.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 
@@ -29,18 +28,23 @@ class RecordingFullscreenView extends StatefulWidget {
   final VoidCallback? onPause;
   final VoidCallback? onDone;
   final VoidCallback? onChat;
+
   /// Riprende la registrazione (bottone pupilla quando in pausa).
-  final VoidCallback? onResume;
+  final void Function({
+    required int seekBarIndex,
+    required List<double> waveData,
+  })?
+  onResume;
+
   /// Avvia/ferma il playback di anteprima dal playhead (bottone play nei controlli).
   final VoidCallback? onPlay;
-  final VoidCallback? onRewind;
-  final VoidCallback? onForward;
   final bool isPlayingPreview;
   final Function(int seekBarIndex)? onSeekBarIndexChanged;
   final int seekBarIndex;
   final int seekVersion;
   final int futureBarsCount;
   final Animation<double> pulseAnimation;
+
   /// seekBarIndex dal BLoC — durante il playback preview fa scorrere la waveform.
   final int? blocSeekBarIndex;
 
@@ -60,8 +64,6 @@ class RecordingFullscreenView extends StatefulWidget {
     this.onChat,
     this.onResume,
     this.onPlay,
-    this.onRewind,
-    this.onForward,
     this.isPlayingPreview = false,
     this.onSeekBarIndexChanged,
     this.seekBarIndex = 0,
@@ -95,20 +97,30 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
     super.dispose();
   }
 
-  String get _formattedTime => widget.elapsed.formatted;
-
   /// Counter posizione: "← MM:SS / MM:SS →"
   /// Durante registrazione: posizione = durata totale (sempre all'ultimo punto).
   /// Durante pausa: posizione = barra di seek corrente.
+  ///
+  /// La durata totale usa il massimo tra waveData e widget.elapsed:
+  /// dopo la fine naturale del playback, _onStopRecordingPreview aggiorna
+  /// RecordingPaused.duration con la durata reale del file di preview assemblato,
+  /// che viene passata come widget.elapsed. In quel momento elapsed > waveData
+  /// e viene mostrata la durata corretta dell'audio completo.
   String _seekLabel(int barIndex) {
     final seekMs = barIndex * 100;
-    final totalMs = widget.waveData.length * 100;
+    final waveMs = widget.waveData.length * 100;
+    final elapsedMs = widget.elapsed.inMilliseconds;
+    // Usa il massimo tra la durata calcolata dalla waveform e quella dal BLoC.
+    // Dopo la fine naturale del playback, elapsed contiene la durata del file
+    // di preview completo (es. 14.9s) che supera waveData.length*100 (es. 9s).
+    final totalMs = elapsedMs > waveMs ? elapsedMs : waveMs;
     String fmt(int ms) {
       final d = Duration(milliseconds: ms);
       final m = d.inMinutes.toString().padLeft(2, '0');
       final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
       return '$m:$s';
     }
+
     return '← ${fmt(seekMs)} / ${fmt(totalMs)} →';
   }
 
@@ -151,17 +163,9 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
         ),
         // Bottone chat (trascrizione) — sempre visibile in alto a destra
         if (widget.onChat != null)
-          Positioned(
-            top: 12,
-            right: 16,
-            child: _buildChatButton(),
-          ),
+          Positioned(top: 12, right: 16, child: _buildChatButton()),
         // Done — sempre visibile
-        Positioned(
-          bottom: 40,
-          right: 20,
-          child: _buildDoneButton(),
-        ),
+        Positioned(bottom: 40, right: 20, child: _buildDoneButton()),
       ],
     );
   }
@@ -254,7 +258,15 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                 futureBarsCount: widget.futureBarsCount,
                 onSeekBarIndexChanged: widget.onSeekBarIndexChanged,
                 seekVersion: widget.seekVersion,
-                externalSeekBarIndex: widget.isPlayingPreview ? widget.blocSeekBarIndex : null,
+                externalSeekBarIndex:
+                    (widget.isPlayingPreview || widget.isPaused)
+                    ? (widget.waveData.isNotEmpty
+                        ? widget.seekBarIndex.clamp(
+                            0,
+                            widget.waveData.length - 1,
+                          )
+                        : widget.seekBarIndex)
+                    : null,
               );
             },
           ),
@@ -265,9 +277,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
 
   Widget _buildPlaybackControls() {
     return FullscreenPlaybackControls(
-      onRewind: widget.onRewind,
       onPlay: widget.onPlay,
-      onForward: widget.onForward,
       isPlayingPreview: widget.isPlayingPreview,
     );
   }
@@ -288,7 +298,10 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                 widget.onPause?.call();
               } else if (widget.isPaused) {
                 // Il pupil button riprende la registrazione (non il preview)
-                widget.onResume?.call();
+                widget.onResume?.call(
+                  seekBarIndex: widget.seekBarIndex,
+                  waveData: widget.waveData,
+                );
               } else {
                 widget.onToggle();
               }

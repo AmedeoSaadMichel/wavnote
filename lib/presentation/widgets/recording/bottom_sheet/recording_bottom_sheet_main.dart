@@ -1,5 +1,4 @@
 // File: presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'recording_compact_view.dart';
@@ -28,7 +27,12 @@ class RecordingBottomSheet extends StatefulWidget {
   final VoidCallback? onDone; // Callback for done action
   final VoidCallback? onChat; // Callback for chat/transcript action
   /// Riprende la registrazione (bottone pupilla in pausa).
-  final VoidCallback? onResume;
+  /// Passa seekBarIndex e waveData per supportare auto-stop + seek-and-resume.
+  final void Function({
+    required int seekBarIndex,
+    required List<double> waveData,
+  })?
+  onResume;
 
   /// Avvia il playback di anteprima dal seekBarIndex corrente (letto dallo stato BLoC).
   final VoidCallback? onPlayFromPosition;
@@ -38,8 +42,6 @@ class RecordingBottomSheet extends StatefulWidget {
 
   /// True quando il playback di anteprima è attivo.
   final bool isPlayingPreview;
-  final VoidCallback? onRewind; // Callback for rewind action
-  final VoidCallback? onForward; // Callback for forward action
   final Function(int seekBarIndex, List<double> waveData)? onPrepareToOverwrite;
   final Function(int seekBarIndex, List<double> waveData)? onSeekAndResume;
 
@@ -82,8 +84,6 @@ class RecordingBottomSheet extends StatefulWidget {
     this.onPlayFromPosition,
     this.onStopPreview,
     this.isPlayingPreview = false,
-    this.onRewind,
-    this.onForward,
     this.onPrepareToOverwrite,
     this.onSeekAndResume,
     this.onSeekBarIndexChanged,
@@ -136,22 +136,15 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   /// rimpiazzate dalla nuova registrazione, una per ogni tick da 100ms.
   int _futureBarsCount = 0;
 
-  /// Offset in ms da aggiungere a widget.elapsed dopo seek-and-resume.
-  /// Il native engine riparte da 0, ma la waveform ha già barre pre-seek.
+  /// Offset in ms da aggiungere a widget.elapsed dopo seek-and-resume (overdub).
+  /// Il native engine riparte da 0 per il nuovo segmento, ma la waveform
+  /// ha già barre pre-seek. Vale 0 per la registrazione normale e il resume semplice
+  /// (il clock nativo emette posizioni cumulative che già includono i segmenti
+  /// precedenti — ADR-001).
   int _seekTimeOffsetMs = 0;
 
-  /// True al primo tick del timer dopo ogni avvio/ripresa della registrazione.
-  /// Al primo tick ricalibra _seekTimeOffsetMs per compensare il ritardo tra
-  /// avvio engine nativo e ricezione dell'evento BLoC (tipicamente 200-300ms).
-  bool _needsCalibration = false;
-
-  // Timer locale per aggiungere barre alla waveform a intervalli fissi.
-  // Disaccoppia la crescita della waveform dagli emit BLoC (che Equatable
-  // può saltare durante il silenzio → gap visivi).
-  Timer? _waveformTimer;
   double _currentAmplitude = 0.0;
   static const double _amplitudeFloor = 0.08;
-  static const Duration _waveformTickInterval = Duration(milliseconds: 100);
 
   @override
   void initState() {
@@ -180,29 +173,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     if (widget.isRecording) {
       _pulseController.repeat(reverse: true);
     }
-  }
-
-  /// Avvia il timer locale che sincronizza la waveform al tempo reale.
-  /// Ad ogni tick calcola quante barre dovrebbero esserci basandosi su
-  /// widget.elapsed e recupera eventuali tick persi (jank).
-  void _startWaveformTimer() {
-    _waveformTimer?.cancel();
-    _currentAmplitude = 0.0;
-    print(
-      '⏱️ [DART] _startWaveformTimer: START — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}',
-    );
-    _needsCalibration = true;
-    _waveformTimer = Timer.periodic(_waveformTickInterval, (_) {
-      _syncWaveformToElapsedTime();
-    });
-  }
-
-  void _stopWaveformTimer() {
-    print(
-      '⏱️ [DART] _stopWaveformTimer: STOP — waveData.length=${_waveData.length} ts=${DateTime.now().millisecondsSinceEpoch}',
-    );
-    _waveformTimer?.cancel();
-    _waveformTimer = null;
   }
 
   @override
@@ -261,27 +231,17 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       _currentAmplitude = 0.0;
     }
 
-    // Aggiorna l'ampiezza corrente — il timer la usa per le barre successive.
+    // Aggiorna l'ampiezza corrente prima di aggiungere barre.
     if (widget.amplitude != oldWidget.amplitude) {
       _currentAmplitude = widget.amplitude;
     }
 
-    // Avvia/ferma il timer waveform in base allo stato di registrazione.
-    // Il timer è l'unico punto che chiama _addWavePoint: garantisce barre
-    // a intervalli fissi (100ms) indipendentemente dagli emit BLoC.
-    if (widget.isRecording && !oldWidget.isRecording) {
-      // Resume semplice (da pausa, senza seek): l'engine nativo riparte da 0
-      // ma la waveform ha già _waveData.length barre. Imposta l'offset
-      // PRIMA di avviare il timer per evitare il freeze della waveform.
-      // Il segmento corrente NON viene azzerato: la registrazione riprende
-      // con lo stesso colore (segmento) del tratto precedente, come da specifiche.
-      if (oldWidget.isPaused && !isSeekResume) {
-        _seekTimeOffsetMs = _waveData.length * 100;
-        // _currentSegment = 0; RIMOSSO: Deve mantenere il segmento corrente (Caso A)
-      }
-      _startWaveformTimer();
-    } else if (!widget.isRecording && oldWidget.isRecording) {
-      _stopWaveformTimer();
+    // Crescita waveform push-based (ADR-001): nessun timer Dart.
+    // Ad ogni tick del clock nativo, widget.elapsed cambia → aggiungiamo una barra.
+    // Il clock nativo emette posizioni cumulative (framesInPreviousSegments inclusi),
+    // quindi per il resume semplice _seekTimeOffsetMs rimane 0.
+    if (widget.isRecording && widget.elapsed != oldWidget.elapsed) {
+      _addWaveformBar();
     }
 
     // Quando si entra in pausa: le barre future rimanenti diventano barre normali.
@@ -372,33 +332,16 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     }
   }
 
-  /// Sincronizza la waveform al tempo reale della registrazione.
-  /// Calcola quante barre dovrebbero esserci in base a widget.elapsed
-  /// e aggiunge/recupera eventuali barre perse per jank.
-  void _syncWaveformToElapsedTime() {
+  /// Aggiunge/aggiorna barre waveform in risposta a un tick del clock nativo.
+  /// Chiamato da didUpdateWidget ogni volta che widget.elapsed cambia durante
+  /// la registrazione (ADR-001: push-based, nessun Timer Dart).
+  void _addWaveformBar() {
     if (!mounted || !widget.isRecording) return;
 
-    // Calibrazione al primo tick: ricalcola _seekTimeOffsetMs in modo che
-    // expectedBars == _waveData.length. Compensa il gap tra avvio engine
-    // nativo e primo evento BLoC (di solito 200–300 ms), che altrimenti
-    // farebbe scattare 2–3 barre extra al primo sync.
-    if (_needsCalibration) {
-      _needsCalibration = false;
-      // Il calcolo originale usava _waveData.length, che include anche le barre
-      // future (ancora da registrare) dopo un seek-and-resume, causando un
-      // offset errato enorme che sovrascriveva istantaneamente tutto il futuro.
-      // Dobbiamo usare solo le barre attualmente registrate.
-      final currentRecordedBars = _waveData.length - _futureBarsCount;
-      _seekTimeOffsetMs =
-          currentRecordedBars * 100 - widget.elapsed.inMilliseconds;
-      print(
-        '⏱️ [DART] _syncWaveform CALIBRATION: currentRecordedBars=$currentRecordedBars, future=$_futureBarsCount, elapsed=${widget.elapsed.inMilliseconds}ms → _seekTimeOffsetMs=$_seekTimeOffsetMs',
-      );
-    }
-
-    // Dopo seek-and-resume il native engine riparte da 0, ma la waveform
-    // ha già _seekTimeOffsetMs di barre pre-seek. Somma l'offset per
-    // ottenere il numero totale di barre attese.
+    // Dopo seek-and-resume il segmento nativo ricomincia da 0: somma l'offset
+    // delle barre pre-seek per ottenere la posizione totale nella timeline.
+    // Per registrazione normale e resume semplice _seekTimeOffsetMs == 0
+    // (il clock nativo emette posizioni cumulative già corrette).
     final elapsedMs = widget.elapsed.inMilliseconds + _seekTimeOffsetMs;
     final expectedBars = (elapsedMs / 100).floor().clamp(0, _maxWavePoints);
     final amplitude = _currentAmplitude > _amplitudeFloor
@@ -406,7 +349,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         : _amplitudeFloor;
 
     setState(() {
-      // Conta solo le barre effettivamente registrate (esclude le future)
       final currentBars = _waveData.length - _futureBarsCount;
       final barsToAdd = expectedBars - currentBars;
 
@@ -429,34 +371,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           }
         }
       } else if (barsToAdd == 0 && _waveData.isNotEmpty) {
-        // Aggiorna solo l'ampiezza dell'ultima barra (il segmento non cambia)
+        // Stesso tick, ampiezza aggiornata → aggiorna solo l'ultima barra
         final lastRecordedIndex = _waveData.length - _futureBarsCount - 1;
         if (lastRecordedIndex >= 0) {
           _waveData[lastRecordedIndex] = amplitude;
           if (lastRecordedIndex < _waveSegments.length) {
-            // Segmento immutato per le barre già acquisite o aggiornato se necessario
             _waveSegments[lastRecordedIndex] = _currentSegment;
           }
         }
       }
 
-      // seekBarIndex = ultima barra registrata (esclude future)
       if (!widget.isPaused) {
         final recordedCount = _waveData.length - _futureBarsCount;
         _seekBarIndex = recordedCount > 0 ? recordedCount - 1 : 0;
-      }
-
-      if (_waveData.length % 5 == 0) {
-        print(
-          '⏱️ [${DateTime.now().millisecondsSinceEpoch}] _syncWaveform: expected=$expectedBars, actual=${_waveData.length}, future=$_futureBarsCount, amp=${amplitude.toStringAsFixed(3)}',
-        );
       }
     });
   }
 
   @override
   void dispose() {
-    _stopWaveformTimer();
     _pulseController.dispose();
     _sheetAnimationController.dispose();
     super.dispose();
@@ -572,26 +505,22 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   onDone: widget.onDone,
                   onChat: widget.onChat,
                   // Pupil button: riprende la registrazione.
+                  // Se il preview è attivo → auto-stop + resume/seek-and-resume.
                   // Se la seekbar è stata spostata indietro → seek-and-resume (trim).
                   // Se è all'ultima barra → resume semplice.
-                  onResume: () {
-                    // Tolleranza di 1 barra (100ms) per la fine della parte registrata.
-                    // Se siamo sull'ultima o penultima barra (o se waveData è vuoto),
-                    // è considerata la fine della registrazione corrente (anche durante un overdub).
-                    final currentRecordedBars =
-                        _waveData.length - _futureBarsCount;
-                    final isAtEnd =
-                        _waveData.isEmpty ||
-                        _seekBarIndex >= currentRecordedBars - 2;
-                    if (isAtEnd) {
-                      widget.onResume?.call();
-                    } else {
-                      widget.onPrepareToOverwrite?.call(
-                        _seekBarIndex,
-                        List<double>.from(_waveData),
-                      );
-                    }
-                  },
+                  onResume:
+                      ({
+                        required int seekBarIndex,
+                        required List<double> waveData,
+                      }) {
+                        // Usiamo sempre ResumeWithAutoStop che gestisce:
+                        // 1. Auto-stop del preview se attivo
+                        // 2. Decisone tra resume semplice e seek-and-resume
+                        widget.onResume?.call(
+                          seekBarIndex: seekBarIndex,
+                          waveData: waveData,
+                        );
+                      },
                   // Play nei controlli: avvia/ferma playback dal playhead
                   onPlay: () {
                     if (widget.isPlayingPreview) {
@@ -601,8 +530,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                     }
                   },
                   isPlayingPreview: widget.isPlayingPreview,
-                  onRewind: widget.onRewind,
-                  onForward: widget.onForward,
                   onSeekBarIndexChanged: (index) {
                     setState(() => _seekBarIndex = index);
                     widget.onSeekBarIndexChanged?.call(index);

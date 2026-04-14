@@ -38,15 +38,52 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     StopRecording event,
     Emitter<RecordingState> emit,
   ) async {
-    if (state is! RecordingInProgress) return;
-    final s = state as RecordingInProgress;
+    if (state is! RecordingInProgress && state is! RecordingPaused) return;
+
+    // Ferma il preview se era in esecuzione
+    if (state is RecordingPaused &&
+        (state as RecordingPaused).isPlayingPreview) {
+      _previewPositionSubscription?.cancel();
+      _previewPositionSubscription = null;
+      _previewCompletionSubscription?.cancel();
+      _previewCompletionSubscription = null;
+      await _audioService.stopPlaying();
+    }
+
+    final s = state; // can be RecordingInProgress or RecordingPaused
+
+    // Estrai le variabili necessarie
+    final seekBasePath = (s is RecordingInProgress)
+        ? s.seekBasePath
+        : (s as RecordingPaused).seekBasePath;
+    final originalFilePathForOverwrite = (s is RecordingInProgress)
+        ? s.originalFilePathForOverwrite
+        : (s as RecordingPaused).originalFilePathForOverwrite;
+    final format = (s is RecordingInProgress)
+        ? s.format
+        : (s as RecordingPaused).format;
+    final sampleRate = (s is RecordingInProgress)
+        ? s.sampleRate
+        : (s as RecordingPaused).sampleRate;
+    final bitRate = (s is RecordingInProgress)
+        ? s.bitRate
+        : (s as RecordingPaused).bitRate;
+    final overwriteStartTime = (s is RecordingInProgress)
+        ? s.overwriteStartTime
+        : (s as RecordingPaused).overwriteStartTime;
+    final folderId = (s is RecordingInProgress)
+        ? s.folderId
+        : (s as RecordingPaused).folderId;
+    final truncatedWaveData = (s is RecordingInProgress)
+        ? s.truncatedWaveData
+        : (s as RecordingPaused).truncatedWaveData;
 
     emit(const RecordingStopping());
     _stopAmplitudeUpdates();
     _stopDurationUpdates();
 
     // Logica di Seek-and-Resume (se c'è un base path tagliato)
-    if (s.seekBasePath != null && s.originalFilePathForOverwrite != null) {
+    if (seekBasePath != null && originalFilePathForOverwrite != null) {
       final part2ResultEntity = await _audioService.stopRecording(raw: true);
 
       if (part2ResultEntity == null || part2ResultEntity.filePath.isEmpty) {
@@ -56,15 +93,15 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
       final part2Path = part2ResultEntity.filePath;
       final finalWavPath =
-          "${s.originalFilePathForOverwrite!}_final_${DateTime.now().millisecondsSinceEpoch}.wav";
+          "${originalFilePathForOverwrite}_final_${DateTime.now().millisecondsSinceEpoch}.wav";
 
       final insertionDurationMs = part2ResultEntity.duration.inMilliseconds;
 
       try {
         await _trimmerService.overwriteAudioSegment(
-          originalPath: s.seekBasePath!,
+          originalPath: seekBasePath,
           insertionPath: part2Path,
-          startTime: s.overwriteStartTime ?? Duration.zero,
+          startTime: overwriteStartTime ?? Duration.zero,
           overwriteDuration: Duration(milliseconds: insertionDurationMs),
           outputPath: finalWavPath,
           format: 'wav',
@@ -72,20 +109,20 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
         // Delete partial files
         try {
-          File(s.seekBasePath!).deleteSync();
+          File(seekBasePath).deleteSync();
           File(part2Path).deleteSync();
         } catch (_) {}
 
         String finalOutputPath = finalWavPath;
 
         // Se l'utente ha richiesto un formato diverso da WAV, convertiamo
-        if (s.format.fileExtension != '.wav') {
+        if (format.fileExtension != '.wav') {
           final convertedPath = await _audioService.convertAudioFile(
             inputPath: finalWavPath,
-            outputPath: s.originalFilePathForOverwrite!,
-            targetFormat: s.format,
-            targetSampleRate: s.sampleRate,
-            targetBitRate: s.bitRate,
+            outputPath: originalFilePathForOverwrite,
+            targetFormat: format,
+            targetSampleRate: sampleRate,
+            targetBitRate: bitRate,
           );
 
           if (convertedPath != null) {
@@ -113,7 +150,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         } catch (_) {}
 
         final existingRecordings = await _recordingRepository
-            .getRecordingsByFolder(s.folderId ?? 'all_recordings');
+            .getRecordingsByFolder(folderId ?? 'all_recordings');
         final matchingRecordings = existingRecordings
             .where((r) => r.name.startsWith(locationName))
             .toList();
@@ -140,13 +177,13 @@ extension _RecordingBlocLifecycle on RecordingBloc {
             RecordingEntity.create(
               name: newName,
               filePath: finalOutputPath,
-              folderId: s.folderId ?? 'all_recordings',
-              format: s.format,
+              folderId: folderId ?? 'all_recordings',
+              format: format,
               duration: duration,
               fileSize: fileSize,
-              sampleRate: s.sampleRate,
+              sampleRate: sampleRate,
             ).copyWith(
-              waveformData: event.waveformData ?? s.truncatedWaveData,
+              waveformData: event.waveformData ?? truncatedWaveData,
               locationName: locationName,
             );
 
@@ -234,6 +271,104 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     });
   }
 
+  /// Resume con auto-stop del preview se attivo.
+  /// Se la seek bar è nel mezzo (non alla fine), inizia un overdub.
+  Future<void> _onResumeWithAutoStop(
+    ResumeWithAutoStop event,
+    Emitter<RecordingState> emit,
+  ) async {
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    // 1. Se il preview è attivo, fermalo
+    if (s.isPlayingPreview) {
+      debugPrint('⏹ Auto-stop preview before resume');
+      _previewPositionSubscription?.cancel();
+      _previewPositionSubscription = null;
+      _previewCompletionSubscription?.cancel();
+      _previewCompletionSubscription = null;
+      await _audioService.stopPlaying();
+
+      // Pulisci file temporanei di preview
+      try {
+        final dir = File(s.filePath).parent;
+        final files = dir.listSync();
+        for (var f in files) {
+          if (f.path.contains('_preview_') && f.path.endsWith('.wav')) {
+            f.deleteSync();
+          }
+        }
+      } catch (_) {}
+
+      // Emetti stato senza isPlayingPreview
+      emit(s.copyWith(isPlayingPreview: false));
+    }
+
+    // 2. Calcola se siamo alla fine della registrazione
+    int totalDurationMs = s.duration.inMilliseconds;
+    if (s.seekBasePath != null) {
+      try {
+        final baseDuration = await _audioService.getAudioDuration(
+          s.seekBasePath!,
+        );
+        final baseDurationMs = baseDuration.inMilliseconds;
+        final overwriteMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+        final endMs = overwriteMs + s.duration.inMilliseconds;
+        totalDurationMs = endMs > baseDurationMs ? endMs : baseDurationMs;
+      } catch (_) {
+        totalDurationMs =
+            (s.overwriteStartTime?.inMilliseconds ?? 0) +
+            s.duration.inMilliseconds;
+      }
+    }
+    // Tolleranza di 2 barre (200ms) per la fine
+    final totalBars = (totalDurationMs / 100).ceil();
+    final isAtEnd = event.seekBarIndex >= totalBars - 2;
+
+    debugPrint(
+      '▶️ ResumeWithAutoStop: seekBar=${event.seekBarIndex}, totalBars=$totalBars, isAtEnd=$isAtEnd',
+    );
+    debugPrint('▶️ ResumeWithAutoStop: State seekBarIndex=${s.seekBarIndex}');
+
+    // 3. Se siamo alla fine, resume semplice; altrimenti, inizia overdub
+    if (isAtEnd) {
+      // Resume semplice
+      final result = await _pauseRecordingUseCase.executeResume();
+      result.fold((failure) => emit(RecordingError(failure.message)), (
+        duration,
+      ) {
+        emit(
+          RecordingInProgress(
+            filePath: s.filePath,
+            folderId: s.folderId,
+            folderName: s.folderName,
+            format: s.format,
+            sampleRate: s.sampleRate,
+            bitRate: s.bitRate,
+            duration: duration,
+            amplitude: 0.0,
+            startTime: s.startTime,
+            title: s.title,
+            seekBasePath: s.seekBasePath,
+            originalFilePathForOverwrite: s.originalFilePathForOverwrite,
+            overwriteStartTime: s.overwriteStartTime,
+            truncatedWaveData: s.truncatedWaveData,
+          ),
+        );
+        _startAmplitudeUpdates();
+        _startDurationUpdates();
+      });
+    } else {
+      // Inizia overdub (seek-and-resume)
+      add(
+        StartOverwrite(
+          seekBarIndex: event.seekBarIndex,
+          waveData: event.waveData,
+        ),
+      );
+    }
+  }
+
   Future<void> _onStartOverwrite(
     StartOverwrite event,
     Emitter<RecordingState> emit,
@@ -248,6 +383,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
     final int rawDurationMs = event.seekBarIndex * 100;
     final durationMs = rawDurationMs < 100 ? 100 : rawDurationMs;
+    debugPrint(
+      '✏️ StartOverwrite: event.seekBarIndex=${event.seekBarIndex}, overwriteStartTimeMs=$durationMs',
+    );
 
     String pathToOverwrite = s.seekBasePath ?? s.filePath;
 
@@ -368,11 +506,53 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
-    if (s.seekBarIndex == event.seekBarIndex) return;
-    debugPrint(
-      '📍 SeekBar → bar ${event.seekBarIndex} (${event.seekBarIndex * 100}ms)',
-    );
-    emit(s.copyWith(seekBarIndex: event.seekBarIndex));
+
+    // Ignora eventi provenienti dal playback se il preview non è più attivo.
+    // Previene che eventi già in coda sovrascrivano il seekBarIndex finale
+    // calcolato da _onStopRecordingPreview dopo la fine naturale del playback.
+    if (event.isFromPlayback && !s.isPlayingPreview) return;
+
+    // Clamp dell'indice all'ultima barra disponibile
+    int totalDurationMs = s.duration.inMilliseconds;
+    if (s.seekBasePath != null) {
+      try {
+        final baseDuration = await _audioService.getAudioDuration(
+          s.seekBasePath!,
+        );
+        final baseDurationMs = baseDuration.inMilliseconds;
+        final overwriteMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+        final endMs = overwriteMs + s.duration.inMilliseconds;
+        totalDurationMs = endMs > baseDurationMs ? endMs : baseDurationMs;
+      } catch (_) {
+        totalDurationMs =
+            (s.overwriteStartTime?.inMilliseconds ?? 0) +
+            s.duration.inMilliseconds;
+      }
+    }
+
+    final maxIndex = (totalDurationMs ~/ 100);
+    final clampedIndex = event.seekBarIndex.clamp(0, maxIndex);
+
+    if (s.seekBarIndex == clampedIndex) return;
+    debugPrint('📍 SeekBar → bar $clampedIndex (${clampedIndex * 100}ms)');
+
+    // Se il playback preview è attivo:
+    // Se stopPreview è true (es. drag da UI), fermiamo il preview.
+    // Altrimenti (es. pulsanti rewind/forward), facciamo seek senza fermare.
+    if (s.isPlayingPreview) {
+      if (event.stopPreview) {
+        debugPrint('⏹ Stop preview due to waveform drag');
+        add(const StopRecordingPreview(isNaturalCompletion: false));
+      } else if (!event.isFromPlayback) {
+        final seekPosition = Duration(milliseconds: clampedIndex * 100);
+        debugPrint(
+          '🔊 Seek during playback to: ${seekPosition.inMilliseconds}ms',
+        );
+        await _audioService.seekTo(seekPosition);
+      }
+    }
+
+    emit(s.copyWith(seekBarIndex: clampedIndex));
   }
 
   Future<void> _onPlayRecordingPreview(
@@ -394,16 +574,51 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     if (s.seekBasePath != null && s.originalFilePathForOverwrite != null) {
       final tempPreviewPath =
           "${s.originalFilePathForOverwrite}_preview_${DateTime.now().millisecondsSinceEpoch}.wav";
-      
+
       try {
-        await _trimmerService.overwriteAudioSegment(
-          originalPath: s.seekBasePath!,
-          insertionPath: s.filePath,
-          startTime: s.overwriteStartTime ?? Duration.zero,
-          overwriteDuration: s.duration,
-          outputPath: tempPreviewPath,
-          format: 'wav',
+        // Distinguiamo tra:
+        // 1. Pause/Resume semplice: overwriteStartTime alla fine del base = CONCATENAZIONE
+        // 2. Seek and overwrite: overwriteStartTime nel mezzo = OVERWRITE
+
+        // Ottieni la durata reale del file base
+        final baseDuration = await _audioService.getAudioDuration(
+          s.seekBasePath!,
         );
+        final baseDurationMs = baseDuration.inMilliseconds;
+
+        // È una semplice concatenazione se stiamo sovrascrivendo dalla fine del file base
+        // (cioè: overwriteStartTime == durata del file base)
+        final isSimpleConcatenation =
+            s.overwriteStartTime?.inMilliseconds == baseDurationMs;
+
+        if (isSimpleConcatenation) {
+          // Caso 1: Concatenazione semplice (pause/resume senza seek)
+          debugPrint(
+            '🔀 Preview: concatenazione semplice (base: ${baseDurationMs}ms + part2: ${s.duration.inMilliseconds}ms)',
+          );
+          await _trimmerService.concatenateAudio(
+            basePath: s.seekBasePath!,
+            appendPath: s.filePath,
+            outputPath: tempPreviewPath,
+            format: 'wav',
+          );
+        } else {
+          // Caso 2: Overwrite con seek (inserimento nel mezzo)
+          // La logica di inserimento (con o senza coda) è gestita nativamente da overwriteAudioSegment
+          // in modo da produrre lo stesso identico risultato di _onStopRecording.
+          debugPrint(
+            '✏️ Preview: overwrite da ${s.overwriteStartTime?.inMilliseconds ?? 0}ms, durata insert: ${s.duration.inMilliseconds}ms, base totale: ${baseDurationMs}ms',
+          );
+
+          await _trimmerService.overwriteAudioSegment(
+            originalPath: s.seekBasePath!,
+            insertionPath: s.filePath,
+            startTime: s.overwriteStartTime ?? Duration.zero,
+            overwriteDuration: s.duration,
+            outputPath: tempPreviewPath,
+            format: 'wav',
+          );
+        }
         playbackPath = tempPreviewPath;
       } catch (e) {
         debugPrint('❌ Errore creazione preview unita: $e');
@@ -434,7 +649,13 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           if (state is RecordingPaused) {
             final current = (state as RecordingPaused).seekBarIndex;
             if (newIndex != current) {
-              add(UpdateSeekBarIndex(seekBarIndex: newIndex));
+              add(
+                UpdateSeekBarIndex(
+                  seekBarIndex: newIndex,
+                  stopPreview: false,
+                  isFromPlayback: true,
+                ),
+              );
             }
           }
         });
@@ -461,28 +682,55 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     _previewCompletionSubscription = null;
     await _audioService.stopPlaying();
 
-    // Pulizia di eventuali file temporanei di preview
+    Duration? finalDuration;
+    int? finalSeekBarIndex;
+
+    // Pulizia di eventuali file temporanei di preview e calcolo durata finale
     try {
       final dir = File(s.filePath).parent;
       final files = dir.listSync();
       for (var f in files) {
         if (f.path.contains('_preview_') && f.path.endsWith('.wav')) {
+          finalDuration = await _audioService.getAudioDuration(f.path);
+          if (event.isNaturalCompletion) {
+            finalSeekBarIndex = (finalDuration.inMilliseconds / 100).floor();
+          }
           f.deleteSync();
         }
       }
     } catch (_) {}
 
-    // Calcolo corretto della durata totale:
-    // Se c'è un base file (s.overwriteStartTime != null), sommiamo la durata del base file (fino all'inserzione)
-    // con la durata del nuovo frammento (s.duration). Altrimenti solo s.duration.
-    final int baseMs = s.overwriteStartTime?.inMilliseconds ?? 0;
-    final int totalDurationMs = baseMs + s.duration.inMilliseconds;
+    // Fallback: nessun file di preview trovato (es. playback diretto su filePath).
+    // Calcola la durata totale dall'audio base + parte registrata.
+    if (finalDuration == null && event.isNaturalCompletion) {
+      int totalDurationMs = s.duration.inMilliseconds;
+      if (s.seekBasePath != null) {
+        try {
+          final baseDuration = await _audioService.getAudioDuration(
+            s.seekBasePath!,
+          );
+          final baseDurationMs = baseDuration.inMilliseconds;
+          final overwriteMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+          final endMs = overwriteMs + s.duration.inMilliseconds;
+          totalDurationMs = endMs > baseDurationMs ? endMs : baseDurationMs;
+        } catch (_) {
+          totalDurationMs =
+              (s.overwriteStartTime?.inMilliseconds ?? 0) +
+              s.duration.inMilliseconds;
+        }
+      }
+      finalSeekBarIndex = (totalDurationMs / 100).floor().clamp(0, 999999);
+      // Aggiorna anche finalDuration così la duration dello stato viene propagata
+      // correttamente all'UI (necessario per il calcolo della durata totale in _seekLabel).
+      finalDuration = Duration(milliseconds: totalDurationMs);
+    }
 
-    // Completamento naturale → cursore all'ULTIMA barra della waveform.
-    final newSeekBarIndex = event.isNaturalCompletion
-        ? (totalDurationMs ~/ 100).clamp(0, 999999)
-        : s.seekBarIndex;
-
-    emit(s.copyWith(isPlayingPreview: false, seekBarIndex: newSeekBarIndex));
+    emit(
+      s.copyWith(
+        isPlayingPreview: false,
+        seekBarIndex: finalSeekBarIndex ?? s.seekBarIndex,
+        duration: finalDuration ?? s.duration,
+      ),
+    );
   }
 }

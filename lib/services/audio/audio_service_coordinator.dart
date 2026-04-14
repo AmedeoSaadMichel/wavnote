@@ -26,6 +26,29 @@ import 'audio_recorder_service.dart';
 import 'audio_player_service.dart';
 import 'audio_engine_service.dart';
 
+// ==== CLOCK TYPES (ADR-001) ====
+
+enum AudioClockMode { idle, recording, playback }
+
+sealed class ClockTick {
+  const ClockTick();
+}
+
+final class RecordingClockTick extends ClockTick {
+  const RecordingClockTick({required this.position, required this.amplitude});
+  final Duration position;
+  final double amplitude;
+}
+
+final class PlaybackClockTick extends ClockTick {
+  const PlaybackClockTick({
+    required this.position,
+    required this.totalDuration,
+  });
+  final Duration position;
+  final Duration totalDuration;
+}
+
 class AudioServiceCoordinator implements IAudioServiceRepository {
   static const MethodChannel _audioTrimmerChannel = MethodChannel(
     'wavnote/audio_trimmer',
@@ -53,19 +76,20 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
 
   // Playback nativo via engine durante registrazione in pausa (iOS/macOS)
   bool _nativePlaybackActive = false;
-  Timer? _nativeCompletionTimer;
 
   bool _isInitialized = false;
 
   StreamController<double>? _amplitudeController;
   StreamController<Duration>? _positionController;
   StreamController<void>? _completionController;
+  StreamController<ClockTick>? _clockController;
 
-  StreamSubscription<double>? _engineAmplitudeSubscription;
+  StreamSubscription<RecordingTick>? _engineAmplitudeSubscription;
   StreamSubscription<double>?
   _recordingAmplitudeSubscription; // record fallback
   StreamSubscription<Duration>? _recordingPositionSubscription;
   // StreamSubscription<void>? _recordingCompletionSubscription;
+  StreamSubscription<PlaybackTick>? _nativePlaybackPositionSubscription;
   StreamSubscription<Duration>? _playbackPositionSubscription;
   StreamSubscription<void>? _playbackCompletionSubscription;
 
@@ -86,6 +110,7 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       _amplitudeController = StreamController<double>.broadcast();
       _positionController = StreamController<Duration>.broadcast();
       _completionController = StreamController<void>.broadcast();
+      _clockController = StreamController<ClockTick>.broadcast();
 
       // Inizializza il playback (sempre)
       final playbackInit = await _playbackService.initialize();
@@ -121,8 +146,7 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   Future<void> dispose() async {
     try {
       _engineAmplitudeSubscription?.cancel();
-      _nativeCompletionTimer?.cancel();
-      _nativeCompletionTimer = null;
+      _nativePlaybackPositionSubscription?.cancel();
       await _playbackPositionSubscription?.cancel();
       await _playbackCompletionSubscription?.cancel();
 
@@ -136,6 +160,8 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
       await _amplitudeController?.close();
       await _positionController?.close();
       await _completionController?.close();
+      await _clockController?.close();
+      _clockController = null;
 
       _isInitialized = false;
       _iosNativeActive = false;
@@ -324,6 +350,12 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
     // Fallback non-iOS
     return await _recordingService.getCurrentRecordingDuration();
   }
+
+  /// Stream unificato push-based (ADR-001).
+  /// Emette [RecordingClockTick] durante la registrazione,
+  /// [PlaybackClockTick] durante il playback.
+  Stream<ClockTick> get activeClockStream =>
+      _clockController?.stream ?? const Stream.empty();
 
   @override
   Stream<double> getRecordingAmplitudeStream() =>
@@ -636,8 +668,17 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
 
   void _setupEngineAmplitudeStream() {
     _engineAmplitudeSubscription?.cancel();
-    _engineAmplitudeSubscription = _engineService?.amplitudeStream.listen(
-      (amp) => _amplitudeController?.add(amp),
+    _engineAmplitudeSubscription = _engineService?.recordingTickStream.listen(
+      (tick) {
+        _amplitudeController?.add(tick.amplitude);
+        _positionController?.add(tick.position); // durata registrazione push-based
+        _clockController?.add(
+          RecordingClockTick(
+            position: tick.position,
+            amplitude: tick.amplitude,
+          ),
+        );
+      },
     );
   }
 
@@ -670,40 +711,47 @@ class AudioServiceCoordinator implements IAudioServiceRepository {
   /// Configura gli stream di posizione e completion per il playback nativo
   /// (durante registrazione in pausa su iOS/macOS).
   void _setupNativePlaybackStreams() {
-    _playbackPositionSubscription?.cancel();
-    _playbackPositionSubscription = _engineService!.positionStream.listen(
-      (pos) => _positionController?.add(pos),
-    );
+    _nativePlaybackPositionSubscription?.cancel();
+    _nativePlaybackPositionSubscription = _engineService!.playbackTickStream
+        .listen((tick) {
+          _positionController?.add(tick.position);
+          _clockController?.add(
+            PlaybackClockTick(
+              position: tick.position,
+              totalDuration: tick.totalDuration,
+            ),
+          );
+        });
 
-    // Il motore nativo non ha uno stream di completion: poll ogni 200ms
-    _nativeCompletionTimer?.cancel();
-    _nativeCompletionTimer = Timer.periodic(const Duration(milliseconds: 200), (
+    _playbackCompletionSubscription?.cancel();
+    _playbackCompletionSubscription = _engineService!.completionStream.listen((
       _,
-    ) async {
-      final stillPlaying =
-          await _engineService?.checkIsPlayingNative() ?? false;
-      if (!stillPlaying && _nativePlaybackActive) {
-        _nativeCompletionTimer?.cancel();
-        _nativeCompletionTimer = null;
+    ) {
+      if (_nativePlaybackActive) {
         _nativePlaybackActive = false;
-        _playbackPositionSubscription?.cancel();
-        _playbackPositionSubscription = null;
+        _nativePlaybackPositionSubscription?.cancel();
+        _nativePlaybackPositionSubscription = null;
         _completionController?.add(null);
       }
     });
   }
 
   void _cleanupNativePlaybackStreams() {
-    _nativeCompletionTimer?.cancel();
-    _nativeCompletionTimer = null;
-    _playbackPositionSubscription?.cancel();
-    _playbackPositionSubscription = null;
+    _nativePlaybackPositionSubscription?.cancel();
+    _nativePlaybackPositionSubscription = null;
+    _playbackCompletionSubscription?.cancel();
+    _playbackCompletionSubscription = null;
   }
 
   void _setupPlaybackStreams() {
     _playbackPositionSubscription = _playbackService
         .getPlaybackPositionStream()
-        .listen((pos) => _positionController?.add(pos));
+        .listen((pos) {
+          _positionController?.add(pos);
+          _clockController?.add(
+            PlaybackClockTick(position: pos, totalDuration: Duration.zero),
+          );
+        });
     _playbackCompletionSubscription = _playbackService
         .getPlaybackCompletionStream()
         .listen((_) => _completionController?.add(null));

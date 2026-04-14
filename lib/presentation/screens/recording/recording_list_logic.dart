@@ -579,11 +579,17 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   }
 
   /// Riprende la registrazione dal punto di pausa (bottone pupilla).
-  void resumeRecording() {
-    print('▶️ Resume recording tapped');
+  /// Gestisce auto-stop del preview e decide tra resume semplice o seek-and-resume.
+  void resumeRecording({int seekBarIndex = 0, List<double>? waveData}) {
+    print('▶️ Resume recording tapped (seekBar: $seekBarIndex)');
     final recordingBloc = context.read<RecordingBloc>();
-    if (recordingBloc.state.canResumeRecording) {
-      recordingBloc.add(const ResumeRecording());
+    if (recordingBloc.state is RecordingPaused) {
+      recordingBloc.add(
+        ResumeWithAutoStop(
+          seekBarIndex: seekBarIndex,
+          waveData: waveData ?? [],
+        ),
+      );
     }
   }
 
@@ -610,16 +616,6 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     if (bloc.state is RecordingPaused) {
       bloc.add(const StopRecordingPreview());
     }
-  }
-
-  void rewindRecording() {
-    print('⏪ Rewind 10 seconds tapped');
-    // TODO: Implement rewind 10 seconds
-  }
-
-  void forwardRecording() {
-    print('⏩ Forward 10 seconds tapped');
-    // TODO: Implement forward 10 seconds
   }
 
   void seekRecording(double position) {

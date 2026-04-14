@@ -139,5 +139,6 @@ lib/
 
 **Fine sessione (solo se >20 min o decisioni architetturali):**
 - Crea `log/sessions/YYYY-MM-DD-topic.md` dal template `templates/session`
+- Assicurati che ogni file di log creato contenga link espliciti (es. `[[project/features]]`) per mantenere il Graph di Obsidian connesso
 - Aggiorna `features.md` e `tech-debt.md`
 - Non scrivere mai in `_index.md` durante la sessione, solo a fine sessione se è cambiata la struttura

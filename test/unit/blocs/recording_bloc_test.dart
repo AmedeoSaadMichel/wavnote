@@ -22,6 +22,10 @@ import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart';
 import 'package:wavnote/core/errors/failures.dart';
 import 'package:dartz/dartz.dart';
 
+import 'package:wavnote/domain/repositories/i_audio_trimmer_repository.dart';
+import 'package:wavnote/domain/usecases/recording/overwrite_recording_usecase.dart';
+import 'package:wavnote/config/dependency_injection.dart';
+
 // Use aliased import to avoid conflicts
 import 'package:wavnote/presentation/bloc/recording/recording_bloc.dart'
     as recording_bloc;
@@ -42,9 +46,16 @@ class MockStopRecordingUseCase extends Mock implements StopRecordingUseCase {}
 
 class MockPauseRecordingUseCase extends Mock implements PauseRecordingUseCase {}
 
+class MockAudioTrimmerRepository extends Mock
+    implements IAudioTrimmerRepository {}
+
+class MockOverwriteRecordingUseCase extends Mock
+    implements OverwriteRecordingUseCase {}
+
 void main() {
   setUpAll(() async {
     await TestHelpers.initializeTestEnvironment();
+    registerFallbackValue(TestHelpers.createTestRecording());
   });
 
   group('RecordingBloc', () {
@@ -55,6 +66,7 @@ void main() {
     late MockStartRecordingUseCase mockStartRecordingUseCase;
     late MockStopRecordingUseCase mockStopRecordingUseCase;
     late MockPauseRecordingUseCase mockPauseRecordingUseCase;
+    late MockAudioTrimmerRepository mockTrimmerService;
 
     setUp(() {
       mockAudioService = MockAudioServiceRepository();
@@ -63,10 +75,34 @@ void main() {
       mockStartRecordingUseCase = MockStartRecordingUseCase();
       mockStopRecordingUseCase = MockStopRecordingUseCase();
       mockPauseRecordingUseCase = MockPauseRecordingUseCase();
+      mockTrimmerService = MockAudioTrimmerRepository();
+
+      // Register in GetIt since the constructor might use it if not provided,
+      // although we will provide it explicitly below.
+      if (!sl.isRegistered<IAudioTrimmerRepository>()) {
+        sl.registerSingleton<IAudioTrimmerRepository>(mockTrimmerService);
+      }
 
       // Setup default mock behaviors
       when(() => mockAudioService.initialize()).thenAnswer((_) async => true);
       when(() => mockAudioService.dispose()).thenAnswer((_) async {});
+      when(() => mockAudioService.needsDisposal).thenReturn(false);
+      when(
+        () => mockAudioService.getRecordingAmplitudeStream(),
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockAudioService.hasMicrophonePermission(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => mockAudioService.hasMicrophone(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => mockAudioService.requestMicrophonePermission(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => mockAudioService.cancelRecording(),
+      ).thenAnswer((_) async => true);
+
       when(
         () => mockRecordingRepository.getAllRecordings(),
       ).thenAnswer((_) async => <RecordingEntity>[]);
@@ -74,15 +110,19 @@ void main() {
       recordingBloc = RecordingBloc(
         audioService: mockAudioService,
         recordingRepository: mockRecordingRepository,
+        locationRepository: mockLocationRepository,
         startRecordingUseCase: mockStartRecordingUseCase,
         stopRecordingUseCase: mockStopRecordingUseCase,
         pauseRecordingUseCase: mockPauseRecordingUseCase,
-        locationRepository: mockLocationRepository,
+        trimmerService: mockTrimmerService,
       );
     });
 
     tearDown(() async {
       await recordingBloc.close();
+      if (sl.isRegistered<IAudioTrimmerRepository>()) {
+        sl.unregister<IAudioTrimmerRepository>();
+      }
     });
 
     group('Initial State', () {

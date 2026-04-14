@@ -9,19 +9,19 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | Motore nativo AVAudioEngine (iOS/macOS) | `services/audio/audio_engine_service.dart` | ✅ Completato |
 | Fallback package `record` (non iOS) | `services/audio/audio_recorder_service.dart` | ✅ Presente (non attivo su iOS) |
 | Overdubbing / seek-and-overwrite | `domain/usecases/recording/overwrite_recording_usecase.dart` | ✅ Completato |
-| Playback audio | `services/audio/audio_player_service.dart` (just_audio) | ✅ Completato |
+| Playback audio (seek, rewind, forward) | `services/audio/audio_player_service.dart` + `recording_list_logic.dart` | ✅ Completato |
 | Trim audio | `services/audio/audio_trimmer_service.dart` + channel `wavnote/audio_trimmer` | ✅ Presente |
 | Formati WAV / M4A / FLAC | `core/enums/audio_format.dart` | ✅ Completato |
 | Sample rate configurabile | `presentation/widgets/dialogs/sample_rate_dialog.dart` | ✅ Completato |
 
 ## Waveform
-| Feature | File chiave | Stato |
-|---------|------------|-------|
-| Waveform live durante registrazione | `presentation/widgets/recording/custom_waveform/` | ✅ Completato |
-| Waveform playback (audio_waveforms) | `presentation/widgets/recording/waveform_widget.dart` | ✅ Completato |
-| Waveform a colori per segmenti overwrite | `recorder_wave_painter.dart` (_kSegmentPalette) | ✅ Completato |
-| Waveform fullscreen | `presentation/widgets/recording/fullscreen_waveform.dart` | ✅ Completato |
-| Seek tramite tap su waveform | `recording_list_logic.dart` | ⚠️ Parziale (vedi tech-debt) |
+| Feature                                  | File chiave                                               | Stato                        |
+| ---------------------------------------- | --------------------------------------------------------- | ---------------------------- |
+| Waveform live durante registrazione      | `presentation/widgets/recording/custom_waveform/`         | ✅ Completato                 |
+| Waveform playback (audio_waveforms)      | `presentation/widgets/recording/waveform_widget.dart`     | ✅ Completato                 |
+| Waveform a colori per segmenti overwrite | `recorder_wave_painter.dart` (_kSegmentPalette)           | ✅ Completato                 |
+| Waveform fullscreen                      | `presentation/widgets/recording/fullscreen_waveform.dart` | ✅ Completato                 |
+| Seek tramite tap su waveform             | `recording_list_logic.dart`                               | ⚠️ Parziale (vedi tech-debt) |
 
 ## Organizzazione
 | Feature | File chiave | Stato |

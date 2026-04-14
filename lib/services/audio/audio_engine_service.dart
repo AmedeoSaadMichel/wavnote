@@ -4,20 +4,29 @@
 // =====================================
 //
 // Flutter wrapper for AVAudioEngine-based recording and playback.
-// This service allows simultaneous recording and playback without
-// the file locking issues found in AVAssetWriter.
 //
-// Key features:
-// - Record audio to file while being able to play it back
-// - Pause/resume recording
-// - Playback with seek support
-// - No file locking issues on iOS
+// Clock architecture (ADR-001):
+// - Recording ticks: pushed by native installTap → clock_events EventChannel
+//   (ogni ~100ms, throttled; contiene positionMs + amplitude sample-accurate)
+// - Playback ticks: pushed by native DispatchSourceTimer (100ms) → clock_events EventChannel
+//   (contiene positionMs + durationMs basati su lastRenderTime)
+// - Zero timer Dart in questo file.
 
 import 'dart:async';
 import 'package:flutter/services.dart';
 
+// Record types per i tick del clock
+typedef RecordingTick = ({Duration position, double amplitude});
+typedef PlaybackTick = ({Duration position, Duration totalDuration});
+
 class AudioEngineService {
   static const _channel = MethodChannel('com.wavnote/audio_engine');
+  static const _playbackEventChannel = EventChannel(
+    'com.wavnote/audio_engine/playback_events',
+  );
+  static const _clockEventChannel = EventChannel(
+    'com.wavnote/audio_engine/clock_events',
+  );
 
   bool _isInitialized = false;
   bool _isRecording = false;
@@ -28,10 +37,16 @@ class AudioEngineService {
   String? _currentRecordingPath;
   String? _currentPlaybackPath;
 
-  StreamController<double>? _amplitudeController;
-  StreamController<Duration>? _positionController;
-  Timer? _amplitudeTimer;
-  Timer? _positionTimer;
+  // Completion stream (playback_events EventChannel — già push-based)
+  StreamController<void>? _completionController;
+  StreamSubscription<dynamic>? _playbackEventSubscription;
+
+  // Clock streams (clock_events EventChannel — ADR-001)
+  StreamController<RecordingTick>? _recordingTickController;
+  StreamController<PlaybackTick>? _playbackTickController;
+  StreamSubscription<dynamic>? _clockEventSubscription;
+
+  double _lastAmplitude = 0.0;
 
   bool get isInitialized => _isInitialized;
   bool get isRecording => _isRecording;
@@ -40,16 +55,31 @@ class AudioEngineService {
   bool get isPlaybackPaused => _isPlaybackPaused;
   String? get currentRecordingPath => _currentRecordingPath;
   String? get currentPlaybackPath => _currentPlaybackPath;
+  double get lastAmplitude => _lastAmplitude;
 
+  // Recording tick stream: position (sample-accurate) + amplitude
+  Stream<RecordingTick> get recordingTickStream =>
+      _recordingTickController?.stream ?? const Stream.empty();
+
+  // Playback tick stream: position + totalDuration (da lastRenderTime nativo)
+  Stream<PlaybackTick> get playbackTickStream =>
+      _playbackTickController?.stream ?? const Stream.empty();
+
+  // Derived streams — mantenuti per compatibilità con AudioServiceCoordinator
+  // (verranno sostituiti in Step 3 con activeClockStream)
   Stream<double> get amplitudeStream =>
-      _amplitudeController?.stream ?? const Stream.empty();
+      _recordingTickController?.stream.map((t) {
+        _lastAmplitude = t.amplitude;
+        return t.amplitude;
+      }) ??
+      const Stream.empty();
 
   Stream<Duration> get positionStream =>
-      _positionController?.stream ?? const Stream.empty();
+      _playbackTickController?.stream.map((t) => t.position) ??
+      const Stream.empty();
 
-  double _lastAmplitude = 0.0;
-
-  double get lastAmplitude => _lastAmplitude;
+  Stream<void> get completionStream =>
+      _completionController?.stream ?? const Stream.empty();
 
   Future<double> getCurrentAmplitude() async {
     if (!_isRecording || _isRecordingPaused) return 0.0;
@@ -66,8 +96,47 @@ class AudioEngineService {
     if (_isInitialized) return true;
 
     try {
-      _amplitudeController = StreamController<double>.broadcast();
-      _positionController = StreamController<Duration>.broadcast();
+      _completionController = StreamController<void>.broadcast();
+      _recordingTickController = StreamController<RecordingTick>.broadcast();
+      _playbackTickController = StreamController<PlaybackTick>.broadcast();
+
+      // Completion events (già presenti, invariati)
+      _playbackEventSubscription = _playbackEventChannel
+          .receiveBroadcastStream()
+          .listen((event) {
+            if (event is Map && event['event'] == 'playbackCompleted') {
+              _completionController?.add(null);
+            }
+          });
+
+      // Clock events (ADR-001) — recording e playback tick push-based
+      _clockEventSubscription = _clockEventChannel
+          .receiveBroadcastStream()
+          .listen((event) {
+            if (event is! Map) return;
+            final type = event['type'] as String?;
+            switch (type) {
+              case 'recordingTick':
+                final posMs = (event['positionMs'] as num?)?.toInt() ?? 0;
+                final amp =
+                    ((event['amplitude'] as num?)?.toDouble() ?? 0.0).clamp(
+                      0.0,
+                      1.0,
+                    );
+                _lastAmplitude = amp;
+                _recordingTickController?.add((
+                  position: Duration(milliseconds: posMs),
+                  amplitude: amp,
+                ));
+              case 'playbackTick':
+                final posMs = (event['positionMs'] as num?)?.toInt() ?? 0;
+                final durMs = (event['durationMs'] as num?)?.toInt() ?? 0;
+                _playbackTickController?.add((
+                  position: Duration(milliseconds: posMs),
+                  totalDuration: Duration(milliseconds: durMs),
+                ));
+            }
+          });
 
       final result = await _channel.invokeMethod<bool>('initialize');
       _isInitialized = result ?? false;
@@ -82,14 +151,18 @@ class AudioEngineService {
     await cancelRecording();
     await stopPlayback();
 
-    _amplitudeTimer?.cancel();
-    _positionTimer?.cancel();
+    _playbackEventSubscription?.cancel();
+    _clockEventSubscription?.cancel();
 
-    await _amplitudeController?.close();
-    await _positionController?.close();
+    await _completionController?.close();
+    await _recordingTickController?.close();
+    await _playbackTickController?.close();
 
-    _amplitudeController = null;
-    _positionController = null;
+    _completionController = null;
+    _recordingTickController = null;
+    _playbackTickController = null;
+    _playbackEventSubscription = null;
+    _clockEventSubscription = null;
 
     _isInitialized = false;
   }
@@ -118,7 +191,7 @@ class AudioEngineService {
       if (result == true) {
         _isRecording = true;
         _isRecordingPaused = false;
-        _startAmplitudeUpdates();
+        // Nessun timer Dart — i tick arrivano via clock_events EventChannel
       }
 
       return result ?? false;
@@ -135,7 +208,7 @@ class AudioEngineService {
       final result = await _channel.invokeMethod<bool>('pauseRecording');
       if (result == true) {
         _isRecordingPaused = true;
-        _stopAmplitudeUpdates();
+        // Nessun timer da fermare — il nativo smette di emettere recording tick
       }
       return result ?? false;
     } catch (e) {
@@ -151,7 +224,7 @@ class AudioEngineService {
       final result = await _channel.invokeMethod<bool>('resumeRecording');
       if (result == true) {
         _isRecordingPaused = false;
-        _startAmplitudeUpdates();
+        // Nessun timer da riavviare — il nativo riprende a emettere recording tick
       }
       return result ?? false;
     } catch (e) {
@@ -162,13 +235,10 @@ class AudioEngineService {
 
   /// Ferma la registrazione.
   /// Se [raw] è true, restituisce il WAV grezzo senza conversione al formato finale.
-  /// Usato da seek-and-resume per mantenere tutto in WAV fino alla conversione finale.
   Future<Map<String, dynamic>?> stopRecording({bool raw = false}) async {
     if (!_isRecording) return null;
 
     try {
-      _stopAmplitudeUpdates();
-
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'stopRecording',
         raw ? {'raw': true} : null,
@@ -188,7 +258,6 @@ class AudioEngineService {
   }
 
   /// Converte un file WAV al formato specificato (singola codifica).
-  /// Usato dopo seek-and-resume per la conversione finale unica.
   Future<Map<String, dynamic>?> convertAudio({
     required String wavPath,
     required String outputPath,
@@ -213,8 +282,6 @@ class AudioEngineService {
     if (!_isRecording && _currentRecordingPath == null) return true;
 
     try {
-      _stopAmplitudeUpdates();
-
       await _channel.invokeMethod<bool>('cancelRecording');
       _isRecording = false;
       _isRecordingPaused = false;
@@ -245,7 +312,7 @@ class AudioEngineService {
       if (result == true) {
         _isPlaying = true;
         _isPlaybackPaused = false;
-        _startPositionUpdates();
+        // Nessun timer Dart — i tick arrivano via clock_events EventChannel
       }
 
       return result ?? false;
@@ -259,8 +326,7 @@ class AudioEngineService {
     if (!_isPlaying) return true;
 
     try {
-      _stopPositionUpdates();
-
+      // Nessun timer Dart da fermare — il nativo ferma il DispatchSourceTimer
       await _channel.invokeMethod<bool>('stopPlayback');
       _isPlaying = false;
       _isPlaybackPaused = false;
@@ -280,7 +346,6 @@ class AudioEngineService {
       final result = await _channel.invokeMethod<bool>('pausePlayback');
       if (result == true) {
         _isPlaybackPaused = true;
-        _stopPositionUpdates();
       }
       return result ?? false;
     } catch (e) {
@@ -296,7 +361,6 @@ class AudioEngineService {
       final result = await _channel.invokeMethod<bool>('resumePlayback');
       if (result == true) {
         _isPlaybackPaused = false;
-        _startPositionUpdates();
       }
       return result ?? false;
     } catch (e) {
@@ -352,9 +416,7 @@ class AudioEngineService {
     }
   }
 
-  /// Interroga il layer nativo per sapere se il player sta ancora ripproducendo.
-  /// Usato per rilevare il completamento naturale del playback (Swift imposta
-  /// isPlaying = false nel completion callback di scheduleFile).
+  /// Interroga il layer nativo per sapere se il player sta ancora riproducendo.
   Future<bool> checkIsPlayingNative() async {
     try {
       return await _channel.invokeMethod<bool>('isPlaying') ?? false;
@@ -391,44 +453,5 @@ class AudioEngineService {
       print('AudioEngineService: Failed to set voice processing: $e');
       return false;
     }
-  }
-
-  void _startAmplitudeUpdates() {
-    _amplitudeTimer?.cancel();
-    _amplitudeTimer = Timer.periodic(const Duration(milliseconds: 50), (
-      _,
-    ) async {
-      if (_isRecording && !_isRecordingPaused) {
-        try {
-          final raw = await _channel.invokeMethod<double>('getAmplitude');
-          _amplitudeController?.add((raw ?? 0.0).clamp(0.0, 1.0));
-        } catch (_) {
-          _amplitudeController?.add(0.0);
-        }
-      }
-    });
-  }
-
-  void _stopAmplitudeUpdates() {
-    _amplitudeTimer?.cancel();
-    _amplitudeTimer = null;
-    _amplitudeController?.add(0.0);
-  }
-
-  void _startPositionUpdates() {
-    _positionTimer?.cancel();
-    _positionTimer = Timer.periodic(const Duration(milliseconds: 100), (
-      _,
-    ) async {
-      if (_isPlaying && !_isPlaybackPaused) {
-        final position = await getPlaybackPosition();
-        _positionController?.add(position);
-      }
-    });
-  }
-
-  void _stopPositionUpdates() {
-    _positionTimer?.cancel();
-    _positionTimer = null;
   }
 }

@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "bcccd8586bf34956",
+        "id": "bd2b302e7b4a7f9a",
         "type": "tabs",
         "children": [
           {
-            "id": "1146198b2dec9703",
+            "id": "80fee6cdb3ebc1b1",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -163,8 +163,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -177,23 +176,30 @@
       "bases:Create new base": false
     }
   },
-  "active": "3ff66f1c75664c7f",
+  "active": "80fee6cdb3ebc1b1",
   "lastOpenFiles": [
-    "log/sessions/2026-04-13-verifica-stophook.md",
-    "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain-2.md",
+    "log/sessions/2026-04-14-audio-clock-architecture.md",
+    "project/adr/2026-04-14-audio-clock-push-based.md",
+    "log/sessions/2026-04-14-correzione-bug-anteprima-playback.md",
+    "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
+    "Untitled.canvas",
+    "project/adr/YYYY-MM-DD-titolo.md",
+    "templates/session.md",
+    "project/CLAUDE.md",
+    "project/features.md",
+    "log/sessions/2026-04-14-playback-logic-fixes.md",
+    "project/tech-debt.md",
+    "_index.md",
+    "templates/adr.md",
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain-1.md",
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain.md",
+    "log/sessions/2026-04-13-verifica-stophook.md",
+    "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain-2.md",
     "log/sessions/2026-04-13-controlla-perche-il-device-non-sta-regis.md",
     "Untitled.base",
     "X.base",
     "Untitled 1.base",
     "Welcome.md",
-    "templates/session.md",
-    "templates/adr.md",
-    "project/tech-debt.md",
-    "project/features.md",
-    "project/CLAUDE.md",
-    "_index.md",
     "log/daily",
     "log/sessions",
     "project/adr",

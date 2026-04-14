@@ -1,18 +1,4 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /Users/amedeosaadmichel/.claude/hooks/save_session_to_obsidian.py",
-            "async": true
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "WebSearch",
@@ -51,7 +37,13 @@
       "Bash(curl:*)",
       "Bash(mcp-obsidian /Users/amedeosaadmichel/Documents/GitHub/wavnote/Wavnotes_brain)",
       "Bash(node:*)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(pandoc --version)",
+      "Bash(python3 -c \"import fpdf2\")",
+      "Bash(python3 -c \"import fpdf\")",
+      "Bash(python3 -c \"import reportlab\")",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -c \"from fpdf import FPDF; print\\('ok'\\)\")"
     ],
     "deny": [],
     "ask": []
@@ -60,5 +52,19 @@
     "obsidian",
     "filesystem",
     "git"
-  ]
+  ],
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/amedeosaadmichel/.claude/hooks/save_session_to_obsidian.py",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
 }

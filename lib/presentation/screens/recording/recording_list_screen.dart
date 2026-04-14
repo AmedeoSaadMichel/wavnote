@@ -373,6 +373,18 @@ class _RecordingListScreenState extends State<RecordingListScreen>
   /// Build recording bottom sheet
   Widget _buildRecordingBottomSheet(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
+      buildWhen: (prev, curr) {
+        // Per RecordingPaused: ricostruisci solo quando cambiano le proprietà
+        // rilevanti per il bottom sheet (preview, seek, durata).
+        // Evita rebuild inutili su altri campi (title, format, ecc.)
+        if (prev is RecordingPaused && curr is RecordingPaused) {
+          return prev.isPlayingPreview != curr.isPlayingPreview ||
+              prev.seekBarIndex != curr.seekBarIndex ||
+              prev.duration != curr.duration;
+        }
+        // Negli altri casi ricostruisci sempre (cambio tipo stato, recording in progress, ecc.)
+        return true;
+      },
       builder: (context, recordingState) {
         final isRecording = recordingState.isRecording;
         final isPaused = recordingState is RecordingPaused;
@@ -395,6 +407,10 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         final blocSeekBarIndex = recordingState is RecordingPaused
             ? recordingState.seekBarIndex
             : null;
+
+        debugPrint(
+          '🎨 BottomSheet Builder - isPlayingPreview: $isPlayingPreview, blocSeekBarIndex: $blocSeekBarIndex, isPaused: $isPaused',
+        );
 
         final isOverwrite =
             recordingState is RecordingInProgress &&
@@ -423,8 +439,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           onResume: resumeRecording,
           onPlayFromPosition: playRecordingPreview,
           onStopPreview: stopRecordingPreview,
-          onRewind: rewindRecording,
-          onForward: forwardRecording,
           onSeekBarIndexChanged: updateSeekBarIndex,
           blocSeekBarIndex: blocSeekBarIndex,
           onPrepareToOverwrite: (seekBarIndex, waveData) {

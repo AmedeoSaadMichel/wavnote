@@ -77,59 +77,28 @@ class RecordPupilButton extends StatelessWidget {
   }
 }
 
-/// Controlli rewind/forward per la vista fullscreen in pausa.
-///
-/// Il bottone play è rimosso: è gestito dal pulsante principale circolare
-/// in RecordingFullscreenView (_buildActionButton).
-/// FullscreenActionButton e EyePausePainter rimossi: mai usati.
+/// Controlli playback per la vista fullscreen in pausa.
+/// Mostra solo il bottone Play/Stop centrale.
 class FullscreenPlaybackControls extends StatelessWidget {
-  final VoidCallback? onRewind;
   final VoidCallback? onPlay;
-  final VoidCallback? onForward;
   /// Se true, il bottone centrale mostra ⏹ stop invece di ▶ play.
   final bool isPlayingPreview;
 
   const FullscreenPlaybackControls({
     super.key,
-    this.onRewind,
     this.onPlay,
-    this.onForward,
     this.isPlayingPreview = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Flexible(
-          flex: 2,
-          child: _buildControlButton(
-            icon: Icons.replay_10,
-            onPressed: onRewind ?? () {},
-            title: 'Rewind',
-          ),
-        ),
-        const SizedBox(width: 10),
-        Flexible(
-          flex: 3,
-          child: _buildControlButton(
-            icon: isPlayingPreview ? Icons.stop : Icons.play_arrow,
-            onPressed: onPlay ?? () {},
-            title: isPlayingPreview ? 'Stop' : 'Play',
-            isLarge: true,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Flexible(
-          flex: 2,
-          child: _buildControlButton(
-            icon: Icons.forward_10,
-            onPressed: onForward ?? () {},
-            title: 'Forward',
-          ),
-        ),
-      ],
+    return Center(
+      child: _buildControlButton(
+        icon: isPlayingPreview ? Icons.stop : Icons.play_arrow,
+        onPressed: onPlay ?? () {},
+        title: isPlayingPreview ? 'Stop' : 'Play',
+        isLarge: true,
+      ),
     );
   }
 

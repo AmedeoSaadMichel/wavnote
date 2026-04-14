@@ -7,12 +7,12 @@
 | **Branch** | `nome-branch` |
 
 ## Task
-- [ ] Task 1
+- [ ] Task 1 (vedi [[project/features]])
 - [ ] Task 2
 
 ## Decisioni prese
 - **Decisione:** …
-  - Perché: …
+  - Perché: … (se pertinente vedi [[project/adr/YYYY-MM-DD-titolo]])
 
 ## File modificati
 | File | Tipo modifica |
@@ -22,5 +22,7 @@
 ## Next
 - [ ] Cosa fare nella prossima sessione
 
-## Tech debt aggiunto
-- (nessuno) oppure descrizione → aggiorna [[project/tech-debt]]
+## Stato Sistema
+- Modifiche documentate in: [[project/features]]
+- Tech debt: aggiornato in [[project/tech-debt]] (se applicabile)
+- Riferimento principale: [[_index]]
