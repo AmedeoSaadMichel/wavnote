@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "WavNote — iOS Simulator (iPhone 16e)",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "DFBB5C01-D12B-47E9-8071-080674EAFF54"],
+      "port": 9100
+    },
+    {
+      "name": "WavNote — macOS",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "macos"],
+      "port": 9101
+    },
+    {
+      "name": "OpenCode Session",
+      "runtimeExecutable": "zsh",
+      "runtimeArgs": ["opencode-session.sh"],
+      "port": 0
+    }
+  ]
+}

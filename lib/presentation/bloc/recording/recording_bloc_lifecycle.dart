@@ -50,6 +50,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       await _audioService.stopPlaying();
     }
 
+    // Pulisci il file preview se esiste
+    if (state is RecordingPaused) {
+      final pausedState = state as RecordingPaused;
+      if (pausedState.previewFilePath != null) {
+        try {
+          File(pausedState.previewFilePath!).deleteSync();
+        } catch (_) {}
+      }
+    }
+
     final s = state; // can be RecordingInProgress or RecordingPaused
 
     // Estrai le variabili necessarie
@@ -218,26 +228,40 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
     // Pausa normale (anche se c'è seekBasePath, mettiamo in pausa solo part2)
     final result = await _pauseRecordingUseCase.executePause();
-    result.fold(
-      (failure) => emit(RecordingError(failure.message)),
-      (duration) => emit(
-        RecordingPaused(
-          filePath: s.filePath,
-          folderId: s.folderId,
-          folderName: s.folderName,
-          title: s.title,
-          format: s.format,
-          sampleRate: s.sampleRate,
-          bitRate: s.bitRate,
-          duration: duration,
-          startTime: s.startTime,
-          seekBasePath: s.seekBasePath,
-          originalFilePathForOverwrite: s.originalFilePathForOverwrite,
-          overwriteStartTime: s.overwriteStartTime,
-          truncatedWaveData: s.truncatedWaveData,
-        ),
-      ),
+
+    // Estrai il valore dal Either senza usare closure async dentro fold
+    final Duration? duration = result.fold((_) => null, (d) => d);
+    if (duration == null) {
+      emit(
+        RecordingError(result.fold((f) => f.message, (_) => 'Unknown error')),
+      );
+      return;
+    }
+
+    // Crea uno stato Paused temporaneo per passarlo al helper
+    final pausedState = RecordingPaused(
+      filePath: s.filePath,
+      folderId: s.folderId,
+      folderName: s.folderName,
+      title: s.title,
+      format: s.format,
+      sampleRate: s.sampleRate,
+      bitRate: s.bitRate,
+      duration: duration,
+      startTime: s.startTime,
+      seekBasePath: s.seekBasePath,
+      originalFilePathForOverwrite: s.originalFilePathForOverwrite,
+      overwriteStartTime: s.overwriteStartTime,
+      truncatedWaveData: s.truncatedWaveData,
+      previewFilePath: null,
     );
+
+    // Assembla il preview una volta al pause e lo riutilizza per i playback successivi
+    final previewPath = await _assemblePreviewFile(pausedState);
+
+    if (emit.isDone) return;
+
+    emit(pausedState.copyWith(previewFilePath: previewPath));
   }
 
   Future<void> _onResumeRecording(
@@ -246,6 +270,14 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
+
+    // Pulisci il preview se esiste (non lo useremo più fino al prossimo pause)
+    if (s.previewFilePath != null) {
+      try {
+        File(s.previewFilePath!).deleteSync();
+      } catch (_) {}
+    }
+
     final result = await _pauseRecordingUseCase.executeResume();
     result.fold((failure) => emit(RecordingError(failure.message)), (duration) {
       emit(
@@ -330,34 +362,39 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     );
     debugPrint('▶️ ResumeWithAutoStop: State seekBarIndex=${s.seekBarIndex}');
 
-    // 3. Se siamo alla fine, resume semplice; altrimenti, inizia overdub
+    // 3. Se siamo alla fine, resume; altrimenti, inizia overdub
     if (isAtEnd) {
-      // Resume semplice
-      final result = await _pauseRecordingUseCase.executeResume();
-      result.fold((failure) => emit(RecordingError(failure.message)), (
-        duration,
-      ) {
-        emit(
-          RecordingInProgress(
-            filePath: s.filePath,
-            folderId: s.folderId,
-            folderName: s.folderName,
-            format: s.format,
-            sampleRate: s.sampleRate,
-            bitRate: s.bitRate,
-            duration: duration,
-            amplitude: 0.0,
-            startTime: s.startTime,
-            title: s.title,
-            seekBasePath: s.seekBasePath,
-            originalFilePathForOverwrite: s.originalFilePathForOverwrite,
-            overwriteStartTime: s.overwriteStartTime,
-            truncatedWaveData: s.truncatedWaveData,
-          ),
-        );
-        _startAmplitudeUpdates();
-        _startDurationUpdates();
-      });
+      if (s.seekBasePath == null) {
+        // Case A: nessun overdub precedente — resume semplice del motore
+        final result = await _pauseRecordingUseCase.executeResume();
+        result.fold((failure) => emit(RecordingError(failure.message)), (
+          duration,
+        ) {
+          emit(
+            RecordingInProgress(
+              filePath: s.filePath,
+              folderId: s.folderId,
+              folderName: s.folderName,
+              format: s.format,
+              sampleRate: s.sampleRate,
+              bitRate: s.bitRate,
+              duration: duration,
+              amplitude: 0.0,
+              startTime: s.startTime,
+              title: s.title,
+              seekBasePath: null,
+              originalFilePathForOverwrite: null,
+              overwriteStartTime: null,
+              truncatedWaveData: null,
+            ),
+          );
+          _startAmplitudeUpdates();
+          _startDurationUpdates();
+        });
+      } else {
+        // Case B: c'è un overdub precedente — consolida e riparti dalla fine
+        await _continueFromEndAfterOverdub(event, emit, s);
+      }
     } else {
       // Inizia overdub (seek-and-resume)
       add(
@@ -369,6 +406,112 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     }
   }
 
+  /// Consolida il segmento overdub nel base file, poi avvia una nuova registrazione
+  /// dalla fine del file consolidato. Usato quando l'utente vuole continuare
+  /// a registrare dalla fine dopo aver fatto un overdub nel mezzo.
+  Future<void> _continueFromEndAfterOverdub(
+    ResumeWithAutoStop event,
+    Emitter<RecordingState> emit,
+    RecordingPaused s,
+  ) async {
+    emit(const RecordingStarting());
+
+    // 1. Stoppa/finalizza il segmento overdub corrente
+    final overdubEntity = await _audioService.stopRecording(raw: true);
+
+    final String consolidatedPath;
+    final Duration consolidatedDuration;
+
+    if (overdubEntity != null && overdubEntity.filePath.isNotEmpty) {
+      // 2a. Applica l'overdub al base file per ottenere il file consolidato
+      final tempPath =
+          "${s.originalFilePathForOverwrite ?? s.filePath}_merged_${DateTime.now().millisecondsSinceEpoch}.wav";
+
+      try {
+        await _trimmerService.overwriteAudioSegment(
+          originalPath: s.seekBasePath!,
+          insertionPath: overdubEntity.filePath,
+          startTime: s.overwriteStartTime ?? Duration.zero,
+          overwriteDuration: overdubEntity.duration,
+          outputPath: tempPath,
+          format: 'wav',
+        );
+
+        // Elimina i frammenti temporanei ora che sono stati uniti
+        try {
+          File(s.seekBasePath!).deleteSync();
+          File(overdubEntity.filePath).deleteSync();
+        } catch (_) {}
+
+        consolidatedPath = tempPath;
+        consolidatedDuration = await _audioService.getAudioDuration(tempPath);
+      } catch (e) {
+        emit(RecordingError('Errore consolidamento overdub: $e'));
+        return;
+      }
+    } else {
+      // 2b. Nessun segmento da consolidare — usa il seekBasePath direttamente
+      consolidatedPath = s.seekBasePath!;
+      consolidatedDuration = await _audioService.getAudioDuration(
+        consolidatedPath,
+      );
+    }
+
+    // 3. Avvia una nuova registrazione dalla fine del file consolidato
+    final newPath =
+        "${s.originalFilePathForOverwrite ?? s.filePath}_cont_${DateTime.now().millisecondsSinceEpoch}.wav";
+
+    final started = await _audioService.startRecording(
+      filePath: newPath,
+      format: s.format,
+      sampleRate: s.sampleRate,
+      bitRate: s.bitRate,
+    );
+
+    if (!started) {
+      emit(
+        const RecordingError('Impossibile avviare la registrazione dalla fine'),
+      );
+      return;
+    }
+
+    // 4. Emetti RecordingInProgress con:
+    //    - truncatedWaveData = waveform troncata alla durata reale del file consolidato.
+    //      event.waveData può contenere barre "in eccesso" se l'overdub precedente aveva
+    //      sbordato visivamente oltre la fine dell'audio fisico. Tronchiamo al numero
+    //      esatto di barre del file consolidato così UI e motore audio parlano la stessa lingua.
+    //    - overwriteStartTime = fine del file consolidato → _onStopRecording userà
+    //      overwriteAudioSegment che rileva isSimpleConcatenation e concatena in append.
+    final int consolidatedBars = (consolidatedDuration.inMilliseconds / 100)
+        .floor();
+    final List<double> alignedWaveData = event.waveData
+        .take(consolidatedBars)
+        .toList();
+
+    emit(
+      RecordingInProgress(
+        filePath: newPath,
+        folderId: s.folderId,
+        folderName: s.folderName,
+        format: s.format,
+        sampleRate: s.sampleRate,
+        bitRate: s.bitRate,
+        duration: Duration.zero,
+        amplitude: 0.0,
+        startTime: DateTime.now(),
+        title: s.title,
+        seekBasePath: consolidatedPath,
+        overwriteStartTime: consolidatedDuration,
+        originalFilePathForOverwrite:
+            s.originalFilePathForOverwrite ?? s.filePath,
+        truncatedWaveData:
+            alignedWaveData, // allineato all'audio fisico consolidato
+      ),
+    );
+    _startAmplitudeUpdates();
+    _startDurationUpdates();
+  }
+
   Future<void> _onStartOverwrite(
     StartOverwrite event,
     Emitter<RecordingState> emit,
@@ -376,6 +519,13 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
     emit(const RecordingStarting());
+
+    // Pulisci il preview pre-assemblato dal pause precedente
+    if (s.previewFilePath != null) {
+      try {
+        File(s.previewFilePath!).deleteSync();
+      } catch (_) {}
+    }
 
     // We want to OVERWRITE the current recording from the seek point.
     // 1. Dobbiamo fermare l'engine nel caso fosse attivo
@@ -476,6 +626,17 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       _previewCompletionSubscription?.cancel();
       _previewCompletionSubscription = null;
       if (await _audioService.isPlaying()) await _audioService.stopPlaying();
+
+      // Pulisci il file preview se esiste
+      if (state is RecordingPaused) {
+        final pausedState = state as RecordingPaused;
+        if (pausedState.previewFilePath != null) {
+          try {
+            File(pausedState.previewFilePath!).deleteSync();
+          } catch (_) {}
+        }
+      }
+
       await _audioService.cancelRecording();
       emit(const RecordingCancelled());
     } catch (e) {
@@ -568,63 +729,8 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final seekMs = s.seekBarIndex * 100;
     debugPrint('🔊 Play preview from bar ${s.seekBarIndex} (${seekMs}ms)');
 
-    String playbackPath = s.filePath;
-
-    // Se siamo in modalità overdub, l'audio completo è in s.seekBasePath + s.filePath
-    if (s.seekBasePath != null && s.originalFilePathForOverwrite != null) {
-      final tempPreviewPath =
-          "${s.originalFilePathForOverwrite}_preview_${DateTime.now().millisecondsSinceEpoch}.wav";
-
-      try {
-        // Distinguiamo tra:
-        // 1. Pause/Resume semplice: overwriteStartTime alla fine del base = CONCATENAZIONE
-        // 2. Seek and overwrite: overwriteStartTime nel mezzo = OVERWRITE
-
-        // Ottieni la durata reale del file base
-        final baseDuration = await _audioService.getAudioDuration(
-          s.seekBasePath!,
-        );
-        final baseDurationMs = baseDuration.inMilliseconds;
-
-        // È una semplice concatenazione se stiamo sovrascrivendo dalla fine del file base
-        // (cioè: overwriteStartTime == durata del file base)
-        final isSimpleConcatenation =
-            s.overwriteStartTime?.inMilliseconds == baseDurationMs;
-
-        if (isSimpleConcatenation) {
-          // Caso 1: Concatenazione semplice (pause/resume senza seek)
-          debugPrint(
-            '🔀 Preview: concatenazione semplice (base: ${baseDurationMs}ms + part2: ${s.duration.inMilliseconds}ms)',
-          );
-          await _trimmerService.concatenateAudio(
-            basePath: s.seekBasePath!,
-            appendPath: s.filePath,
-            outputPath: tempPreviewPath,
-            format: 'wav',
-          );
-        } else {
-          // Caso 2: Overwrite con seek (inserimento nel mezzo)
-          // La logica di inserimento (con o senza coda) è gestita nativamente da overwriteAudioSegment
-          // in modo da produrre lo stesso identico risultato di _onStopRecording.
-          debugPrint(
-            '✏️ Preview: overwrite da ${s.overwriteStartTime?.inMilliseconds ?? 0}ms, durata insert: ${s.duration.inMilliseconds}ms, base totale: ${baseDurationMs}ms',
-          );
-
-          await _trimmerService.overwriteAudioSegment(
-            originalPath: s.seekBasePath!,
-            insertionPath: s.filePath,
-            startTime: s.overwriteStartTime ?? Duration.zero,
-            overwriteDuration: s.duration,
-            outputPath: tempPreviewPath,
-            format: 'wav',
-          );
-        }
-        playbackPath = tempPreviewPath;
-      } catch (e) {
-        debugPrint('❌ Errore creazione preview unita: $e');
-        return;
-      }
-    }
+    // Usa il preview pre-assemblato al pause, o il file diretto se non in overdub
+    String playbackPath = s.previewFilePath ?? s.filePath;
 
     final initialPosition = seekMs > 0 ? Duration(milliseconds: seekMs) : null;
     final started = await _audioService.startPlaying(
@@ -692,9 +798,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       for (var f in files) {
         if (f.path.contains('_preview_') && f.path.endsWith('.wav')) {
           finalDuration = await _audioService.getAudioDuration(f.path);
-          if (event.isNaturalCompletion) {
-            finalSeekBarIndex = (finalDuration.inMilliseconds / 100).floor();
-          }
           f.deleteSync();
         }
       }
@@ -719,18 +822,72 @@ extension _RecordingBlocLifecycle on RecordingBloc {
               s.duration.inMilliseconds;
         }
       }
-      finalSeekBarIndex = (totalDurationMs / 100).floor().clamp(0, 999999);
-      // Aggiorna anche finalDuration così la duration dello stato viene propagata
-      // correttamente all'UI (necessario per il calcolo della durata totale in _seekLabel).
-      finalDuration = Duration(milliseconds: totalDurationMs);
+      // NON aggiornare finalDuration: s.duration deve rimanere la durata del
+      // segmento registrato. Impostarlo a totalDurationMs (= overwriteMs + s.duration)
+      // causerebbe un accumulo a ogni play (+overwriteMs ogni volta).
     }
 
     emit(
       s.copyWith(
         isPlayingPreview: false,
-        seekBarIndex: finalSeekBarIndex ?? s.seekBarIndex,
         duration: finalDuration ?? s.duration,
       ),
     );
+  }
+
+  /// Assembla il file di preview dal base file e dal segmento registrato.
+  /// Ritorna il path al file preview, o null se non in modalità overdub.
+  Future<String?> _assemblePreviewFile(RecordingPaused state) async {
+    if (state.seekBasePath == null ||
+        state.originalFilePathForOverwrite == null) {
+      return null;
+    }
+
+    final tempPreviewPath =
+        "${state.originalFilePathForOverwrite}_preview_${DateTime.now().millisecondsSinceEpoch}.wav";
+
+    try {
+      // Ottieni la durata reale del file base
+      final baseDuration = await _audioService.getAudioDuration(
+        state.seekBasePath!,
+      );
+      final baseDurationMs = baseDuration.inMilliseconds;
+
+      // È una semplice concatenazione se stiamo sovrascrivendo dalla fine del file base
+      final isSimpleConcatenation =
+          state.overwriteStartTime?.inMilliseconds == baseDurationMs;
+
+      if (isSimpleConcatenation) {
+        // Caso 1: Concatenazione semplice (pause/resume senza seek)
+        debugPrint(
+          '🔀 Preview assembly: concatenazione semplice (base: ${baseDurationMs}ms + part2: ${state.duration.inMilliseconds}ms)',
+        );
+        await _trimmerService.concatenateAudio(
+          basePath: state.seekBasePath!,
+          appendPath: state.filePath,
+          outputPath: tempPreviewPath,
+          format: 'wav',
+        );
+      } else {
+        // Caso 2: Overwrite con seek (inserimento nel mezzo)
+        debugPrint(
+          '✏️ Preview assembly: overwrite da ${state.overwriteStartTime?.inMilliseconds ?? 0}ms, durata insert: ${state.duration.inMilliseconds}ms',
+        );
+
+        await _trimmerService.overwriteAudioSegment(
+          originalPath: state.seekBasePath!,
+          insertionPath: state.filePath,
+          startTime: state.overwriteStartTime ?? Duration.zero,
+          overwriteDuration: state.duration,
+          outputPath: tempPreviewPath,
+          format: 'wav',
+        );
+      }
+
+      return tempPreviewPath;
+    } catch (e) {
+      debugPrint('❌ Errore assembly preview: $e');
+      return null;
+    }
   }
 }

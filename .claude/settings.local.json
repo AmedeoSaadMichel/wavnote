@@ -43,7 +43,8 @@
       "Bash(python3 -c \"import fpdf\")",
       "Bash(python3 -c \"import reportlab\")",
       "Bash(pip3 install:*)",
-      "Bash(python3 -c \"from fpdf import FPDF; print\\('ok'\\)\")"
+      "Bash(python3 -c \"from fpdf import FPDF; print\\('ok'\\)\")",
+      "Bash(grep -v \"^Analyzing\\\\|^$\")"
     ],
     "deny": [],
     "ask": []

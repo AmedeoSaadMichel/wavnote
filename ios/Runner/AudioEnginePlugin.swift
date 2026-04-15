@@ -95,6 +95,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private var isPaused = false
     private var isPlaying = false
     private var isPlaybackPaused = false
+    /// Flag impostata dal callback nativo quando l'audio fisicamente finisce.
+    /// Solo il timer può leggere questa flag e gestire il completamento.
+    private var playbackFinished = false
     /// Incrementato ad ogni nuova sessione di playback (startPlayback o seekTo).
     /// I completion handler confrontano la propria generazione con quella corrente:
     /// se diversa, il handler è orfano (da un vecchio segmento) e va ignorato.
@@ -837,6 +840,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let gen = playbackGeneration
             try engine.start()
             
+            // Reset della flag di completamento prima di iniziare il playback
+            self.playbackFinished = false
+            
             if let pos = position, pos > 0 {
                 let rawFramePosition = AVAudioFramePosition(Double(pos) / 1000.0 * sr)
                 let framePosition = min(rawFramePosition, file.length > 0 ? file.length - 1 : 0)
@@ -855,14 +861,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         guard let self = self, self.playbackEngine != nil else { return }
                         guard self.playbackGeneration == gen else { return }
                         
-                        let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
-                            guard self.playbackGeneration == gen else { return }
-                            self.logger.info("🔊 [NATIVE] Playback (segment) completion handler called.")
-                            self.isPlaying = false
-                            self.playbackStreamHandler.sendPlaybackComplete()
-                        }
+                        // Il callback nativo segnala solo al timer che il playback è finito.
+                        // Solo il timer può gestire il completamento effettivo.
+                        self.logger.debug("🔊 [NATIVE] Playback (segment) completion callback: signaling finished")
+                        self.playbackFinished = true
                     }
                 }
             } else {
@@ -872,14 +874,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         guard let self = self, self.playbackEngine != nil else { return }
                         guard self.playbackGeneration == gen else { return }
                         
-                        let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
-                            guard self.playbackGeneration == gen else { return }
-                            self.logger.info("🔊 [NATIVE] Playback (full file) completion handler called.")
-                            self.isPlaying = false
-                            self.playbackStreamHandler.sendPlaybackComplete()
-                        }
+                        // Il callback nativo segnala solo al timer che il playback è finito.
+                        // Solo il timer può gestire il completamento effettivo.
+                        self.logger.debug("🔊 [NATIVE] Playback (full file) completion callback: signaling finished")
+                        self.playbackFinished = true
                     }
                 }
             }
@@ -956,6 +954,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         playbackGeneration += 1
         let gen = playbackGeneration
         seekOffsetFrames = Int64(framePosition)
+        
+        // Reset della flag di completamento prima di iniziare il playback
+        self.playbackFinished = false
+        
         player.stop()
         
         player.scheduleSegment(file, startingFrame: framePosition, frameCount: frameCount, at: nil) { [weak self] in
@@ -963,14 +965,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 guard let self = self, self.playbackEngine != nil else { return }
                 guard self.playbackGeneration == gen else { return }
                 
-                let latency = self.playbackEngine?.outputNode.presentationLatency ?? 0.2
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + latency) {
-                    guard self.playbackGeneration == gen else { return }
-                    self.logger.info("🔊 [NATIVE] Playback (seek) completion handler called.")
-                    self.isPlaying = false
-                    self.playbackStreamHandler.sendPlaybackComplete()
-                }
+                // Il callback nativo segnala solo al timer che il playback è finito.
+                // Solo il timer può gestire il completamento effettivo.
+                self.logger.debug("🔊 [NATIVE] Playback (seek) completion callback: signaling finished")
+                self.playbackFinished = true
             }
         }
         
@@ -1017,12 +1015,18 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         }
     }
 
+    private var lastReportedFrames: Int64 = 0
+    private var stalledTicks: Int = 0
+
     // MARK: - Playback Clock
 
     /// Avvia il DispatchSourceTimer che emette playback tick ogni 100ms.
     /// La posizione è calcolata da lastRenderTime (sample-accurate).
+    /// Il timer è l'unica autorità per la posizione e il completamento del playback.
     private func startPlaybackClock() {
         stopPlaybackClock()
+        self.lastReportedFrames = 0
+        self.stalledTicks = 0
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
         timer.setEventHandler { [weak self] in
@@ -1041,6 +1045,31 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let totalFrames = self.seekOffsetFrames + renderedFrames
             let positionMs = Int(Double(totalFrames) / sampleRate * 1000)
             let durationMs = Int(Double(file.length) / sampleRate * 1000)
+            
+            if totalFrames == self.lastReportedFrames {
+                self.stalledTicks += 1
+            } else {
+                self.stalledTicks = 0
+            }
+            self.lastReportedFrames = totalFrames
+            
+            // Il timer è l'unica autorità per il completamento del playback.
+            // Attendiamo che il player frame arrivi alla fine, oppure che il callback
+            // sia scattato E il playerNode si sia fermato (stalledTicks > 2).
+            // Questo impedisce al timer di forzare la fine prematuramente causando salti UI,
+            // poiché il callback di scheduleFile scatta prima che l'audio sia fisicamente uscito.
+            let marginFrames = Int64(sampleRate * 0.1) // 100ms margin
+            if totalFrames >= file.length - marginFrames || (self.playbackFinished && self.stalledTicks > 2) {
+                // Tick finale con posizione esattamente alla fine
+                self.clockStreamHandler.sendPlaybackTick(positionMs: durationMs, durationMs: durationMs)
+                // Segnala il completamento
+                self.logger.info("🔊 [NATIVE] Playback completed via clock (position reached end or stalled after callback)")
+                self.isPlaying = false
+                self.stopPlaybackClock()
+                self.playbackStreamHandler.sendPlaybackComplete()
+                return
+            }
+            
             self.clockStreamHandler.sendPlaybackTick(positionMs: positionMs, durationMs: durationMs)
         }
         timer.resume()

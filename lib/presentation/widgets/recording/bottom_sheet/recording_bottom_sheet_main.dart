@@ -227,6 +227,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _futureBarsCount = _waveData.length - targetLength;
         if (_futureBarsCount < 0) _futureBarsCount = 0;
         _seekBarIndex = targetLength > 0 ? targetLength - 1 : 0;
+
+        // Continuazione dalla fine: futureBarsCount==0 significa che il seek era
+        // alla fine della waveform, non nel mezzo. In questo caso le nuove barre
+        // devono usare il colore base (segmento 0), non il colore overdub.
+        if (_futureBarsCount == 0) {
+          _currentSegment = 0;
+        }
       });
       _currentAmplitude = 0.0;
     }

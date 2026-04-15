@@ -194,6 +194,9 @@ class RecordingPaused extends RecordingState {
   final Duration? overwriteStartTime;
   final List<double>? truncatedWaveData;
 
+  /// File path del preview assemblato, riutilizzato per playback multipli.
+  final String? previewFilePath;
+
   const RecordingPaused({
     required this.filePath,
     this.folderId,
@@ -210,6 +213,7 @@ class RecordingPaused extends RecordingState {
     this.originalFilePathForOverwrite,
     this.overwriteStartTime,
     this.truncatedWaveData,
+    this.previewFilePath,
   });
 
   @override
@@ -229,6 +233,7 @@ class RecordingPaused extends RecordingState {
     originalFilePathForOverwrite,
     overwriteStartTime,
     truncatedWaveData,
+    previewFilePath,
   ];
 
   RecordingPaused copyWith({
@@ -247,6 +252,7 @@ class RecordingPaused extends RecordingState {
     String? originalFilePathForOverwrite,
     Duration? overwriteStartTime,
     List<double>? truncatedWaveData,
+    String? previewFilePath,
   }) {
     return RecordingPaused(
       filePath: filePath ?? this.filePath,
@@ -265,6 +271,7 @@ class RecordingPaused extends RecordingState {
           originalFilePathForOverwrite ?? this.originalFilePathForOverwrite,
       overwriteStartTime: overwriteStartTime ?? this.overwriteStartTime,
       truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
+      previewFilePath: previewFilePath ?? this.previewFilePath,
     );
   }
 }
