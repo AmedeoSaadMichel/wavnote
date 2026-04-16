@@ -6,8 +6,10 @@
 // Returns Either<Failure, RecordingEntity> following the canonical Either pattern
 // (CLAUDE.md). The BLoC consumes via result.fold(left, right).
 import 'dart:async';
+import 'dart:io';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as path;
 import '../../../core/enums/audio_format.dart';
 import '../../../core/errors/failures.dart';
 import '../../../domain/entities/recording_entity.dart';
@@ -166,12 +168,42 @@ class StopRecordingUseCase {
         newName = '$locationName ${highestNumber + 1}';
       }
 
-      debugPrint(
-        '📝 StopRecordingUseCase: Generated name: "$newName" (${matchingRecordings.length} existing)',
+      // Create updated recording with the new name and location
+      final recordingWithName = recording.copyWith(
+        name: newName,
+        locationName: locationName,
       );
 
-      // Create updated recording with the new name and location
-      return recording.copyWith(name: newName, locationName: locationName);
+      // --- File Rename Logic ---
+      try {
+        final oldFile = File(recording.filePath);
+        if (await oldFile.exists()) {
+          final directory = path.dirname(recording.filePath);
+          final fileExtension = path.extension(recording.filePath);
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+          final safeNewName = newName
+              .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+              .replaceAll(RegExp(r'\s+'), '_');
+
+          final newFileName = '${safeNewName}_$timestamp$fileExtension';
+          final newPath = path.join(directory, newFileName);
+
+          await oldFile.rename(newPath);
+          debugPrint('✅ StopRecordingUseCase: Renamed file to "$newPath"');
+          return recordingWithName.copyWith(filePath: newPath);
+        } else {
+          debugPrint(
+            '⚠️ StopRecordingUseCase: Original file not found, skipping rename. Path: ${recording.filePath}',
+          );
+          return recordingWithName;
+        }
+      } catch (e) {
+        debugPrint(
+          '❌ StopRecordingUseCase: Error renaming file, using original path. Error: $e',
+        );
+        return recordingWithName;
+      }
     } catch (e) {
       debugPrint(
         '❌ StopRecordingUseCase: Error generating location-based name: $e',
@@ -193,8 +225,9 @@ class StopRecordingUseCase {
       );
       // La durata viene CALCOLATA dalla lunghezza della waveform (100ms per punto)
       // per garantire la sincronizzazione con la visualizzazione
-      final durationFromWaveform =
-          Duration(milliseconds: waveformData.length * 100);
+      final durationFromWaveform = Duration(
+        milliseconds: waveformData.length * 100,
+      );
 
       return recording.copyWith(
         waveformData: waveformData,

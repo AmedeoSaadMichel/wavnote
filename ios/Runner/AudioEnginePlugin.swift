@@ -1060,10 +1060,11 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             // poiché il callback di scheduleFile scatta prima che l'audio sia fisicamente uscito.
             let marginFrames = Int64(sampleRate * 0.1) // 100ms margin
             if totalFrames >= file.length - marginFrames || (self.playbackFinished && self.stalledTicks > 2) {
-                // Tick finale con posizione esattamente alla fine
-                self.clockStreamHandler.sendPlaybackTick(positionMs: durationMs, durationMs: durationMs)
+                // Non forziamo più l'ultimo tick alla durata totale per evitare il salto visivo nella UI.
+                // Inviamo l'ultima posizione reale nota. La UI (Dart) si preoccuperà di gestire la fine.
+                self.clockStreamHandler.sendPlaybackTick(positionMs: positionMs, durationMs: durationMs)
                 // Segnala il completamento
-                self.logger.info("🔊 [NATIVE] Playback completed via clock (position reached end or stalled after callback)")
+                self.logger.info("🔊 [NATIVE] Playback completed via clock (position reached end or stalled after callback) at \(positionMs)ms")
                 self.isPlaying = false
                 self.stopPlaybackClock()
                 self.playbackStreamHandler.sendPlaybackComplete()

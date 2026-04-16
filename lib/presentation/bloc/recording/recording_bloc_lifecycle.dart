@@ -197,7 +197,36 @@ extension _RecordingBlocLifecycle on RecordingBloc {
               locationName: locationName,
             );
 
-        final saved = await _recordingRepository.createRecording(recording);
+        // Ora che abbiamo l'entità, rinominiamo il file fisico
+        // usando il nome finale calcolato.
+        final oldFile = File(finalOutputPath);
+        final directory = oldFile.parent.path;
+        final fileExtension = path.extension(finalOutputPath);
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+        final safeNewName = newName
+            .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+            .replaceAll(RegExp(r'\s+'), '_');
+
+        final newFileName = '${safeNewName}_$timestamp$fileExtension';
+        final newPath = path.join(directory, newFileName);
+
+        RecordingEntity finalRecording;
+
+        try {
+          await oldFile.rename(newPath);
+          debugPrint('✅ Renamed recording to: $newPath');
+          finalRecording = recording.copyWith(filePath: newPath);
+        } catch (e) {
+          debugPrint(
+            '⚠️ Could not rename recording file, using original path. Error: $e',
+          );
+          finalRecording = recording;
+        }
+
+        final saved = await _recordingRepository.createRecording(
+          finalRecording,
+        );
         emit(RecordingCompleted(recording: saved));
         _refreshFolderCounts();
       } catch (e) {

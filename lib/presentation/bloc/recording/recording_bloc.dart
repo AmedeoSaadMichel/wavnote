@@ -18,6 +18,7 @@ import 'dart:io';
 import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:equatable/equatable.dart';
+import 'package:path/path.dart' as path;
 
 // Domain imports
 import '../../../domain/entities/recording_entity.dart';

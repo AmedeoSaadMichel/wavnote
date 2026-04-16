@@ -13,6 +13,7 @@
 import 'dart:async';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/enums/audio_format.dart';
 import '../../../core/errors/failures.dart';
@@ -56,7 +57,7 @@ class StartRecordingUseCase {
       final title = _generateTempTitle();
 
       // 3. Create unique file path
-      final filePath = _buildFilePath(folderId, title, format);
+      final filePath = await _buildFilePath(folderId, title, format);
 
       // 4. Validate configuration
       final configError = _validateConfig(format, sampleRate, bitRate);
@@ -124,14 +125,30 @@ class StartRecordingUseCase {
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
-  String _buildFilePath(String folderId, String title, AudioFormat format) {
+  /// Costruisce un **percorso assoluto** univoco per il file di registrazione.
+  ///
+  /// Esempio: `/var/mobile/.../Documents/all_recordings/Recording_2026-04-15_23_00_1776286832823.m4a`
+  Future<String> _buildFilePath(
+    String folderId,
+    String title,
+    AudioFormat format,
+  ) async {
     final ts = DateTime.now().millisecondsSinceEpoch;
     final safe = title
         .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
         .replaceAll(RegExp(r'\s+'), '_');
     final name = safe.length > 50 ? safe.substring(0, 50) : safe;
     // fileExtension include già il dot (es. ".m4a") — non aggiungere un dot extra
-    return '$folderId/${name}_$ts${format.fileExtension}';
+    final relativePath = '$folderId/${name}_$ts${format.fileExtension}';
+    return _resolvePath(relativePath);
+  }
+
+  /// Risolve un path relativo al documents directory.
+  /// I path già assoluti (che iniziano con '/') vengono restituiti invariati.
+  Future<String> _resolvePath(String path) async {
+    if (path.startsWith('/')) return path;
+    final dir = await getApplicationDocumentsDirectory();
+    return '${dir.path}/$path';
   }
 
   String? _validateConfig(AudioFormat format, int sampleRate, int bitRate) {

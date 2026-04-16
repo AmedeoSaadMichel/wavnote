@@ -11,10 +11,14 @@
             "id": "80fee6cdb3ebc1b1",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "log/sessions/2026-04-14-overdub-unit-testing.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2026-04-14-overdub-unit-testing"
             }
           }
         ]
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "log/sessions/2026-04-14-overdub-unit-testing.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for 2026-04-14-overdub-unit-testing"
             }
           },
           {
@@ -163,7 +168,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -176,23 +181,23 @@
       "bases:Create new base": false
     }
   },
-  "active": "80fee6cdb3ebc1b1",
+  "active": "3ff66f1c75664c7f",
   "lastOpenFiles": [
+    "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
+    "log/sessions/2026-04-14-overdub-unit-testing.md",
+    "log/sessions/2026-04-14-playback-logic-fixes.md",
     "log/sessions/2026-04-15-fix-race-condition-playback.md",
-    "project/adr/YYYY-MM-DD-titolo.md",
     "_index.md",
-    "templates/session.md",
     "templates/adr.md",
+    "templates/session.md",
     "project/tech-debt.md",
     "project/features.md",
     "project/CLAUDE.md",
-    "log/sessions/2026-04-14-overdub-unit-testing.md",
+    "project/adr/YYYY-MM-DD-titolo.md",
     "log/sessions/2026-04-14-audio-clock-architecture.md",
     "project/adr/2026-04-14-audio-clock-push-based.md",
     "log/sessions/2026-04-14-correzione-bug-anteprima-playback.md",
-    "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
     "Untitled.canvas",
-    "log/sessions/2026-04-14-playback-logic-fixes.md",
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain-1.md",
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain.md",
     "log/sessions/2026-04-13-verifica-stophook.md",
