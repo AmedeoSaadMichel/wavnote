@@ -27,6 +27,8 @@ import '../domain/repositories/i_folder_repository.dart';
 import '../domain/repositories/i_location_repository.dart';
 import '../domain/repositories/i_recording_repository.dart';
 import '../domain/repositories/i_settings_repository.dart';
+import '../services/audio/audio_recorder_service.dart';
+import '../services/audio/audio_engine_service.dart';
 import '../services/audio/audio_service_coordinator.dart';
 import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
@@ -48,6 +50,13 @@ final GetIt sl = GetIt.instance;
 /// Safe to call multiple times (GetIt will not re-register).
 Future<void> setupDependencies() async {
   // ── Services ──────────────────────────────────────────────
+  if (!sl.isRegistered<AudioRecorderService>()) {
+    sl.registerLazySingleton<AudioRecorderService>(() => AudioRecorderService());
+  }
+  if (!sl.isRegistered<AudioEngineService>()) {
+    sl.registerLazySingleton<AudioEngineService>(() => AudioEngineService());
+  }
+
   if (!sl.isRegistered<IAudioServiceRepository>()) {
     sl.registerLazySingleton<IAudioServiceRepository>(
       () => AudioServiceCoordinator(),
@@ -111,22 +120,8 @@ Future<void> setupDependencies() async {
   }
 
   // ── Audio initialization ───────────────────────────────────
-  // Inizializza i servizi audio singleton (Engine e PreparationService)
-  final engineInitialized = await sl<IAudioPlaybackEngine>().initialize();
-  if (!engineInitialized) {
-    assert(false, 'AudioPlaybackEngine failed to initialize');
+  final audioInitialized = await sl<IAudioServiceRepository>().initialize();
+  if (!audioInitialized) {
+    assert(false, 'AudioServiceCoordinator failed to initialize');
   }
-  // Il PreparationService non necessita di una initialize esplicita al momento se è singleton.
-  // sl<IAudioPreparationService>().initialize(); // Se avesse un metodo initialize
-
-  // Il RecordingPlaybackCoordinator, essendo un factory, sarà inizializzato
-  // dalla schermata che lo richiede.
-
-  // TODO: Valutare la rimozione o la riorganizzazione di questa sezione
-  // Inizializzazione del vecchio AudioServiceCoordinator, potrebbe non essere più necessario per il playback
-  // final audioInitialized = await sl<IAudioServiceRepository>().initialize();
-  // if (!audioInitialized) {
-  //   // Non-fatal: app continues, recording will fail gracefully
-  //   assert(false, 'AudioServiceCoordinator failed to initialize');
-  // }
 }

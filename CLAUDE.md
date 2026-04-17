@@ -138,6 +138,64 @@ Questo ti permette di capire il contesto del progetto senza rileggere i file sor
 
 ---
 
+## LINEE GUIDA COMPORTAMENTALI (ridurre errori LLM comuni)
+
+> Queste linee guida privilegiano la cautela rispetto alla velocità. Per task banali, usa il giudizio.
+
+### 1. Pensa Prima di Scrivere Codice
+Non assumere. Non nascondere la confusione. Porta in superficie i trade-off.
+
+Prima di implementare:
+- Dichiara esplicitamente le tue assunzioni. Se incerto, chiedi.
+- Se esistono più interpretazioni, presentale — non scegliere in silenzio.
+- Se esiste un approccio più semplice, dillo. Contesta quando è giustificato.
+- Se qualcosa non è chiaro, fermati. Nomina cosa crea confusione. Chiedi.
+
+### 2. Semplicità Prima di Tutto
+Minimo codice che risolve il problema. Niente di speculativo.
+
+- Nessuna funzionalità oltre a quanto richiesto.
+- Nessuna astrazione per codice a uso singolo.
+- Nessuna "flessibilità" o "configurabilità" non richiesta.
+- Nessuna gestione degli errori per scenari impossibili.
+- Se scrivi 200 righe e potevano essere 50, riscrivi.
+
+Chiediti: "Un senior engineer direbbe che è troppo complicato?" Se sì, semplifica.
+
+### 3. Modifiche Chirurgiche
+Tocca solo ciò che devi. Pulisci solo il tuo casino.
+
+Quando modifichi codice esistente:
+- Non "migliorare" codice adiacente, commenti o formattazione.
+- Non refactorizzare cose che non sono rotte.
+- Rispetta lo stile esistente, anche se lo faresti diversamente.
+- Se noti codice morto non correlato, segnalalo — non eliminarlo.
+
+Quando le tue modifiche creano "orfani":
+- Rimuovi import/variabili/funzioni resi inutilizzati DALLE TUE modifiche.
+- Non rimuovere codice morto preesistente a meno che non venga richiesto.
+
+Test: ogni riga modificata deve ricondursi direttamente alla richiesta dell'utente.
+
+### 4. Esecuzione Orientata all'Obiettivo
+Definisci criteri di successo. Itera fino alla verifica.
+
+Trasforma i task in obiettivi verificabili:
+- "Aggiungi validazione" → "Scrivi test per input non validi, poi falli passare"
+- "Correggi il bug" → "Scrivi un test che lo riproduce, poi fallo passare"
+- "Refactorizza X" → "Assicurati che i test passino prima e dopo"
+
+Per task multi-step, dichiara un piano sintetico:
+```
+1. [Step] → verifica: [controllo]
+2. [Step] → verifica: [controllo]
+3. [Step] → verifica: [controllo]
+```
+
+Criteri di successo forti permettono di iterare autonomamente. Criteri deboli ("fallo funzionare") richiedono chiarimenti continui.
+
+---
+
 ## CONTESTO DEL PROGETTO
 
 **WavNote** è un'applicazione Flutter per memo vocali. L'app si concentra sulla creazione di un'esperienza user-friendly per la registrazione e l'organizzazione audio.

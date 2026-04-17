@@ -203,6 +203,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     if ((widget.isPlayingPreview || widget.isPaused) &&
         widget.blocSeekBarIndex != null &&
         widget.blocSeekBarIndex != _seekBarIndex) {
+      debugPrint(
+        '🎚️ BOTTOM SHEET sync local seek from $_seekBarIndex to bloc=${widget.blocSeekBarIndex} paused=${widget.isPaused} playingPreview=${widget.isPlayingPreview}',
+      );
       _seekBarIndex = widget.blocSeekBarIndex!;
     }
 
@@ -321,6 +324,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         } else {
           _seekBarIndex = _waveData.isNotEmpty ? _waveData.length - 1 : 0;
         }
+        debugPrint(
+          '⏸️ BOTTOM SHEET pause finalize elapsedMs=$finalElapsedMs finalExpectedBars=$finalExpectedBars recordedBars=$recordedBars remainingFutureBars=$remainingFutureBars localSeekBarIndex=$_seekBarIndex waveDataLength=${_waveData.length}',
+        );
         _sheetOffset = 1.0;
       });
       _seekTimeOffsetMs = 0;
@@ -566,6 +572,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   },
                   isPlayingPreview: widget.isPlayingPreview,
                   onSeekBarIndexChanged: (index) {
+                    debugPrint(
+                      '🎚️ BOTTOM SHEET onSeekBarIndexChanged local=$_seekBarIndex -> $index paused=${widget.isPaused} playingPreview=${widget.isPlayingPreview}',
+                    );
                     setState(() => _seekBarIndex = index);
                     widget.onSeekBarIndexChanged?.call(index);
                   },

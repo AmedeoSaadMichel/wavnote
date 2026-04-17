@@ -605,6 +605,10 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   void updateSeekBarIndex(int index) {
     final bloc = context.read<RecordingBloc>();
     if (bloc.state is RecordingPaused) {
+      final paused = bloc.state as RecordingPaused;
+      debugPrint(
+        '🎯 UI -> BLoC UpdateSeekBarIndex currentStateIndex=${paused.seekBarIndex} requested=$index isPlayingPreview=${paused.isPlayingPreview}',
+      );
       bloc.add(UpdateSeekBarIndex(seekBarIndex: index));
     }
   }

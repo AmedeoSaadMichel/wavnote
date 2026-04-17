@@ -138,6 +138,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
           0,
         );
       });
+      debugPrint(
+        '🌊 WAVEFORM pause align externalSeekBarIndex=${widget.externalSeekBarIndex} lastIndex=$lastIndex waveDataLength=${widget.waveData.length} spacing=${widget.spacing} totalBackDistance=${_totalBackDistance.dx}',
+      );
       return;
     }
 
@@ -165,6 +168,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
       setState(() {
         _totalBackDistance = Offset(targetDx, 0);
       });
+      debugPrint(
+        '🌊 WAVEFORM external seek sync old=${oldWidget.externalSeekBarIndex} new=${widget.externalSeekBarIndex} current=$_currentSeekBarIndex targetDx=$targetDx',
+      );
     }
 
     // Auto-follow end: durante la registrazione (non in pausa), se la waveform
@@ -203,7 +209,12 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   // ── Listener handlers (non partecipano alla gesture arena) ──────────────
   // Usare Listener invece di GestureDetector garantisce che i drag verticali
   // del parent (compact/expand sheet) non vengano mai bloccati.
-  void _onPointerDown(PointerDownEvent event) {}
+  void _onPointerDown(PointerDownEvent event) {
+    if (!widget.isPaused) return;
+    debugPrint(
+      '🌊 WAVEFORM pointerDown x=${event.position.dx.toStringAsFixed(1)} y=${event.position.dy.toStringAsFixed(1)} currentIndex=$_currentSeekBarIndex',
+    );
+  }
 
   void _onPointerMove(PointerMoveEvent event) {
     if (!widget.isPaused) return;
@@ -224,10 +235,18 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     setState(() {
       _totalBackDistance = Offset(newDx, 0);
     });
+    debugPrint(
+      '🌊 WAVEFORM pointerMove dx=${dx.toStringAsFixed(2)} newDx=${newDx.toStringAsFixed(2)} currentIndex=$_currentSeekBarIndex',
+    );
     widget.onSeekBarIndexChanged?.call(_currentSeekBarIndex);
   }
 
-  void _onPointerUp(PointerUpEvent event) {}
+  void _onPointerUp(PointerUpEvent event) {
+    if (!widget.isPaused) return;
+    debugPrint(
+      '🌊 WAVEFORM pointerUp x=${event.position.dx.toStringAsFixed(1)} y=${event.position.dy.toStringAsFixed(1)} currentIndex=$_currentSeekBarIndex',
+    );
+  }
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Called when waveform needs to scroll back (same as audio_waveforms library)

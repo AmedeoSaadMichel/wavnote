@@ -268,8 +268,38 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       return;
     }
 
-    // Se eravamo in overdub, la durata nativa del segmento è sufficiente
-    final finalSegmentDuration = nativeDuration;
+    // Calcolo seekBarIndex per la source of truth
+    int pausedSeekBarIndex = 0;
+    final int segmentDurationMs = nativeDuration.inMilliseconds;
+
+    if (s.seekBasePath == null) {
+      final bars = (segmentDurationMs / 100).floor();
+      pausedSeekBarIndex = bars > 0 ? bars - 1 : 0;
+      debugPrint(
+        '⏸️ PAUSE CALC [NORMAL] segmentDurationMs=$segmentDurationMs bars=$bars pausedSeekBarIndex=$pausedSeekBarIndex',
+      );
+    } else {
+      int baseDurationMs = 0;
+      try {
+        final baseDuration = await _audioService.getAudioDuration(
+          await AppFileUtils.resolve(s.seekBasePath!),
+        );
+        baseDurationMs = baseDuration.inMilliseconds;
+      } catch (_) {
+        // Fallback se il file base non è leggibile
+      }
+      final overwriteStartMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+      final totalDurationMs = [
+        baseDurationMs,
+        overwriteStartMs + segmentDurationMs,
+      ].reduce((a, b) => a > b ? a : b);
+
+      final bars = (totalDurationMs / 100).floor();
+      pausedSeekBarIndex = bars > 0 ? bars - 1 : 0;
+      debugPrint(
+        '⏸️ PAUSE CALC [OVERDUB] baseDurationMs=$baseDurationMs overwriteStartMs=$overwriteStartMs segmentDurationMs=$segmentDurationMs totalDurationMs=$totalDurationMs bars=$bars pausedSeekBarIndex=$pausedSeekBarIndex',
+      );
+    }
 
     final pausedState = RecordingPaused(
       filePath: s.filePath,
@@ -279,19 +309,23 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       format: s.format,
       sampleRate: s.sampleRate,
       bitRate: s.bitRate,
-      duration: finalSegmentDuration, // <-- Usa la durata nativa del segmento
+      duration: nativeDuration, // <-- Usa la durata nativa del segmento
       startTime: s.startTime,
       seekBasePath: s.seekBasePath,
       originalFilePathForOverwrite: s.originalFilePathForOverwrite,
       overwriteStartTime: s.overwriteStartTime,
       truncatedWaveData: s.truncatedWaveData,
       previewFilePath: null,
+      seekBarIndex: pausedSeekBarIndex, // <-- Passa l'indice calcolato
     );
 
     final previewPath = await _assemblePreviewFile(pausedState);
 
     if (emit.isDone) return;
 
+    debugPrint(
+      '⏸️ EMIT RecordingPaused durationMs=${pausedState.duration.inMilliseconds} seekBarIndex=${pausedState.seekBarIndex} seekBasePath=${pausedState.seekBasePath} overwriteStartMs=${pausedState.overwriteStartTime?.inMilliseconds}',
+    );
     emit(pausedState.copyWith(previewFilePath: previewPath));
   }
 
@@ -378,6 +412,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final totalBars = (totalDurationMs / 100).ceil();
     // Tolleranza ripristinata: circa 200 ms
     final isAtEnd = event.seekBarIndex >= totalBars - 2;
+    debugPrint(
+      '▶️ RESUME CHECK eventSeekBarIndex=${event.seekBarIndex} stateSeekBarIndex=${s.seekBarIndex} totalDurationMs=$totalDurationMs totalBars=$totalBars isAtEnd=$isAtEnd seekBasePath=${s.seekBasePath} overwriteStartMs=${s.overwriteStartTime?.inMilliseconds}',
+    );
 
     if (isAtEnd) {
       if (s.seekBasePath == null) {
@@ -583,6 +620,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           originalFilePathForOverwrite:
               s.originalFilePathForOverwrite ?? s.filePath,
           truncatedWaveData: truncatedWave,
+          waveformDataForPlayer: event.waveData,
         ),
       );
       _startAmplitudeUpdates();
@@ -765,7 +803,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final clampedIndex = event.seekBarIndex.clamp(0, maxIndex);
 
     if (s.seekBarIndex == clampedIndex) return;
-    debugPrint('📍 SeekBar → bar $clampedIndex (${clampedIndex * 100}ms)');
+    debugPrint(
+      '📍 SEEK UPDATE from=${s.seekBarIndex} requested=${event.seekBarIndex} clamped=$clampedIndex maxIndex=$maxIndex stopPreview=${event.stopPreview} isFromPlayback=${event.isFromPlayback} totalDurationMs=$totalDurationMs',
+    );
 
     if (s.isPlayingPreview) {
       if (event.stopPreview) {
