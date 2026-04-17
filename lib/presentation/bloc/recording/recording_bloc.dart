@@ -1,26 +1,13 @@
 // File: presentation/bloc/recording/recording_bloc.dart
-//
-// Recording BLoC - Presentation Layer
-// ====================================
-//
-// Central state management for audio recording in WavNote.
-// Implements BLoC pattern for clean separation between UI and business logic.
-//
-// This file contains: class declaration, constructor, close(), lifecycle helpers,
-// and trivial event handlers. Heavy handlers are split into part files to respect
-// the 500-line limit (CLAUDE.md):
-//
-//   recording_bloc_lifecycle.dart  — start/stop/pause/resume/cancel handlers
-//   recording_bloc_management.dart — load, delete, move, favorite, debug handlers
-
 import 'dart:async';
 import 'dart:io';
-import 'package:bloc/bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart'; // IMPORT FONDAMENTALE
 import 'package:flutter/foundation.dart';
 import 'package:equatable/equatable.dart';
 import 'package:path/path.dart' as path;
 
 // Domain imports
+import '../../../core/utils/app_file_utils.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/repositories/i_audio_service_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
@@ -45,9 +32,6 @@ part 'recording_bloc_lifecycle.dart';
 part 'recording_bloc_management.dart';
 
 /// BLoC responsible for managing audio recording state and operations.
-///
-/// Handles recording lifecycle, real-time updates, list management, and errors.
-/// Split across part files to stay within the 500-line limit.
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioServiceRepository _audioService;
   final IRecordingRepository _recordingRepository;
@@ -101,7 +85,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
              trimmerService: trimmerService ?? sl<IAudioTrimmerRepository>(),
            ),
        super(const RecordingInitial()) {
-    // Lifecycle handlers (recording_bloc_lifecycle.dart)
     on<StartRecording>(_onStartRecording);
     on<StopRecording>(_onStopRecording);
     on<PauseRecording>(_onPauseRecording);
@@ -113,15 +96,12 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<PlayRecordingPreview>(_onPlayRecordingPreview);
     on<StopRecordingPreview>(_onStopRecordingPreview);
 
-    // Real-time update handlers
     on<UpdateRecordingAmplitude>(_onUpdateRecordingAmplitude);
     on<UpdateRecordingDuration>(_onUpdateRecordingDuration);
 
-    // Permission handlers
     on<CheckRecordingPermissions>(_onCheckRecordingPermissions);
     on<RequestRecordingPermissions>(_onRequestRecordingPermissions);
 
-    // Management handlers (recording_bloc_management.dart)
     on<LoadRecordings>(_onLoadRecordings);
     on<ToggleEditMode>(_onToggleEditMode);
     on<ToggleRecordingSelection>(_onToggleRecordingSelection);
@@ -155,31 +135,29 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       try {
         await _audioService.dispose();
       } catch (e) {
-        print('⚠️ Error disposing audio service coordinator: $e');
+        debugPrint('⚠️ Error disposing audio service coordinator: $e');
       }
     }
 
     return super.close();
   }
 
-  // ==== INITIALIZATION ====
-
   Future<void> _initializeAudioService() async {
     try {
       final success = await _audioService.initialize();
-      if (!success) print('❌ Audio service initialization failed');
+      if (!success) debugPrint('❌ Audio service initialization failed');
     } catch (e) {
-      print('❌ Error initializing audio service: $e');
+      debugPrint('❌ Error initializing audio service: $e');
     }
   }
 
-  // ==== REAL-TIME UPDATE HANDLERS ====
-
+  // ==== HANDLERS (implementati nei part file) ====
   void _onUpdateRecordingAmplitude(
     UpdateRecordingAmplitude event,
     Emitter<RecordingState> emit,
   ) {
     if (state is RecordingInProgress) {
+      debugPrint('🔍 BLoC received amplitude: ${event.amplitude}');
       emit((state as RecordingInProgress).copyWith(amplitude: event.amplitude));
     }
   }
@@ -190,12 +168,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   ) {
     if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(duration: event.duration));
-    } else if (state is RecordingPaused) {
-      emit((state as RecordingPaused).copyWith(duration: event.duration));
     }
   }
-
-  // ==== PERMISSION HANDLERS ====
 
   Future<void> _onCheckRecordingPermissions(
     CheckRecordingPermissions event,
@@ -211,7 +185,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         ),
       );
     } catch (e) {
-      print('❌ Error checking permissions: $e');
+      debugPrint('❌ Error checking permissions: $e');
       emit(
         const RecordingPermissionStatus(
           hasMicrophonePermission: false,
@@ -244,7 +218,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
         );
       }
     } catch (e) {
-      print('❌ Error requesting permissions: $e');
+      debugPrint('❌ Error requesting permissions: $e');
       emit(
         const RecordingError(
           'Failed to request permissions',
@@ -253,8 +227,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       );
     }
   }
-
-  // ==== UI STATE HANDLERS ====
 
   void _onToggleEditMode(ToggleEditMode event, Emitter<RecordingState> emit) {
     if (state is RecordingLoaded) {
@@ -275,11 +247,10 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is RecordingLoaded) {
       final s = state as RecordingLoaded;
       final selected = Set<String>.from(s.selectedRecordings);
-      if (selected.contains(event.recordingId)) {
+      if (selected.contains(event.recordingId))
         selected.remove(event.recordingId);
-      } else {
+      else
         selected.add(event.recordingId);
-      }
       emit(s.copyWith(selectedRecordings: selected));
     }
   }
@@ -288,9 +259,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     ClearRecordingSelection event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingLoaded) {
+    if (state is RecordingLoaded)
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
-    }
   }
 
   void _onSelectAllRecordings(
@@ -309,44 +279,36 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     DeselectAllRecordings event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingLoaded) {
+    if (state is RecordingLoaded)
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
-    }
   }
 
   void _onUpdateRecordingTitle(
     UpdateRecordingTitle event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingInProgress) {
+    if (state is RecordingInProgress)
       emit((state as RecordingInProgress).copyWith(title: event.title));
-    }
   }
 
-  // ==== PRIVATE HELPERS ====
-
-  /// Risolve il titolo geolocalizzato in background dopo l'avvio della
-  /// registrazione, senza bloccare l'UI. Aggiorna lo stato via [UpdateRecordingTitle].
   Future<void> _refreshTitleInBackground() async {
     try {
       final loc = await _locationRepository.getRecordingLocationName();
-      if (loc.isNotEmpty && !isClosed && state is RecordingInProgress) {
+      if (loc.isNotEmpty && !isClosed && state is RecordingInProgress)
         add(UpdateRecordingTitle(title: loc));
-      }
     } catch (_) {}
   }
 
   void _refreshFolderCounts() {
-    if (_folderBloc != null && !isClosed) {
+    if (_folderBloc != null && !isClosed)
       _folderBloc!.add(const RefreshFolders());
-    }
   }
 
   void _startAmplitudeUpdates() {
     _amplitudeSubscription?.cancel();
     _amplitudeSubscription = _audioService.getRecordingAmplitudeStream().listen(
       (amplitude) => add(UpdateRecordingAmplitude(amplitude)),
-      onError: (e) => print('❌ Amplitude stream error: $e'),
+      onError: (e) => debugPrint('❌ Amplitude stream error: $e'),
     );
   }
 
@@ -356,17 +318,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     _durationSubscription?.cancel();
     _durationSubscription = _audioService.durationStream?.listen(
       (duration) => add(UpdateRecordingDuration(duration)),
-      onError: (e) => print('❌ Duration stream error: $e'),
+      onError: (e) => debugPrint('❌ Duration stream error: $e'),
     );
   }
 
-  void _stopDurationUpdates() {
-    _durationSubscription?.cancel();
-    _durationSubscription = null;
-  }
-
-  bool _needsReloadAfterFavoriteToggle(List<RecordingEntity> recordings) {
-    if (recordings.isEmpty) return false;
-    return recordings.map((r) => r.folderId).toSet().length > 1;
-  }
+  void _stopDurationUpdates() => _durationSubscription?.cancel();
 }
