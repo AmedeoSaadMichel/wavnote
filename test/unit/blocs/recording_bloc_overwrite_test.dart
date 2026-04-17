@@ -119,5 +119,56 @@ void main() {
             ),
       ],
     );
+
+    blocTest<RecordingBloc, RecordingState>(
+      'reproduces bug: waveformDataForPlayer is not truncated after overwrite',
+      build: () {
+        when(
+          () => mockAudio.stopRecording(raw: true),
+        ).thenAnswer((_) async => null);
+        when(
+          () => mockAudio.startRecording(
+            filePath: any(named: 'filePath'),
+            format: any(named: 'format'),
+            sampleRate: any(named: 'sampleRate'),
+            bitRate: any(named: 'bitRate'),
+          ),
+        ).thenAnswer((_) async => true);
+        return bloc;
+      },
+      // 1. Start with a 10-second recording (100 waveform points)
+      seed: () => RecordingPaused(
+        filePath: '/test/file.wav',
+        folderId: 'all',
+        duration: const Duration(seconds: 10),
+        startTime: DateTime.now(),
+        format: AudioFormat.wav,
+        sampleRate: 44100,
+        bitRate: 128000,
+      ),
+      // 2. Seek back to 2s and start overwriting
+      act: (b) => b.add(
+        StartOverwrite(
+          seekBarIndex: 20, // 2 seconds
+          waveData: List.generate(100, (i) => i / 100.0), // 10s of data
+        ),
+      ),
+      expect: () => [
+        const RecordingStarting(),
+        isA<RecordingInProgress>()
+            // 3. Assert that the internal data is correctly truncated
+            .having(
+              (s) => s.truncatedWaveData?.length,
+              'truncatedWaveData length',
+              21, // take(20 + 1)
+            )
+            // 4. Assert that the UI data is NOT truncated (THIS IS THE BUG)
+            .having(
+              (s) => s.waveformDataForPlayer?.length,
+              'waveformDataForPlayer length',
+              100,
+            ),
+      ],
+    );
   });
 }

@@ -1,6 +1,8 @@
 // File: presentation/screens/recording/recording_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+
 import '../../../domain/entities/folder_entity.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../domain/entities/recording_entity.dart';
@@ -12,11 +14,15 @@ import '../../widgets/recording/recording_card/recording_card.dart';
 import '../../widgets/recording/recording_list_header.dart';
 import '../../widgets/recording/pull_to_search_list.dart';
 import '../../widgets/common/skeleton_screen.dart';
-import '../../../services/audio/audio_player_service.dart';
+// import '../../../services/audio/audio_player_service.dart'; // Rimosso o commentato
 import 'recording_list_logic.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_router.dart';
-import '../../../core/utils/performance_logger.dart';
+// import '../../../core/utils/performance_logger.dart'; // Rimosso: import non utilizzato
+
+// Nuovi import per il playback
+import 'controllers/recording_playback_coordinator.dart';
+import 'controllers/recording_playback_view_state.dart';
 
 /// Recording List Screen with Single AudioPlayer Architecture
 ///
@@ -36,29 +42,31 @@ class RecordingListScreen extends StatefulWidget {
 
 class _RecordingListScreenState extends State<RecordingListScreen>
     with RecordingListLogic {
+  // Ottieni il coordinator tramite GetIt
+  late final RecordingPlaybackCoordinator _playbackCoordinator;
+
   @override
   FolderEntity get folder => widget.folder;
 
-  AudioPlayerService get audioPlayerService => AudioPlayerService.instance;
+  /// Contatore che si incrementa ad ogni fine registrazione.
+  /// Serve come Key per forzare la distruzione del widget Waveform
+  /// ed evitare che l'interfaccia ricicli vecchi dati residui.
+  int _sessionCounter = 0;
 
   @override
   void initState() {
     super.initState();
+    _playbackCoordinator = GetIt.I<RecordingPlaybackCoordinator>();
+    // Inizializza il coordinator (ora è idempotente)
+    _playbackCoordinator.initialize();
     // Clean architecture: Single loading point via initializeRecordingList
     initializeRecordingList();
   }
 
   @override
   void dispose() {
-    // Clear any callbacks to prevent setState after dispose
-    try {
-      audioPlayerService.setExpansionCallback(null);
-      print('🔧 Cleared audio service expansion callback');
-    } catch (e) {
-      print('⚠️ Error clearing audio service callback: $e');
-    }
-
-    // AudioPlayerService is a singleton, don't dispose it here
+    _playbackCoordinator
+        .dispose(); // Dispone il coordinator quando la screen muore (corretto per factory)
     super.dispose();
   }
 
@@ -87,12 +95,38 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     );
   }
 
+  // Sovrascrivi i metodi di RecordingListLogic per delegare al coordinator
+  @override
+  Future<void> expandRecording(RecordingEntity recording) async {
+    await _playbackCoordinator.expandRecording(recording);
+  }
+
+  @override
+  Future<void> togglePlayback() async {
+    await _playbackCoordinator.togglePlayback();
+  }
+
+  @override
+  void seekToPosition(double percent) {
+    _playbackCoordinator.seekToPercent(percent);
+  }
+
+  @override
+  void skipBackward() {
+    _playbackCoordinator.skipBackward();
+  }
+
+  @override
+  void skipForward() {
+    _playbackCoordinator.skipForward();
+  }
+
   @override
   Widget build(BuildContext context) {
     print(
       '🏗️ VERBOSE: RecordingListScreen build() called for folder: ${widget.folder.name}',
     );
-    PerformanceLogger.logRebuild('RecordingListScreen');
+    // PerformanceLogger.logRebuild('RecordingListScreen'); // Commentato o rimosso se PerformanceLogger non serve più
     return MultiBlocListener(
       listeners: [
         BlocListener<RecordingBloc, RecordingState>(
@@ -232,28 +266,23 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           }
         }
 
-        PerformanceLogger.logRebuild('_buildRecordingsList');
+        // PerformanceLogger.logRebuild('_buildRecordingsList'); // Commentato o rimosso se PerformanceLogger non serve più
 
-        // OPTIMIZATION: Eliminate skeleton for RecordingInitial state completely
-        // Only show skeleton for RecordingLoading if it takes too long
         if (state is RecordingLoaded && state.recordings.isNotEmpty) {
           print('🚀 FAST PATH: Showing content immediately');
           final filteredRecordings = filterRecordings(state.recordings);
           return _buildRecordingContent(filteredRecordings, state);
         }
 
-        // CRITICAL OPTIMIZATION: Skip skeleton for RecordingInitial - our immediate loading should prevent this
         if (state is RecordingLoading) {
           print('🟡 MINIMAL: Brief loading state, showing minimal skeleton');
           return RecordingListSkeleton(folderName: widget.folder.name);
         }
 
-        // OPTIMIZATION: RecordingInitial should never show skeleton - immediate loading prevents this
         if (state is RecordingInitial) {
           print(
             '⚠️ UNEXPECTED: RecordingInitial state reached - should be bypassed by immediate loading',
           );
-          // Return empty container instead of skeleton to avoid unnecessary builds
           return const SizedBox.shrink();
         }
 
@@ -264,7 +293,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           final filteredRecordings = filterRecordings(state.recordings);
 
           if (state.recordings.isEmpty) {
-            // Don't show "No recordings yet" when recording is active
             final recordingBloc = context.read<RecordingBloc>();
             final currentState = recordingBloc.state;
             if (currentState.isRecording) {
@@ -308,44 +336,60 @@ class _RecordingListScreenState extends State<RecordingListScreen>
                 : null,
             itemBuilder: (context, index) {
               final recording = filteredRecordings[index];
-              final isExpanded =
-                  audioPlayerService.expandedRecordingId == recording.id;
-              print(
-                '🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded',
-              );
-              print('🔍 UI: Card favorite status: ${recording.isFavorite}');
-              return RecordingCard(
-                recording: recording,
-                isExpanded: isExpanded,
-                onTap: () => expandRecording(recording),
-                onShowWaveform: () {},
-                onDelete: () => deleteRecording(recording),
-                onMoveToFolder: () => moveRecordingToFolder(recording),
-                onMoreActions: () => showMoreActions(recording),
-                onRestore: () => restoreRecording(recording),
-                onToggleFavorite: () => toggleFavoriteRecording(recording),
-                audioStateManager: isExpanded
-                    ? audioPlayerService.audioState
-                    : null,
-                isPlaying: isExpanded
-                    ? audioPlayerService.isCurrentlyPlaying
-                    : false,
-                isLoading: isExpanded ? audioPlayerService.isLoading : false,
-                currentPosition: isExpanded
-                    ? audioPlayerService.position
-                    : Duration.zero,
-                actualDuration: isExpanded ? audioPlayerService.duration : null,
-                onPlayPause: togglePlayback,
-                onSeek: seekToPosition,
-                onSkipBackward: skipBackward,
-                onSkipForward: skipForward,
-                currentFolderId: widget.folder.id,
-                folderNames: folderNames,
-                isEditMode: state.isEditMode,
-                isSelected: state.selectedRecordings.contains(recording.id),
-                onSelectionToggle: () => context.read<RecordingBloc>().add(
-                  ToggleRecordingSelection(recordingId: recording.id),
-                ),
+
+              // Utilizza ValueListenableBuilder per ricostruire solo la RecordingCard
+              // quando lo stato di playback cambia, senza ricostruire l'intera lista.
+              return ValueListenableBuilder<RecordingPlaybackViewState>(
+                valueListenable: _playbackCoordinator.state,
+                builder: (context, playbackState, child) {
+                  final isExpanded =
+                      playbackState.expandedRecordingId == recording.id;
+                  final isActiveRecording =
+                      playbackState.activeRecordingId == recording.id;
+
+                  print(
+                    '🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${playbackState.expandedRecordingId}, isExpanded: $isExpanded, isActive: $isActiveRecording',
+                  );
+                  print('🔍 UI: Card favorite status: ${recording.isFavorite}');
+
+                  return RecordingCard(
+                    recording: recording,
+                    isExpanded: isExpanded,
+                    onTap: () => expandRecording(recording),
+                    onShowWaveform: () {},
+                    onDelete: () => deleteRecording(recording),
+                    onMoveToFolder: () => moveRecordingToFolder(recording),
+                    onMoreActions: () => showMoreActions(recording),
+                    onRestore: () => restoreRecording(recording),
+                    onToggleFavorite: () => toggleFavoriteRecording(recording),
+                    // audioStateManager: isExpanded
+                    //     ? audioPlayerService.audioState
+                    //     : null, // AudioStateManager non è più usato qui
+                    isPlaying: isActiveRecording
+                        ? playbackState.isPlaying
+                        : false,
+                    isLoading: isActiveRecording
+                        ? playbackState.isLoading
+                        : false,
+                    currentPosition: isActiveRecording
+                        ? playbackState.position
+                        : Duration.zero,
+                    actualDuration: isActiveRecording
+                        ? playbackState.duration
+                        : null,
+                    onPlayPause: togglePlayback,
+                    onSeek: seekToPosition,
+                    onSkipBackward: skipBackward,
+                    onSkipForward: skipForward,
+                    currentFolderId: widget.folder.id,
+                    folderNames: folderNames,
+                    isEditMode: state.isEditMode,
+                    isSelected: state.selectedRecordings.contains(recording.id),
+                    onSelectionToggle: () => context.read<RecordingBloc>().add(
+                      ToggleRecordingSelection(recordingId: recording.id),
+                    ),
+                  );
+                },
               );
             },
           );
@@ -361,7 +405,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           );
         }
 
-        // Default fallback for any other states
         print('🔴 VERBOSE: FALLBACK - Unhandled state: ${state.runtimeType}');
         print('🔴 VERBOSE: State details: $state');
         print('🔴 VERBOSE: Returning fallback RecordingListSkeleton');
@@ -404,6 +447,7 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         final truncatedWaveData = recordingState is RecordingInProgress
             ? recordingState.truncatedWaveData
             : null;
+        // Rimosso cast non necessario: final blocSeekBarIndex = recordingState is RecordingPaused ? recordingState.seekBarIndex : null;
         final blocSeekBarIndex = recordingState is RecordingPaused
             ? recordingState.seekBarIndex
             : null;
@@ -434,7 +478,15 @@ class _RecordingListScreenState extends State<RecordingListScreen>
             );
           },
           onPause: pauseRecording,
-          onDone: finishRecording,
+          onDone: () {
+            // Finiamo la registrazione e incrementiamo il contatore per
+            // segnalare a Flutter di non riciclare il widget Waveform
+            // alla prossima sessione.
+            setState(() {
+              _sessionCounter++;
+            });
+            finishRecording();
+          },
           onChat: showTranscriptOptions,
           onResume: resumeRecording,
           onPlayFromPosition: playRecordingPreview,
@@ -446,6 +498,7 @@ class _RecordingListScreenState extends State<RecordingListScreen>
               StartOverwrite(seekBarIndex: seekBarIndex, waveData: waveData),
             );
           },
+          sessionCounter: _sessionCounter,
         );
       },
     );
@@ -457,7 +510,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     RecordingLoaded state,
   ) {
     if (state.recordings.isEmpty) {
-      // Don't show "No recordings yet" when recording is active
       final recordingBloc = context.read<RecordingBloc>();
       final currentState = recordingBloc.state;
       if (currentState.isRecording) {
@@ -494,40 +546,52 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           : null,
       itemBuilder: (context, index) {
         final recording = filteredRecordings[index];
-        final isExpanded =
-            audioPlayerService.expandedRecordingId == recording.id;
-        print(
-          '🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${audioPlayerService.expandedRecordingId}, isExpanded: $isExpanded',
-        );
-        print('🔍 UI: Card favorite status: ${recording.isFavorite}');
-        return RecordingCard(
-          recording: recording,
-          isExpanded: isExpanded,
-          onTap: () => expandRecording(recording),
-          onShowWaveform: () {},
-          onDelete: () => deleteRecording(recording),
-          onMoveToFolder: () => moveRecordingToFolder(recording),
-          onMoreActions: () => showMoreActions(recording),
-          onRestore: () => restoreRecording(recording),
-          onToggleFavorite: () => toggleFavoriteRecording(recording),
-          audioStateManager: isExpanded ? audioPlayerService.audioState : null,
-          isPlaying: isExpanded ? audioPlayerService.isCurrentlyPlaying : false,
-          isLoading: isExpanded ? audioPlayerService.isLoading : false,
-          currentPosition: isExpanded
-              ? audioPlayerService.position
-              : Duration.zero,
-          actualDuration: isExpanded ? audioPlayerService.duration : null,
-          onPlayPause: togglePlayback,
-          onSeek: seekToPosition,
-          onSkipBackward: skipBackward,
-          onSkipForward: skipForward,
-          currentFolderId: widget.folder.id,
-          folderNames: folderNames,
-          isEditMode: state.isEditMode,
-          isSelected: state.selectedRecordings.contains(recording.id),
-          onSelectionToggle: () => context.read<RecordingBloc>().add(
-            ToggleRecordingSelection(recordingId: recording.id),
-          ),
+
+        return ValueListenableBuilder<RecordingPlaybackViewState>(
+          valueListenable: _playbackCoordinator.state,
+          builder: (context, playbackState, child) {
+            final isExpanded =
+                playbackState.expandedRecordingId == recording.id;
+            final isActiveRecording =
+                playbackState.activeRecordingId == recording.id;
+
+            print(
+              '🔍 UI: Building card for ${recording.name} (ID: ${recording.id}), expandedId: ${playbackState.expandedRecordingId}, isExpanded: $isExpanded, isActive: $isActiveRecording',
+            );
+            print('🔍 UI: Card favorite status: ${recording.isFavorite}');
+
+            return RecordingCard(
+              recording: recording,
+              isExpanded: isExpanded,
+              onTap: () => expandRecording(recording),
+              onShowWaveform: () {},
+              onDelete: () => deleteRecording(recording),
+              onMoveToFolder: () => moveRecordingToFolder(recording),
+              onMoreActions: () => showMoreActions(recording),
+              onRestore: () => restoreRecording(recording),
+              onToggleFavorite: () => toggleFavoriteRecording(recording),
+              // audioStateManager: isExpanded
+              //     ? audioPlayerService.audioState
+              //     : null, // AudioStateManager non è più usato qui
+              isPlaying: isActiveRecording ? playbackState.isPlaying : false,
+              isLoading: isActiveRecording ? playbackState.isLoading : false,
+              currentPosition: isActiveRecording
+                  ? playbackState.position
+                  : Duration.zero,
+              actualDuration: isActiveRecording ? playbackState.duration : null,
+              onPlayPause: togglePlayback,
+              onSeek: seekToPosition,
+              onSkipBackward: skipBackward,
+              onSkipForward: skipForward,
+              currentFolderId: widget.folder.id,
+              folderNames: folderNames,
+              isEditMode: state.isEditMode,
+              isSelected: state.selectedRecordings.contains(recording.id),
+              onSelectionToggle: () => context.read<RecordingBloc>().add(
+                ToggleRecordingSelection(recordingId: recording.id),
+              ),
+            );
+          },
         );
       },
     );
@@ -550,7 +614,7 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    PerformanceLogger.logRebuild('_RecordingListHeaderWrapper');
+    // PerformanceLogger.logRebuild('_RecordingListHeaderWrapper'); // Commentato o rimosso se PerformanceLogger non serve più
     return RecordingListHeader(
       folderName: folder.name,
       onBack: onBack,

@@ -1,20 +1,20 @@
 // File: services/file/file_manager_service.dart
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // Import corretto per debugPrint
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import '../../core/enums/audio_format.dart';
+import '../../core/errors/exceptions.dart';
+import '../../core/errors/failure_types/data_failures.dart';
 
-/// Cosmic File Manager Service - Universal File Operations
+/// File Manager Service - Universal File Operations
 ///
-/// Handles all file system operations in the cosmic realm including:
-/// - File creation, copying, moving, and deletion with ethereal precision
-/// - Directory management with mystical organization
-/// - File validation and integrity checking with divine wisdom
-/// - Storage management and cleanup with cosmic efficiency
-/// - Backup and recovery operations with universal safety
-/// - Atomic operations with transcendent reliability
+/// Handles all file system operations including:
+/// - File creation, copying, moving, and deletion
+/// - Directory management
+/// - File validation and integrity checking
+/// - Storage management and cleanup
 class FileManagerService {
-
   // Default folder structure
   static const String _recordingsFolder = 'recordings';
   static const String _tempFolder = 'temp';
@@ -27,7 +27,11 @@ class FileManagerService {
     try {
       return await getApplicationDocumentsDirectory();
     } catch (e) {
-      throw Exception('Failed to access cosmic documents directory');
+      throw FileSystemException(
+        message: 'Failed to access application documents directory',
+        errorType: FileSystemErrorType.accessDenied,
+        originalError: e,
+      );
     }
   }
 
@@ -35,7 +39,9 @@ class FileManagerService {
   Future<Directory> getRecordingsDirectory() async {
     try {
       final appDir = await getAppDocumentsDirectory();
-      final recordingsDir = Directory(path.join(appDir.path, _recordingsFolder));
+      final recordingsDir = Directory(
+        path.join(appDir.path, _recordingsFolder),
+      );
 
       if (!await recordingsDir.exists()) {
         await recordingsDir.create(recursive: true);
@@ -43,7 +49,11 @@ class FileManagerService {
 
       return recordingsDir;
     } catch (e) {
-      throw Exception('Failed to access cosmic recordings directory');
+      throw FileSystemException(
+        message: 'Failed to access recordings directory',
+        errorType: FileSystemErrorType.directoryCreationFailed,
+        originalError: e,
+      );
     }
   }
 
@@ -59,7 +69,11 @@ class FileManagerService {
 
       return folderDir;
     } catch (e) {
-      throw Exception('Failed to create cosmic folder directory');
+      throw FileSystemException(
+        message: 'Failed to create folder directory: $folderId',
+        errorType: FileSystemErrorType.directoryCreationFailed,
+        originalError: e,
+      );
     }
   }
 
@@ -75,7 +89,11 @@ class FileManagerService {
 
       return tempDir;
     } catch (e) {
-      throw Exception('Failed to access cosmic temporary directory');
+      throw FileSystemException(
+        message: 'Failed to access temporary directory',
+        errorType: FileSystemErrorType.accessDenied,
+        originalError: e,
+      );
     }
   }
 
@@ -91,7 +109,11 @@ class FileManagerService {
 
       return backupDir;
     } catch (e) {
-      throw Exception('Failed to access cosmic backup directory');
+      throw FileSystemException(
+        message: 'Failed to access backup directory',
+        errorType: FileSystemErrorType.accessDenied,
+        originalError: e,
+      );
     }
   }
 
@@ -108,7 +130,11 @@ class FileManagerService {
 
       // Check if destination exists
       if (await destinationFile.exists() && !overwrite) {
-        throw Exception('Destination file already exists in the cosmic realm');
+        throw FileSystemException(
+          message: 'Destination file already exists',
+          errorType: FileSystemErrorType.fileAlreadyExists,
+          context: {'filePath': destinationPath},
+        );
       }
 
       // Ensure destination directory exists
@@ -124,9 +150,13 @@ class FileManagerService {
       await _verifyFileCopy(sourceFile, copiedFile);
 
       return copiedFile;
-
     } catch (e) {
-      throw Exception('Failed to copy file in the cosmic realm: ${e.toString()}');
+      if (e is FileSystemException) rethrow;
+      throw FileSystemException(
+        message: 'Failed to copy file: ${e.toString()}',
+        errorType: FileSystemErrorType.fileCopyFailed,
+        originalError: e,
+      );
     }
   }
 
@@ -141,7 +171,11 @@ class FileManagerService {
 
       // Check if destination exists
       if (await destinationFile.exists() && !overwrite) {
-        throw Exception('Destination file already exists in the cosmic realm');
+        throw FileSystemException(
+          message: 'Destination file already exists',
+          errorType: FileSystemErrorType.fileAlreadyExists,
+          context: {'filePath': destinationPath},
+        );
       }
 
       // Ensure destination directory exists
@@ -165,9 +199,13 @@ class FileManagerService {
         await deleteFile(sourceFile);
         return copiedFile;
       }
-
     } catch (e) {
-      throw Exception('Failed to move file in the cosmic realm: ${e.toString()}');
+      if (e is FileSystemException) rethrow;
+      throw FileSystemException(
+        message: 'Failed to move file: ${e.toString()}',
+        errorType: FileSystemErrorType.fileMoveFailed,
+        originalError: e,
+      );
     }
   }
 
@@ -180,9 +218,12 @@ class FileManagerService {
 
       await file.delete();
       return true;
-
     } catch (e) {
-      throw Exception('Failed to delete file from the cosmic realm: ${e.toString()}');
+      throw FileSystemException(
+        message: 'Failed to delete file: ${e.toString()}',
+        errorType: FileSystemErrorType.fileDeletionFailed,
+        originalError: e,
+      );
     }
   }
 
@@ -204,14 +245,22 @@ class FileManagerService {
 
         // Prevent infinite loop
         if (counter > 9999) {
-          throw Exception('Unable to generate unique filename in cosmic realm');
+          throw FileSystemException(
+            message: 'Unable to generate unique filename',
+            errorType: FileSystemErrorType.invalidFileName,
+            context: {'baseName': baseName},
+          );
         }
       }
 
       return fullPath;
-
     } catch (e) {
-      throw Exception('Failed to generate unique filename: ${e.toString()}');
+      if (e is FileSystemException) rethrow;
+      throw FileSystemException(
+        message: 'Failed to generate unique filename: ${e.toString()}',
+        errorType: FileSystemErrorType.invalidFileName,
+        originalError: e,
+      );
     }
   }
 
@@ -220,30 +269,16 @@ class FileManagerService {
   /// Validate audio file
   Future<bool> validateAudioFile(File audioFile) async {
     try {
-      // Check if file exists
-      if (!await audioFile.exists()) {
-        return false;
-      }
-
-      // Check file size
+      if (!await audioFile.exists()) return false;
       final stat = await audioFile.stat();
-      if (stat.size == 0) {
-        return false;
-      }
-
-      // Check file extension
+      if (stat.size == 0) return false;
       final extension = path.extension(audioFile.path).toLowerCase();
       final supportedExtensions = AudioFormat.values
           .map((format) => '.${format.fileExtension}')
           .toList();
 
-      if (!supportedExtensions.contains(extension)) {
-        return false;
-      }
-
-      // Basic file header validation
+      if (!supportedExtensions.contains(extension)) return false;
       return await _validateFileHeader(audioFile, extension);
-
     } catch (e) {
       return false;
     }
@@ -252,10 +287,8 @@ class FileManagerService {
   /// Check file integrity
   Future<bool> checkFileIntegrity(File file) async {
     try {
-      // Basic integrity check - ensure file is readable
       final bytes = await file.openRead(0, 1024).toList();
       return bytes.isNotEmpty;
-
     } catch (e) {
       return false;
     }
@@ -266,7 +299,6 @@ class FileManagerService {
     try {
       final bytes = await file.openRead(0, 12).toList();
       final headerBytes = bytes.expand((x) => x).toList();
-
       if (headerBytes.isEmpty) return false;
 
       switch (extension) {
@@ -279,9 +311,8 @@ class FileManagerService {
         case '.flac':
           return _validateFlacHeader(headerBytes);
         default:
-          return true; // No specific validation for other formats
+          return true;
       }
-
     } catch (e) {
       return false;
     }
@@ -290,19 +321,14 @@ class FileManagerService {
   /// Validate WAV file header
   bool _validateWavHeader(List<int> headerBytes) {
     if (headerBytes.length < 12) return false;
-
-    // Check RIFF signature
     final riffSignature = String.fromCharCodes(headerBytes.sublist(0, 4));
     final waveSignature = String.fromCharCodes(headerBytes.sublist(8, 12));
-
     return riffSignature == 'RIFF' && waveSignature == 'WAVE';
   }
 
   /// Validate M4A file header
   bool _validateM4aHeader(List<int> headerBytes) {
     if (headerBytes.length < 8) return false;
-
-    // Check ftyp signature at offset 4
     final ftypSignature = String.fromCharCodes(headerBytes.sublist(4, 8));
     return ftypSignature == 'ftyp';
   }
@@ -310,8 +336,6 @@ class FileManagerService {
   /// Validate FLAC file header
   bool _validateFlacHeader(List<int> headerBytes) {
     if (headerBytes.length < 4) return false;
-
-    // Check fLaC signature
     final flacSignature = String.fromCharCodes(headerBytes.sublist(0, 4));
     return flacSignature == 'fLaC';
   }
@@ -322,7 +346,10 @@ class FileManagerService {
     final destStat = await destination.stat();
 
     if (sourceStat.size != destStat.size) {
-      throw Exception('File copy verification failed - cosmic energy not preserved');
+      throw FileSystemException(
+        message: 'File copy verification failed',
+        errorType: FileSystemErrorType.fileCopyFailed,
+      );
     }
   }
 
@@ -333,23 +360,18 @@ class FileManagerService {
     try {
       final directory = Directory(directoryPath);
       if (!await directory.exists()) return 0;
-
       int totalSize = 0;
-
       await for (final entity in directory.list(recursive: true)) {
         if (entity is File) {
           try {
             final stat = await entity.stat();
             totalSize += stat.size;
           } catch (e) {
-            // Skip files that can't be accessed
             continue;
           }
         }
       }
-
       return totalSize;
-
     } catch (e) {
       return 0;
     }
@@ -358,10 +380,7 @@ class FileManagerService {
   /// Get available storage space
   Future<int> getAvailableSpace() async {
     try {
-      // This is a simplified implementation
-      // In production, use platform-specific code to get actual free space
-      return 1024 * 1024 * 1024; // Return 1GB as placeholder
-
+      return 1024 * 1024 * 1024;
     } catch (e) {
       return 0;
     }
@@ -371,7 +390,6 @@ class FileManagerService {
   Future<void> cleanupTempFiles() async {
     try {
       final tempDir = await getTempDirectory();
-
       if (await tempDir.exists()) {
         await for (final entity in tempDir.list()) {
           try {
@@ -381,15 +399,13 @@ class FileManagerService {
               await entity.delete(recursive: true);
             }
           } catch (e) {
-            // Continue with other files if one fails
             continue;
           }
         }
       }
-
     } catch (e) {
       // Cleanup failure is not critical
-      print('Warning: Failed to cleanup temp files: $e');
+      debugPrint('Warning: Failed to cleanup temp files: $e');
     }
   }
 
@@ -399,9 +415,7 @@ class FileManagerService {
   }) async {
     try {
       final backupDir = await getBackupDirectory();
-
       if (!await backupDir.exists()) return;
-
       final cutoffDate = DateTime.now().subtract(maxAge);
 
       await for (final entity in backupDir.list()) {
@@ -412,15 +426,12 @@ class FileManagerService {
               await entity.delete();
             }
           } catch (e) {
-            // Continue with other files if one fails
             continue;
           }
         }
       }
-
     } catch (e) {
-      // Cleanup failure is not critical
-      print('Warning: Failed to cleanup old backups: $e');
+      debugPrint('Warning: Failed to cleanup old backups: $e');
     }
   }
 
@@ -440,10 +451,8 @@ class FileManagerService {
     try {
       final file = File(filePath);
       if (!await file.exists()) return 0;
-
       final stat = await file.stat();
       return stat.size;
-
     } catch (e) {
       return 0;
     }
@@ -454,10 +463,8 @@ class FileManagerService {
     try {
       final file = File(filePath);
       if (!await file.exists()) return null;
-
       final stat = await file.stat();
       return stat.modified;
-
     } catch (e) {
       return null;
     }
@@ -467,15 +474,16 @@ class FileManagerService {
   Future<Directory> ensureDirectoryExists(String directoryPath) async {
     try {
       final directory = Directory(directoryPath);
-
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
-
       return directory;
-
     } catch (e) {
-      throw Exception('Failed to ensure directory exists in cosmic realm: ${e.toString()}');
+      throw FileSystemException(
+        message: 'Failed to ensure directory exists: $directoryPath',
+        errorType: FileSystemErrorType.directoryCreationFailed,
+        originalError: e,
+      );
     }
   }
 }

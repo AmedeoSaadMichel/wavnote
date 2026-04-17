@@ -47,6 +47,7 @@ class RecordingFullscreenView extends StatefulWidget {
 
   /// seekBarIndex dal BLoC — durante il playback preview fa scorrere la waveform.
   final int? blocSeekBarIndex;
+  final int sessionCounter;
 
   const RecordingFullscreenView({
     super.key,
@@ -70,6 +71,7 @@ class RecordingFullscreenView extends StatefulWidget {
     this.seekVersion = 0,
     this.futureBarsCount = 0,
     this.blocSeekBarIndex,
+    this.sessionCounter = 0,
   });
 
   @override
@@ -243,6 +245,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               return RecordingWaveform(
+                key: ValueKey(widget.sessionCounter),
                 amplitude: widget.amplitude,
                 waveData: widget.waveData,
                 waveSegments: widget.waveSegments,
@@ -261,11 +264,11 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                 externalSeekBarIndex:
                     (widget.isPlayingPreview || widget.isPaused)
                     ? (widget.waveData.isNotEmpty
-                        ? widget.seekBarIndex.clamp(
-                            0,
-                            widget.waveData.length - 1,
-                          )
-                        : widget.seekBarIndex)
+                          ? widget.seekBarIndex.clamp(
+                              0,
+                              widget.waveData.length - 1,
+                            )
+                          : widget.seekBarIndex)
                     : null,
               );
             },

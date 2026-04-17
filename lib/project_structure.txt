@@ -1,244 +1,213 @@
 # ============================================
-# FLUTTER VOICE MEMO APP - PROJECT STRUCTURE
+# WAVNOTE - PROJECT STRUCTURE
 # ============================================
-# This file defines the current implementation status and file organization
-# for the Flutter voice memo application with organized folders.
+# Questo file fotografa lo stato reale del repository in lib/ al momento
+# dell'aggiornamento. Elenca solo directory e file effettivamente presenti.
 #
-# STATUS: CURRENT PROJECT STRUCTURE (IMPLEMENTED FILES ONLY)
-# ✅ IMPLEMENTED: 101 files
-# Total Directories: 42
-#
-# CURRENT IMPLEMENTATION STATUS:
-# ✅ Core Architecture: Complete error handling, extensions, utilities
-# ✅ Data Layer: Models, repositories, database operations
-# ✅ Domain Layer: Entities, interfaces, use cases
-# ✅ Presentation Layer: BLoC state management, screens, widgets
-# ✅ Services Layer: Audio services, file management, permissions
+# Snapshot corrente:
+# - File totali in lib/: 131
+# - File Dart in lib/: 126
+# - File non Dart in lib/: 5
+# - Directory principali: 6
 # ============================================
 
-# ==== TECHNOLOGY STACK ====
-# Dependencies from pubspec.yaml:
-  cupertino_icons: ^1.0.8
-  flutter_bloc: ^9.1.1
-  flutter_sound: ^9.28.0
-  just_audio: ^0.10.4
-  sqflite: ^2.4.2
-  path_provider: ^2.1.5
-  audio_waveforms: ^1.3.0
-  mockito: ^5.4.6
-  dartz: ^0.10.1
-  equatable: ^2.0.7
-  permission_handler: ^12.0.0+1
-  fluttericon: ^2.0.0
+# ==== RIPARTIZIONE PER LAYER ====
+# config: 2 file
+# core: 18 file
+# data: 14 file
+# domain: 13 file
+# presentation: 61 file
+# services: 19 file
+#
+# File root aggiuntivi:
+# - main.dart
+# - idea_project_structure.txt
+# - project_structure.txt
 
-# ==== CONFIGURATION LAYER ====
+# ==== ROOT ====
+lib/
 ├── config/
-│   ├── app_config.dart               # App configuration ✅ IMPLEMENTED
-│   └── dependency_injection.dart     # DI container setup ✅ IMPLEMENTED
-
-# ==== CORE LAYER ====
+│   ├── app_config.dart
+│   └── dependency_injection.dart
 ├── core/
 │   ├── constants/
-│   │   └── app_constants.dart         # App-wide constants ✅ IMPLEMENTED
+│   │   └── app_constants.dart
 │   ├── enums/
-│   │   ├── audio_format.dart          # Audio format enum ✅ IMPLEMENTED
-│   │   └── folder_type.dart           # Folder type enum ✅ IMPLEMENTED
+│   │   ├── audio_format.dart
+│   │   └── folder_type.dart
 │   ├── errors/
-│   │   ├── exceptions.dart            # Custom exceptions ✅ IMPLEMENTED
-│   │   ├── failures.dart              # Base failure types ✅ IMPLEMENTED
-│   │   ├── failure_utils.dart         # Failure utility functions ✅ IMPLEMENTED
+│   │   ├── exceptions.dart
+│   │   ├── failure_utils.dart
+│   │   ├── failures.dart
 │   │   └── failure_types/
-│   │       ├── audio_failures.dart    # Audio-related failures ✅ IMPLEMENTED
-│   │       ├── data_failures.dart     # Data/DB/File failures ✅ IMPLEMENTED
-│   │       └── system_failures.dart   # System/Network failures ✅ IMPLEMENTED
+│   │       ├── audio_failures.dart
+│   │       ├── data_failures.dart
+│   │       └── system_failures.dart
 │   ├── extensions/
-│   │   ├── datetime_extensions.dart   # DateTime helper methods ✅ IMPLEMENTED
-│   │   ├── duration_extensions.dart   # Duration helper methods ✅ IMPLEMENTED
-│   │   └── string_extensions.dart     # String helper methods ✅ IMPLEMENTED
+│   │   ├── datetime_extensions.dart
+│   │   ├── duration_extensions.dart
+│   │   └── string_extensions.dart
+│   ├── routing/
+│   │   └── app_router.dart
 │   └── utils/
-│       ├── date_formatter.dart        # Date formatting utilities ✅ IMPLEMENTED
-│       ├── file_utils.dart            # File handling utilities ✅ IMPLEMENTED
-│       ├── recording_actions.dart     # Recording action utilities ✅ IMPLEMENTED
-│       └── waveform_generator.dart    # Waveform generation utilities ✅ IMPLEMENTED
-
-# ==== DATA LAYER ====
+│       ├── date_formatter.dart
+│       ├── file_utils.dart
+│       ├── performance_logger.dart
+│       ├── recording_actions.dart
+│       └── waveform_generator.dart
 ├── data/
 │   ├── database/
-│   │   └── database_helper.dart       # SQLite database setup ✅ IMPLEMENTED
+│   │   └── database_helper.dart
+│   ├── mappers/
+│   │   ├── folder_sort_mapper.dart
+│   │   └── recording_sort_mapper.dart
 │   ├── models/
-│   │   ├── folder_model.dart          # Folder data model ✅ IMPLEMENTED
-│   │   └── recording_model.dart       # Recording data model ✅ IMPLEMENTED
+│   │   ├── folder_model.dart
+│   │   └── recording_model.dart
 │   └── repositories/
-│       ├── folder_repository.dart     # Folder operations repository ✅ IMPLEMENTED
-│       ├── recording_repository.dart  # Recording management repository ✅ IMPLEMENTED
-│       ├── recording_repository_base.dart # Base recording operations ✅ IMPLEMENTED
-│       ├── recording_repository_bulk.dart # Recording bulk operations ✅ IMPLEMENTED
-│       ├── recording_repository_crud.dart # Recording CRUD operations ✅ IMPLEMENTED
-│       ├── recording_repository_search.dart # Recording search operations ✅ IMPLEMENTED
-│       ├── recording_repository_stats.dart # Recording statistics ✅ IMPLEMENTED
-│       └── recording_repository_utils.dart # Recording utilities ✅ IMPLEMENTED
-
-# ==== DOMAIN LAYER ====
+│       ├── folder_repository.dart
+│       ├── recording_repository.dart
+│       ├── recording_repository_base.dart
+│       ├── recording_repository_bulk.dart
+│       ├── recording_repository_crud.dart
+│       ├── recording_repository_search.dart
+│       ├── recording_repository_stats.dart
+│       ├── recording_repository_utils.dart
+│       └── settings_repository_impl.dart
 ├── domain/
 │   ├── entities/
-│   │   ├── folder_entity.dart         # Pure folder business object ✅ IMPLEMENTED
-│   │   └── recording_entity.dart      # Pure recording business object ✅ IMPLEMENTED
+│   │   ├── folder_entity.dart
+│   │   └── recording_entity.dart
 │   ├── repositories/
-│   │   ├── i_audio_service_repository.dart     # Audio service interface ✅ IMPLEMENTED
-│   │   ├── i_folder_repository.dart            # Folder repository interface ✅ IMPLEMENTED
-│   │   └── i_recording_repository.dart         # Recording repository interface ✅ IMPLEMENTED
+│   │   ├── i_audio_service_repository.dart
+│   │   ├── i_audio_trimmer_repository.dart
+│   │   ├── i_folder_repository.dart
+│   │   ├── i_location_repository.dart
+│   │   ├── i_recording_repository.dart
+│   │   └── i_settings_repository.dart
 │   └── usecases/
 │       └── recording/
-│           ├── audio_service_integration_usecase.dart # Audio service integration ✅ IMPLEMENTED
-│           ├── bulk_operations_usecase.dart        # Bulk operations ✅ IMPLEMENTED
-│           ├── create_recording_usecase.dart       # Create new recording ✅ IMPLEMENTED
-│           ├── delete_recording_usecase.dart       # Delete recording ✅ IMPLEMENTED
-│           ├── filter_models.dart                  # Filter models & enums ✅ IMPLEMENTED
-│           ├── filter_recordings_usecase.dart      # Filter recordings ✅ IMPLEMENTED
-│           ├── filter_statistics.dart              # Filter statistics ✅ IMPLEMENTED
-│           ├── import_export_usecase.dart          # Import/export operations ✅ IMPLEMENTED
-│           ├── move_recording_usecase.dart         # Move recordings ✅ IMPLEMENTED
-│           ├── pause_recording_usecase.dart        # Pause recording ✅ IMPLEMENTED
-│           ├── play_recording_usecase.dart         # Play recording ✅ IMPLEMENTED
-│           ├── search_recordings_usecase.dart      # Search recordings ✅ IMPLEMENTED
-│           ├── start_recording_usecase.dart        # Start recording ✅ IMPLEMENTED
-│           └── stop_recording_usecase.dart         # Stop recording ✅ IMPLEMENTED
-
-# ==== PRESENTATION LAYER ====
+│           ├── get_recordings_usecase.dart
+│           ├── overwrite_recording_usecase.dart
+│           ├── pause_recording_usecase.dart
+│           ├── start_recording_usecase.dart
+│           └── stop_recording_usecase.dart
 ├── presentation/
 │   ├── bloc/
-│   │   ├── audio_player/
-│   │   │   ├── audio_player_bloc.dart         # Playback state management ✅ IMPLEMENTED
-│   │   │   ├── audio_player_event.dart        # Playback events ✅ IMPLEMENTED
-│   │   │   └── audio_player_state.dart        # Playback states ✅ IMPLEMENTED
 │   │   ├── folder/
-│   │   │   ├── folder_bloc.dart               # Folder management ✅ IMPLEMENTED
-│   │   │   ├── folder_event.dart              # Folder events ✅ IMPLEMENTED
-│   │   │   └── folder_state.dart              # Folder states ✅ IMPLEMENTED
+│   │   │   ├── folder_bloc.dart
+│   │   │   ├── folder_event.dart
+│   │   │   └── folder_state.dart
 │   │   ├── recording/
-│   │   │   ├── recording_bloc.dart            # Recording management ✅ IMPLEMENTED
-│   │   │   ├── recording_event.dart           # Recording events ✅ IMPLEMENTED
-│   │   │   └── recording_state.dart           # Recording states ✅ IMPLEMENTED
+│   │   │   ├── recording_bloc.dart
+│   │   │   ├── recording_bloc_lifecycle.dart
+│   │   │   ├── recording_bloc_management.dart
+│   │   │   ├── recording_event.dart
+│   │   │   └── recording_state.dart
 │   │   └── settings/
-│   │       ├── settings_bloc.dart             # Settings management ✅ IMPLEMENTED
-│   │       ├── settings_event.dart            # Settings events ✅ IMPLEMENTED
-│   │       └── settings_state.dart            # Settings states ✅ IMPLEMENTED
+│   │       ├── settings_bloc.dart
+│   │       ├── settings_event.dart
+│   │       └── settings_state.dart
+│   ├── mappers/
+│   │   ├── audio_format_ui_mapper.dart
+│   │   └── folder_ui_mapper.dart
 │   ├── screens/
 │   │   ├── main/
-│   │   │   └── main_screen.dart       # Main folders view ✅ IMPLEMENTED
+│   │   │   └── main_screen.dart
 │   │   ├── recording/
-│   │   │   └── recording_list_screen.dart # List of recordings in folder ✅ IMPLEMENTED
+│   │   │   ├── controllers/
+│   │   │   │   └── recording_playback_controller.dart
+│   │   │   ├── recording_list_logic.dart
+│   │   │   └── recording_list_screen.dart
 │   │   └── settings/
-│   │       └── settings_screen.dart   # App settings ✅ IMPLEMENTED
+│   │       └── settings_screen.dart
 │   └── widgets/
 │       ├── common/
-│       │   ├── custom_button.dart     # Reusable button component ✅ IMPLEMENTED
-│       │   ├── custom_dialog.dart     # Base dialog component ✅ IMPLEMENTED
-│       │   ├── empty_state.dart       # Empty list state ✅ IMPLEMENTED
-│       │   ├── error_widget.dart      # Error display widget ✅ IMPLEMENTED
-│       │   ├── loading_indicator.dart # Loading spinner ✅ IMPLEMENTED
-│       │   └── settings_section_header.dart # Settings section header ✅ IMPLEMENTED
+│       │   ├── custom_button.dart
+│       │   ├── custom_dialog.dart
+│       │   ├── empty_state.dart
+│       │   ├── error_widget.dart
+│       │   ├── loading_indicator.dart
+│       │   ├── settings_section_header.dart
+│       │   └── skeleton_screen.dart
 │       ├── dialogs/
-│       │   ├── audio_format_dialog.dart       # Select audio format ✅ IMPLEMENTED
-│       │   ├── create_folder_dialog.dart      # Create folder dialog ✅ IMPLEMENTED
-│       │   └── sample_rate_dialog.dart        # Select sample rate ✅ IMPLEMENTED
+│       │   ├── audio_format_dialog.dart
+│       │   ├── create_folder_dialog.dart
+│       │   ├── folder_selection_dialog.dart
+│       │   └── sample_rate_dialog.dart
 │       ├── folder/
-│       │   └── folder_item.dart       # Folder list item ✅ IMPLEMENTED
+│       │   └── folder_item.dart
 │       ├── inputs/
-│       │   └── search_bar.dart        # Search input widget ✅ IMPLEMENTED
+│       │   └── search_bar.dart
 │       ├── recording/
-│       │   ├── fullscreen_waveform.dart       # Fullscreen waveform display ✅ IMPLEMENTED
-│       │   ├── record_waveform.dart           # Recording waveform ✅ IMPLEMENTED
-│       │   ├── recording_bottom_sheet.dart    # Recording actions sheet ✅ IMPLEMENTED
-│       │   ├── recording_card.dart            # Recording list item ✅ IMPLEMENTED
-│       │   └── waveform_widget.dart           # Audio waveform visualization ✅ IMPLEMENTED
+│       │   ├── bottom_sheet/
+│       │   │   ├── control_buttons.dart
+│       │   │   ├── recording_bottom_sheet_main.dart
+│       │   │   ├── recording_compact_view.dart
+│       │   │   ├── recording_fullscreen_view.dart
+│       │   │   └── waveform_components.dart
+│       │   ├── custom_waveform/
+│       │   │   ├── flutter_sound_waveform.dart
+│       │   │   ├── label.dart
+│       │   │   ├── recorder_wave_painter.dart
+│       │   │   └── waveform_utils.dart
+│       │   ├── recording_card/
+│       │   │   ├── recording_card.dart
+│       │   │   ├── recording_card_actions.dart
+│       │   │   ├── recording_card_info.dart
+│       │   │   └── recording_card_main.dart
+│       │   ├── fullscreen_waveform.dart
+│       │   ├── pull_to_search_list.dart
+│       │   ├── record_waveform.dart
+│       │   ├── recording_bottom_sheet.dart
+│       │   ├── recording_controls.dart
+│       │   ├── recording_edit_toolbar.dart
+│       │   ├── recording_list_header.dart
+│       │   ├── recording_search_bar.dart
+│       │   ├── recording_waveform_section.dart
+│       │   └── waveform_widget.dart
 │       └── settings/
-│           ├── app_settings_section.dart      # App settings ✅ IMPLEMENTED
-│           ├── audio_settings_section.dart    # Audio settings ✅ IMPLEMENTED
-│           ├── recording_settings_section.dart # Recording settings ✅ IMPLEMENTED
-│           ├── settings_header.dart           # Settings header ✅ IMPLEMENTED
-│           └── storage_settings_section.dart  # Storage settings ✅ IMPLEMENTED
-
-# ==== SERVICES LAYER ====
+│           ├── app_settings_section.dart
+│           ├── audio_settings_section.dart
+│           ├── recording_settings_section.dart
+│           ├── settings_header.dart
+│           └── storage_settings_section.dart
 ├── services/
 │   ├── audio/
-│   │   ├── audio_player_service.dart          # Playback service ✅ IMPLEMENTED
-│   │   ├── audio_recorder_service.dart        # Recording service ✅ IMPLEMENTED
-│   │   ├── audio_service_coordinator.dart     # Service coordination ✅ IMPLEMENTED
-│   │   ├── audio_service_factory.dart         # Service factory ✅ IMPLEMENTED
-│   │   └── impl/
-│   │       ├── audio_monitoring_service.dart  # Monitoring service ✅ IMPLEMENTED
-│   │       ├── audio_player_impl.dart         # Player implementation ✅ IMPLEMENTED
-│   │       └── audio_recorder_impl.dart       # Recorder implementation ✅ IMPLEMENTED
+│   │   ├── impl/
+│   │   │   ├── audio_monitoring_service.dart
+│   │   │   └── audio_player_impl.dart
+│   │   ├── audio_analysis_service.dart
+│   │   ├── audio_cache_manager.dart
+│   │   ├── audio_engine_service.dart
+│   │   ├── audio_player_service.dart
+│   │   ├── audio_recorder_service.dart
+│   │   ├── audio_service_coordinator.dart
+│   │   ├── audio_state_manager.dart
+│   │   ├── audio_trimmer_service.dart
+│   │   └── waveform_processing_service.dart
 │   ├── file/
-│   │   ├── export_service.dart                # Export/share files ✅ IMPLEMENTED
-│   │   ├── file_manager_service.dart          # File operations ✅ IMPLEMENTED
-│   │   ├── import_service.dart                # Import external files ✅ IMPLEMENTED
-│   │   └── metadata_service.dart              # Extract audio metadata ✅ IMPLEMENTED
+│   │   ├── export_service.dart
+│   │   ├── file_manager_service.dart
+│   │   ├── import_service.dart
+│   │   └── metadata_service.dart
 │   ├── location/
-│   │   └── geolocation_service.dart           # Location tagging service ✅ IMPLEMENTED
+│   │   └── geolocation_service.dart
+│   ├── logging/
+│   │   └── swift_log_channel_service.dart
 │   ├── permission/
-│   │   └── permission_service.dart            # Handle permissions ✅ IMPLEMENTED
+│   │   └── permission_service.dart
 │   └── storage/
-│       └── database_service.dart              # Database operations ✅ IMPLEMENTED
-
-# ==== PROJECT DOCUMENTATION ====
-├── idea_project_structure.txt         # Ideal project structure ✅ IMPLEMENTED
-├── main.dart                          # App entry point ✅ IMPLEMENTED
-└── project_structure.txt              # Current project structure ✅ IMPLEMENTED
+│       └── database_service.dart
+├── idea_project_structure.txt
+├── main.dart
+└── project_structure.txt
 
 # ============================================
-# CURRENT PROJECT STATUS SUMMARY:
+# NOTE SULLO STATO REALE
 # ============================================
-# ✅ IMPLEMENTED FILES: 101 files
-# 📁 TOTAL DIRECTORIES: 42 directories
-#
-# MAJOR COMPLETED COMPONENTS:
-# ✅ Configuration Layer (2 files)
-# ✅ Core Architecture (16 files - constants, enums, utilities, extensions, comprehensive error handling)
-# ✅ Complete Data Layer (11 files - models, repositories, database operations)
-# ✅ Complete Domain Layer (17 files - entities, interfaces, 14 use cases)
-# ✅ Complete BLoC State Management (12 files - 4 BLoCs with events/states)
-# ✅ Screen Layer (3 files - main screen, recording list screen, settings screen)
-# ✅ Widget Library (23 files - common widgets, dialogs, specialized components)
-# ✅ Complete Audio Services Layer (10 files - coordinator, player, recorder, factory)
-# ✅ File Management Services (4 files - file_manager, import, export, metadata)
-# ✅ Permission, Storage, and Location Services (3 files)
-# ✅ Project Documentation (3 files)
-#
-# KEY FEATURES FULLY IMPLEMENTED:
-# - Complete recording lifecycle management
-# - Advanced pause/resume with duration tracking
-# - Comprehensive error handling system with modular failures
-# - File backup and recovery with metadata extraction
-# - Session state management across app lifecycle
-# - Audio service integration and coordination
-# - Database operations with statistics
-# - Folder organization with management
-# - Complete settings management system
-# - Advanced search and filtering capabilities
-# - Import/export functionality
-# - Permission handling and location services
-# - Enhanced string, datetime, and duration utilities
-# - Clean Architecture failure types for error management
-#
-# ARCHITECTURE COMPLIANCE STATUS:
-# ✅ Clean Architecture principles fully implemented
-# ✅ SOLID principles adherence throughout codebase
-# ✅ Dependency injection patterns established
-# ✅ Comprehensive error handling and validation
-# ✅ Proper file organization with path comments
-# ✅ Consistent coding patterns and naming conventions
-# ✅ Testable and maintainable code structure
-# ✅ Complete separation of concerns
-# ✅ Interface-based design patterns
-# ✅ Repository pattern implementation
-# ✅ BLoC pattern for state management
-# ✅ Service layer abstraction
-# ✅ Entity-based domain modeling
-#
-# DEVELOPMENT PHASE STATUS:
-# 🎯 CURRENT PHASE: Core Implementation Complete (101 files)
-# 📱 STATUS: Fully functional voice memo app with core features
-# 🚀 READY FOR: UI enhancement, additional screens, and platform-specific features
+# - I file di struttura precedenti erano disallineati: includevano file mancanti,
+#   dipendenze non presenti e servizi ormai rimossi o rinominati.
+# - Questa versione rappresenta solo il codice realmente presente in lib/.
+# - La struttura e' coerente con l'uso corrente di BLoC, GetIt, repository e servizi.
 # ============================================

@@ -1,118 +1,86 @@
 // File: core/errors/failure_utils.dart
-import 'failures.dart';
-import 'failure_types/audio_failures.dart';
-import 'failure_types/data_failures.dart';
-import 'failure_types/system_failures.dart';
-import 'exceptions.dart';
+import 'package:flutter/foundation.dart'; // Per debugPrint
+import 'package:dartz/dartz.dart';
 
-// ==== UTILITY FUNCTIONS ====
+import 'package:wavnote/core/errors/failures.dart';
+import 'package:wavnote/core/errors/exceptions.dart';
+import 'package:wavnote/core/errors/failure_types/audio_failures.dart';
+import 'package:wavnote/core/errors/failure_types/data_failures.dart';
+import 'package:wavnote/core/errors/failure_types/system_failures.dart';
 
-/// Convert exception to appropriate failure
-Failure convertExceptionToFailure(Exception exception) {
-  if (exception is AudioRecordingException) {
-    return AudioRecordingFailure.fromException(exception);
-  } else if (exception is AudioPlaybackException) {
-    return AudioPlaybackFailure.fromException(exception);
-  } else if (exception is FileSystemException) {
-    return FileSystemFailure.fromException(exception);
-  } else if (exception is DatabaseException) {
-    return DatabaseFailure.fromException(exception);
-  } else if (exception is PermissionException) {
-    return PermissionFailure.fromException(exception);
-  } else if (exception is ValidationException) {
-    return ValidationFailure.fromException(exception);
-  } else if (exception is NetworkException) {
-    return NetworkFailure.fromException(exception);
-  } else {
-    return UnexpectedFailure.fromException(exception);
+/// Utility functions for error handling and Failure conversion.
+class FailureUtils {
+  // Private constructor to prevent instantiation
+  FailureUtils._();
+
+  /// Converts an Exception to a specific Failure type.
+  /// This is the primary mapping function to be used in data/service layers.
+  static Failure convertExceptionToFailure(
+    Object e, {
+    String? contextMessage,
+    FailureSeverity severity = FailureSeverity.error,
+  }) {
+    debugPrint(
+      '⚠️ Converting Exception to Failure: $e${contextMessage != null ? ' - $contextMessage' : ''}',
+    );
+
+    if (e is AudioRecordingException) {
+      return AudioRecordingFailure.fromException(e);
+    } else if (e is AudioPlaybackException) {
+      return AudioPlaybackFailure.fromException(e);
+    } else if (e is FileSystemException) {
+      return FileSystemFailure.fromException(e);
+    } else if (e is DatabaseException) {
+      return DatabaseFailure.fromException(e);
+    } else if (e is PermissionException) {
+      return PermissionFailure.fromException(e);
+    } else if (e is NetworkException) {
+      return NetworkFailure.fromException(e);
+    } else if (e is ValidationException) {
+      return ValidationFailure.fromException(e);
+    } else if (e is ArgumentError) {
+      return UnexpectedFailure(
+        message: 'Invalid argument: ${e.message}',
+        code: 'INVALID_ARGUMENT',
+      );
+    } else if (e is StateError) {
+      return UnexpectedFailure(
+        message: 'Invalid state: ${e.message}',
+        code: 'INVALID_STATE',
+      );
+    }
+
+    // Fallback generico per eccezioni non riconosciute
+    return UnexpectedFailure(
+      message:
+          contextMessage ?? 'An unexpected error occurred: ${e.toString()}',
+      code: 'UNEXPECTED_EXCEPTION',
+    );
   }
-}
 
-/// Create a failure with context
-Failure createFailureWithContext({
-  required String message,
-  required String code,
-  FailureSeverity severity = FailureSeverity.error,
-  Map<String, dynamic>? context,
-}) {
-  return UnexpectedFailure(
-    message: message,
-    code: code,
-    context: context,
-  );
-}
+  /// Returns a user-friendly message for a given Failure.
+  static String getUserErrorMessage(Failure failure) {
+    return failure.userMessage;
+  }
 
-/// Create a success result
-Success createSuccess({
-  required String message,
-  Map<String, dynamic>? context,
-}) {
-  return Success(
-    message: message,
-    context: context,
-  );
-}
+  /// Logs a Failure, including its severity and context.
+  static void logFailure(Failure failure) {
+    if (failure.shouldLog) {
+      debugPrint(
+        '🔴 FAILURE LOG: Type: ${failure.runtimeType}, Message: ${failure.message}, ' +
+            'Code: ${failure.code ?? 'N/A'}, Severity: ${failure.severity}, ' +
+            'Context: ${failure.context ?? 'N/A'}',
+      );
+    }
+  }
 
-/// Combine multiple failures into one
-CombinedFailure combineFailures(List<Failure> failures, [String? message]) {
-  return CombinedFailure(
-    failures: failures,
-    message: message,
-  );
-}
+  /// Creates an Either<Failure, Unit> from a given Failure.
+  static Either<Failure, Unit> leftUnit(Failure failure) {
+    return Left(failure);
+  }
 
-/// Check if a failure is retryable
-bool isFailureRetryable(Failure failure) {
-  return failure.isRetryable;
-}
-
-/// Get user-friendly message from failure
-String getFailureMessage(Failure failure) {
-  return failure.userMessage;
-}
-
-/// Check if failure should be logged
-bool shouldLogFailure(Failure failure) {
-  return failure.shouldLog;
-}
-
-/// Get failure severity level
-FailureSeverity getFailureSeverity(Failure failure) {
-  return failure.severity;
-}
-
-/// Check if failure is critical
-bool isFailureCritical(Failure failure) {
-  return failure.severity == FailureSeverity.critical;
-}
-
-/// Get failure context data
-Map<String, dynamic>? getFailureContext(Failure failure) {
-  return failure.context;
-}
-
-/// Create a cache failure
-CacheFailure createCacheFailure({
-  required String message,
-  String? code,
-  Map<String, dynamic>? context,
-}) {
-  return CacheFailure(
-    message: message,
-    code: code,
-    context: context,
-  );
-}
-
-/// Create an unexpected failure
-UnexpectedFailure createUnexpectedFailure({
-  required String message,
-  String? code,
-  Map<String, dynamic>? context,
-}) {
-  return UnexpectedFailure(
-    message: message,
-    code: code,
-    context: context,
-  );
+  /// Creates an Either<Failure, Unit> for a successful operation.
+  static Either<Failure, Unit> rightUnit() {
+    return const Right(unit);
+  }
 }

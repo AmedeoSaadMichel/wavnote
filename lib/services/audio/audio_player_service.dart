@@ -592,36 +592,7 @@ class AudioPlayerService implements IAudioServiceRepository {
     _audioStateManager?.updateExpandedRecording(recording.id);
     _onExpansionChanged?.call();
 
-    try {
-      final success = await startPlaying(recording.filePath);
-      _isLoading = false;
-      if (!success) {
-        debugPrint('❌ Failed to start playback for ${recording.name}');
-      }
-      // Update AudioStateManager with duration
-      _audioStateManager?.updateDuration(_playbackDuration);
-      _onExpansionChanged?.call();
-
-      // Listen for position updates to AudioStateManager
-      await _uiPositionSubscription?.cancel();
-      _uiPositionSubscription = _positionStreamController?.stream.listen((pos) {
-        _audioStateManager?.updatePosition(pos);
-        _audioStateManager?.updatePlaybackState(
-          isPlaying: _playbackActive && !_playbackPaused,
-        );
-      });
-
-      // Listen for completion
-      await _uiCompletionSubscription?.cancel();
-      _uiCompletionSubscription = _completionStreamController?.stream.listen((
-        _,
-      ) {
-        _hasCompletedCurrentPlayback = true;
-        _audioStateManager?.updatePlaybackState(isPlaying: false);
-        _audioStateManager?.updatePosition(Duration.zero);
-        _onExpansionChanged?.call();
-      });
-    } catch (e) {
+    try {} catch (e) {
       _isLoading = false;
       debugPrint('❌ Error expanding recording: $e');
       _onExpansionChanged?.call();

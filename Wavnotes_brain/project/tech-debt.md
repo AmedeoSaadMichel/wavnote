@@ -9,6 +9,7 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | 1 | `main.dart` | 89 | `SwiftLogChannelService` attivo — rimuovere prima del rilascio in produzione | 🔴 Alta |
 | 2 | `main.dart` | 258 | Bottone "Retry" nella error screen non funzionale (nessuna logica implementata) | 🟡 Media |
 | 3 | `recording_list_logic.dart` | 627 | `TODO: Implement seek to position (0.0-1.0)` — seek da UI non implementato | 🟡 Media |
+| 4 | `lib/presentation/bloc/recording/recording_bloc.dart` | 159 | Rimuovere log di debug `🔍 BLoC received amplitude: ...` dopo aver verificato il corretto funzionamento | 🟢 Bassa |
 
 ## Workaround architetturali noti (post ADR-001)
 
@@ -24,6 +25,7 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | UI/BLoC | `BlocBuilder` in `RecordingListScreen` con `buildWhen` potenzialmente restrittivo | La condizione `buildWhen` potrebbe bloccare aggiornamenti necessari per il `BottomSheet` (es. `seekBarIndex`). Da raffinare se si ripresentano problemi di UI non reattiva. |
 | Logging | Logging di debug in `AudioEnginePlugin.swift` | Aggiunto per diagnosticare il bug del playback. Dovrebbe essere rimosso o reso configurabile prima del rilascio. |
 | ~~Timer hierarchy~~ | ~~10 timer Dart concorrenti sul bottom sheet~~ | **✅ Risolto 2026-04-14** via ADR-001: clock push-based nativo end-to-end. `_waveformTimer`, `RecordingClockService`, `_amplitudeTimer`, `_positionTimer` eliminati. `_needsCalibration`/`_seekTimeOffsetMs` (calibrazione wall-clock) rimossi. Da Step 7: verifica posizione cumulativa su dispositivo. |
+| Stream Ampiezza (iOS) | Inoltro manuale stream `_engineService` in `AudioServiceCoordinator` | Necessario per collegare il motore nativo AVAudioEngine al BLoC |
 
 ## Dead code eliminato (2026-04-14)
 

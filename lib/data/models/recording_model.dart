@@ -4,17 +4,14 @@ import '../../domain/entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
 
 /// Data model for recording with database mapping
-///
-/// Handles conversion between database storage format
-/// and domain entity objects with validation.
 class RecordingModel {
   final String id;
   final String name;
-  final String filePath;
+  final String filePath; // Path relativo memorizzato nel DB
   final String folderId;
   final int formatIndex;
-  final int durationSeconds; // Legacy column - kept for backwards compatibility
-  final int? durationMilliseconds; // New precise duration column
+  final int durationSeconds;
+  final int? durationMilliseconds;
   final int fileSize;
   final int sampleRate;
   final double? latitude;
@@ -27,7 +24,7 @@ class RecordingModel {
   final bool isDeleted;
   final String? deletedAt;
   final String? originalFolderId;
-  final String? waveformDataJson; // JSON string of List<double>
+  final String? waveformDataJson;
 
   const RecordingModel({
     required this.id,
@@ -57,11 +54,11 @@ class RecordingModel {
     return RecordingModel(
       id: entity.id,
       name: entity.name,
-      filePath: entity.filePath,
+      filePath: entity.filePath, // Il path nell'entity è già relativo
       folderId: entity.folderId,
       formatIndex: entity.format.index,
-      durationSeconds: entity.duration.inSeconds, // Keep for compatibility
-      durationMilliseconds: entity.duration.inMilliseconds, // Precise duration
+      durationSeconds: entity.duration.inSeconds,
+      durationMilliseconds: entity.duration.inMilliseconds,
       fileSize: entity.fileSize,
       sampleRate: entity.sampleRate,
       latitude: entity.latitude,
@@ -74,13 +71,14 @@ class RecordingModel {
       isDeleted: entity.isDeleted,
       deletedAt: entity.deletedAt?.toIso8601String(),
       originalFolderId: entity.originalFolderId,
-      waveformDataJson: entity.waveformData != null 
-          ? jsonEncode(entity.waveformData) 
+      waveformDataJson: entity.waveformData != null
+          ? jsonEncode(entity.waveformData)
           : null,
     );
   }
 
-  /// Create from database map
+  // ... (restano invariati i metodi fromDatabase, fromJson, toEntity, toDatabase, toJson, isValid, copyWith, ecc.) ...
+
   factory RecordingModel.fromDatabase(Map<String, dynamic> map) {
     return RecordingModel(
       id: map['id'] as String,
@@ -102,11 +100,12 @@ class RecordingModel {
       isDeleted: (map['is_deleted'] as int?) == 1,
       deletedAt: map['deleted_at'] as String?,
       originalFolderId: map['original_folder_id'] as String?,
-      waveformDataJson: map.containsKey('waveform_data') ? map['waveform_data'] as String? : null,
+      waveformDataJson: map.containsKey('waveform_data')
+          ? map['waveform_data'] as String?
+          : null,
     );
   }
 
-  /// Create from JSON
   factory RecordingModel.fromJson(Map<String, dynamic> json) {
     return RecordingModel(
       id: json['id'] as String,
@@ -131,7 +130,6 @@ class RecordingModel {
     );
   }
 
-  /// Convert to entity
   RecordingEntity toEntity() {
     return RecordingEntity(
       id: id,
@@ -139,9 +137,9 @@ class RecordingModel {
       filePath: filePath,
       folderId: folderId,
       format: AudioFormat.values[formatIndex],
-      duration: durationMilliseconds != null 
-          ? Duration(milliseconds: durationMilliseconds!) 
-          : Duration(seconds: durationSeconds), // Fallback to seconds for legacy data
+      duration: durationMilliseconds != null
+          ? Duration(milliseconds: durationMilliseconds!)
+          : Duration(seconds: durationSeconds),
       fileSize: fileSize,
       sampleRate: sampleRate,
       latitude: latitude,
@@ -150,17 +148,17 @@ class RecordingModel {
       createdAt: DateTime.parse(createdAt),
       updatedAt: updatedAt != null ? DateTime.parse(updatedAt!) : null,
       isFavorite: isFavorite,
-      tags: tags?.split(',').where((tag) => tag.trim().isNotEmpty).toList() ?? [],
+      tags:
+          tags?.split(',').where((tag) => tag.trim().isNotEmpty).toList() ?? [],
       isDeleted: isDeleted,
       deletedAt: deletedAt != null ? DateTime.parse(deletedAt!) : null,
       originalFolderId: originalFolderId,
-      waveformData: waveformDataJson != null 
+      waveformData: waveformDataJson != null
           ? (jsonDecode(waveformDataJson!) as List).cast<double>()
           : null,
     );
   }
 
-  /// Convert to database map
   Map<String, dynamic> toDatabase() {
     return {
       'id': id,
@@ -186,7 +184,6 @@ class RecordingModel {
     };
   }
 
-  /// Convert to JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -211,49 +208,28 @@ class RecordingModel {
     };
   }
 
-  /// Validate model data
   bool get isValid {
     try {
-      // Check required fields
-      if (id.isEmpty || name.isEmpty || filePath.isEmpty || folderId.isEmpty) {
+      if (id.isEmpty || name.isEmpty || filePath.isEmpty || folderId.isEmpty)
         return false;
-      }
-
-      // Check format index is valid
-      if (formatIndex < 0 || formatIndex >= AudioFormat.values.length) {
+      if (formatIndex < 0 || formatIndex >= AudioFormat.values.length)
         return false;
-      }
-
-      // Check numeric values are reasonable
-      if (durationSeconds < 0 || fileSize < 0 || sampleRate <= 0) {
-        return false;
-      }
-
-      // Check date format
+      if (durationSeconds < 0 || fileSize < 0 || sampleRate <= 0) return false;
       DateTime.parse(createdAt);
-      if (updatedAt != null) {
-        DateTime.parse(updatedAt!);
-      }
-
+      if (updatedAt != null) DateTime.parse(updatedAt!);
       return true;
     } catch (e) {
       return false;
     }
   }
 
-  /// Get audio format
   AudioFormat get format => AudioFormat.values[formatIndex];
-
-  /// Get duration
   Duration get duration => Duration(seconds: durationSeconds);
-
-  /// Get tags as list
   List<String> get tagsList {
     if (tags == null || tags!.isEmpty) return [];
     return tags!.split(',').where((tag) => tag.trim().isNotEmpty).toList();
   }
 
-  /// Create copy with updated values
   RecordingModel copyWith({
     String? id,
     String? name,
@@ -297,7 +273,6 @@ class RecordingModel {
   }
 
   @override
-  String toString() {
-    return 'RecordingModel(id: $id, name: $name, format: ${format.name})';
-  }
+  String toString() =>
+      'RecordingModel(id: $id, name: $name, format: ${format.name})';
 }

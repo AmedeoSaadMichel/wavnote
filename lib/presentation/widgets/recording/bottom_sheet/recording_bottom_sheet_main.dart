@@ -65,6 +65,9 @@ class RecordingBottomSheet extends StatefulWidget {
   /// Waveform completa, usata per inizializzare o ripristinare lo stato.
   final List<double>? fullWaveData;
 
+  /// Identificatore univoco della sessione incrementato alla chiusura
+  final int sessionCounter;
+
   const RecordingBottomSheet({
     super.key,
     required this.title,
@@ -90,6 +93,7 @@ class RecordingBottomSheet extends StatefulWidget {
     this.truncatedWaveData,
     this.blocSeekBarIndex,
     this.fullWaveData,
+    this.sessionCounter = 0,
   });
 
   @override
@@ -179,6 +183,21 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void didUpdateWidget(RecordingBottomSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    // Reset completo dello stato interno quando inizia una nuova sessione (es. dopo aver premuto Done)
+    if (widget.sessionCounter != oldWidget.sessionCounter) {
+      setState(() {
+        _waveData.clear();
+        _waveSegments.clear();
+        _currentSegment = 0;
+        _overwriteCount = 0;
+        _futureBarsCount = 0;
+        _seekVersion = 0;
+        _seekBarIndex = 0;
+        _seekTimeOffsetMs = 0;
+        _currentAmplitude = 0.0;
+      });
+    }
+
     // Sincronizza _seekBarIndex locale con il BLoC durante il playback preview
     // o quando la seekbar è stata spostata manualmente in pausa
     if ((widget.isPlayingPreview || widget.isPaused) &&
@@ -229,10 +248,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _seekBarIndex = targetLength > 0 ? targetLength - 1 : 0;
 
         // Continuazione dalla fine: futureBarsCount==0 significa che il seek era
-        // alla fine della waveform, non nel mezzo. In questo caso le nuove barre
-        // devono usare il colore base (segmento 0), non il colore overdub.
+        // alla fine della waveform, non nel mezzo. Manteniamo il colore corrente.
         if (_futureBarsCount == 0) {
-          _currentSegment = 0;
+          _overwriteCount--; // Annulla l'incremento fatto prima del setState
+          _currentSegment = _waveSegments.isNotEmpty ? _waveSegments.last : 0;
         }
       });
       _currentAmplitude = 0.0;
@@ -507,7 +526,16 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   seekVersion: _seekVersion,
                   futureBarsCount: _futureBarsCount,
                   pulseAnimation: _pulseAnimation,
-                  onToggle: widget.onToggle,
+                  onToggle: () {
+                    if (widget.isPaused) {
+                      widget.onResume?.call(
+                        seekBarIndex: _seekBarIndex,
+                        waveData: _waveData,
+                      );
+                    } else {
+                      widget.onToggle();
+                    }
+                  },
                   onPause: widget.onPause,
                   onDone: widget.onDone,
                   onChat: widget.onChat,
@@ -545,6 +573,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   blocSeekBarIndex: widget.isPlayingPreview
                       ? widget.blocSeekBarIndex
                       : null,
+                  sessionCounter: widget.sessionCounter,
                 )
               : RecordingCompactView(
                   key: const ValueKey('compact'),
@@ -555,7 +584,16 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   waveData: _waveData,
                   waveSegments: _waveSegments,
                   pulseAnimation: _pulseAnimation,
-                  onToggle: widget.onToggle,
+                  onToggle: () {
+                    if (widget.isPaused) {
+                      widget.onResume?.call(
+                        seekBarIndex: _seekBarIndex,
+                        waveData: _waveData,
+                      );
+                    } else {
+                      widget.onToggle();
+                    }
+                  },
                 ),
         ),
       ),

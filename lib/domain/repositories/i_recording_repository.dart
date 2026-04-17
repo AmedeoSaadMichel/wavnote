@@ -1,6 +1,8 @@
 // File: domain/repositories/i_recording_repository.dart
+import 'package:dartz/dartz.dart';
 import '../entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
+import '../../core/errors/failures.dart';
 
 /// Repository interface for recording operations
 ///
@@ -26,18 +28,18 @@ abstract class IRecordingRepository {
   Future<RecordingEntity> updateRecording(RecordingEntity recording);
 
   /// Delete a recording by ID
-  Future<bool> deleteRecording(String id);
+  Future<Either<Failure, Unit>> deleteRecording(String id);
 
   // ==== SOFT DELETE OPERATIONS ====
 
   /// Soft delete a recording (move to Recently Deleted)
-  Future<bool> softDeleteRecording(String id);
+  Future<Either<Failure, Unit>> softDeleteRecording(String id);
 
   /// Restore a recording from Recently Deleted
-  Future<bool> restoreRecording(String id);
+  Future<Either<Failure, Unit>> restoreRecording(String id);
 
   /// Permanently delete a recording
-  Future<bool> permanentlyDeleteRecording(String id);
+  Future<Either<Failure, Unit>> permanentlyDeleteRecording(String id);
 
   /// Get recordings that should be auto-deleted (older than 15 days)
   Future<List<RecordingEntity>> getExpiredDeletedRecordings();
@@ -76,25 +78,25 @@ abstract class IRecordingRepository {
   // ==== BULK OPERATIONS ====
 
   /// Move multiple recordings to a different folder
-  Future<bool> moveRecordingsToFolder(
+  Future<Either<Failure, Unit>> moveRecordingsToFolder(
     List<String> recordingIds,
     String folderId,
   );
 
   /// Delete multiple recordings
-  Future<bool> deleteRecordings(List<String> recordingIds);
+  Future<Either<Failure, Unit>> deleteRecordings(List<String> recordingIds);
 
   /// Mark multiple recordings as favorite/unfavorite
-  Future<bool> updateRecordingsFavoriteStatus(
+  Future<Either<Failure, Unit>> updateRecordingsFavoriteStatus(
     List<String> recordingIds,
     bool isFavorite,
   );
 
   /// Toggle favorite status of a single recording
-  Future<bool> toggleFavorite(String recordingId);
+  Future<Either<Failure, Unit>> toggleFavorite(String recordingId);
 
   /// Add tags to multiple recordings
-  Future<bool> addTagsToRecordings(
+  Future<Either<Failure, Unit>> addTagsToRecordings(
     List<String> recordingIds,
     List<String> tags,
   );
@@ -128,7 +130,7 @@ abstract class IRecordingRepository {
   Future<int> cleanupOrphanedRecordings();
 
   /// Rebuild recording indices for performance
-  Future<bool> rebuildIndices();
+  Future<Either<Failure, Unit>> rebuildIndices();
 
   /// Validate all recording data integrity
   Future<List<String>> validateRecordingIntegrity();
@@ -139,10 +141,10 @@ abstract class IRecordingRepository {
   Future<Map<String, dynamic>> exportRecordings();
 
   /// Import recordings metadata from JSON
-  Future<bool> importRecordings(Map<String, dynamic> data);
+  Future<Either<Failure, Unit>> importRecordings(Map<String, dynamic> data);
 
   /// Clear all recordings (for testing/reset)
-  Future<bool> clearAllRecordings();
+  Future<Either<Failure, Unit>> clearAllRecordings();
 
   /// Get recordings that need to be backed up
   Future<List<RecordingEntity>> getRecordingsForBackup();

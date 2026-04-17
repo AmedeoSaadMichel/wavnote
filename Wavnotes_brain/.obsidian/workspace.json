@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "log/sessions/2026-04-14-overdub-unit-testing.md",
+                "file": "templates/adr.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-04-14-overdub-unit-testing"
+              "title": "adr"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "log/sessions/2026-04-14-overdub-unit-testing.md",
+                "file": "templates/adr.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for 2026-04-14-overdub-unit-testing"
+              "title": "Backlinks for adr"
             }
           },
           {
@@ -181,15 +181,17 @@
       "bases:Create new base": false
     }
   },
-  "active": "3ff66f1c75664c7f",
+  "active": "80fee6cdb3ebc1b1",
   "lastOpenFiles": [
-    "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
+    "log/sessions/2026-04-16-debug-waveform.md",
+    "templates/session.md",
+    "templates/adr.md",
     "log/sessions/2026-04-14-overdub-unit-testing.md",
+    "log/sessions/2026-04-16-Inizio-Sessione.md",
+    "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
     "log/sessions/2026-04-14-playback-logic-fixes.md",
     "log/sessions/2026-04-15-fix-race-condition-playback.md",
     "_index.md",
-    "templates/adr.md",
-    "templates/session.md",
     "project/tech-debt.md",
     "project/features.md",
     "project/CLAUDE.md",

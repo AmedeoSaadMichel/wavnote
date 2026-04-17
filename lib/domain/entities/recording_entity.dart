@@ -1,15 +1,13 @@
 // File: domain/entities/recording_entity.dart
 import 'package:equatable/equatable.dart';
 import '../../core/enums/audio_format.dart';
+import '../../core/utils/app_file_utils.dart';
 
 /// Pure business entity representing an audio recording
-///
-/// Contains only business logic with no external dependencies.
-/// Represents the core data and behavior of a voice recording.
 class RecordingEntity extends Equatable {
   final String id;
   final String name;
-  final String filePath;
+  final String filePath; // Path relativo memorizzato nel DB
   final String folderId;
   final AudioFormat format;
   final Duration duration;
@@ -49,66 +47,51 @@ class RecordingEntity extends Equatable {
     this.waveformData,
   });
 
+  // Getter per risolvere il path assoluto
+  Future<String> get resolvedFilePath => AppFileUtils.resolve(filePath);
+
   // ==== BUSINESS LOGIC PROPERTIES ====
+  // ... (tutto il resto invariato) ...
 
-  /// Whether this recording is empty/invalid
   bool get isEmpty => duration.inSeconds == 0 || fileSize == 0;
-
-  /// Whether this recording has a valid duration
   bool get hasValidDuration => duration.inSeconds > 0;
-
-  /// Whether this recording has location data
   bool get hasLocation => latitude != null && longitude != null;
-
-  /// Whether this recording has been modified since creation
   bool get isModified => updatedAt != null && updatedAt!.isAfter(createdAt);
-
-  /// Whether this recording is in Recently Deleted folder
   bool get isInTrash => isDeleted && folderId == 'recently_deleted';
-
-  /// Days remaining before permanent deletion (15 days max)
   int get daysUntilPermanentDeletion {
     if (!isDeleted || deletedAt == null) return 0;
     final daysSinceDeletion = DateTime.now().difference(deletedAt!).inDays;
     return (15 - daysSinceDeletion).clamp(0, 15);
   }
 
-  /// Whether this recording should be permanently deleted (older than 15 days)
   bool get shouldBePermanentlyDeleted {
     if (!isDeleted || deletedAt == null) return false;
     return DateTime.now().difference(deletedAt!).inDays >= 15;
   }
 
-  /// File size in human-readable format
   String get fileSizeFormatted {
     if (fileSize < 1024) return '${fileSize}B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)}KB';
+    if (fileSize < 1024 * 1024)
+      return '${(fileSize / 1024).toStringAsFixed(1)}KB';
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
-  /// Duration in human-readable format
   String get durationFormatted {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-
-    if (hours > 0) {
+    if (hours > 0)
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// Short duration format for lists
   String get shortDurationFormatted {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds.remainder(60);
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// File extension based on format
   String get fileExtension => format.fileExtension;
-
-  /// Quality description based on sample rate
   String get qualityDescription {
     if (sampleRate >= 48000) return 'High Quality';
     if (sampleRate >= 44100) return 'CD Quality';
@@ -116,11 +99,9 @@ class RecordingEntity extends Equatable {
     return 'Basic Quality';
   }
 
-  /// Recording age description
   String get ageDescription {
     final now = DateTime.now();
     final difference = now.difference(createdAt);
-
     if (difference.inDays > 365) {
       final years = (difference.inDays / 365).floor();
       return '${years} year${years > 1 ? 's' : ''} ago';
@@ -138,9 +119,6 @@ class RecordingEntity extends Equatable {
     }
   }
 
-  // ==== BUSINESS LOGIC METHODS ====
-
-  /// Validate if recording name is acceptable
   bool isValidName(String name) {
     final trimmed = name.trim();
     return trimmed.isNotEmpty &&
@@ -148,45 +126,29 @@ class RecordingEntity extends Equatable {
         !_containsInvalidCharacters(trimmed);
   }
 
-  /// Check if name contains invalid characters for file system
   bool _containsInvalidCharacters(String name) {
     const invalidChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
     return invalidChars.any((char) => name.contains(char));
   }
 
-  /// Get validation error message for a name
   String? getNameValidationError(String name) {
     final trimmed = name.trim();
-
-    if (trimmed.isEmpty) {
-      return 'Recording name cannot be empty';
-    }
-
-    if (trimmed.length > 100) {
+    if (trimmed.isEmpty) return 'Recording name cannot be empty';
+    if (trimmed.length > 100)
       return 'Recording name cannot exceed 100 characters';
-    }
-
-    if (_containsInvalidCharacters(trimmed)) {
+    if (_containsInvalidCharacters(trimmed))
       return 'Recording name contains invalid characters';
-    }
-
-    return null; // No error
+    return null;
   }
 
-  /// Check if recording can be moved to another folder
-  bool canBeMovedToFolder(String targetFolderId) {
-    return targetFolderId != folderId && targetFolderId.isNotEmpty;
-  }
-
-  /// Calculate recording bitrate (approximate)
+  bool canBeMovedToFolder(String targetFolderId) =>
+      targetFolderId != folderId && targetFolderId.isNotEmpty;
   int get approximateBitrate {
     if (duration.inSeconds == 0) return 0;
     return ((fileSize * 8) / duration.inSeconds).round();
   }
 
   // ==== IMMUTABLE UPDATE METHODS ====
-
-  /// Create a copy with updated values
   RecordingEntity copyWith({
     String? id,
     String? name,
@@ -231,91 +193,48 @@ class RecordingEntity extends Equatable {
     );
   }
 
-  /// Mark recording as favorite
-  RecordingEntity markAsFavorite() {
-    return copyWith(
-      isFavorite: true,
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  /// Remove from favorites
-  RecordingEntity removeFromFavorites() {
-    return copyWith(
-      isFavorite: false,
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  /// Toggle favorite status
-  RecordingEntity toggleFavorite() {
-    return copyWith(
-      isFavorite: !isFavorite,
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  /// Rename the recording
+  RecordingEntity markAsFavorite() =>
+      copyWith(isFavorite: true, updatedAt: DateTime.now());
+  RecordingEntity removeFromFavorites() =>
+      copyWith(isFavorite: false, updatedAt: DateTime.now());
+  RecordingEntity toggleFavorite() =>
+      copyWith(isFavorite: !isFavorite, updatedAt: DateTime.now());
   RecordingEntity rename(String newName) {
-    if (!isValidName(newName)) {
+    if (!isValidName(newName))
       throw ArgumentError('Invalid recording name: $newName');
-    }
-
-    return copyWith(
-      name: newName.trim(),
-      updatedAt: DateTime.now(),
-    );
+    return copyWith(name: newName.trim(), updatedAt: DateTime.now());
   }
 
-  /// Move to different folder
   RecordingEntity moveToFolder(String newFolderId) {
-    if (!canBeMovedToFolder(newFolderId)) {
+    if (!canBeMovedToFolder(newFolderId))
       throw ArgumentError('Cannot move recording to folder: $newFolderId');
-    }
-
-    return copyWith(
-      folderId: newFolderId,
-      updatedAt: DateTime.now(),
-    );
+    return copyWith(folderId: newFolderId, updatedAt: DateTime.now());
   }
 
-  /// Add tag to recording
   RecordingEntity addTag(String tag) {
     if (tags.contains(tag)) return this;
-
-    return copyWith(
-      tags: [...tags, tag],
-      updatedAt: DateTime.now(),
-    );
+    return copyWith(tags: [...tags, tag], updatedAt: DateTime.now());
   }
 
-  /// Remove tag from recording
   RecordingEntity removeTag(String tag) {
     if (!tags.contains(tag)) return this;
-
     return copyWith(
       tags: tags.where((t) => t != tag).toList(),
       updatedAt: DateTime.now(),
     );
   }
 
-  /// Soft delete recording - move to Recently Deleted folder
-  RecordingEntity softDelete() {
-    return copyWith(
-      originalFolderId: folderId, // Store current folder
-      folderId: 'recently_deleted', // Move to Recently Deleted
-      isDeleted: true,
-      deletedAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  /// Restore recording from Recently Deleted folder
+  RecordingEntity softDelete() => copyWith(
+    originalFolderId: folderId,
+    folderId: 'recently_deleted',
+    isDeleted: true,
+    deletedAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  );
   RecordingEntity restore() {
     if (!isDeleted || originalFolderId == null) return this;
-    
     return copyWith(
-      folderId: originalFolderId, // Restore to original folder
+      folderId: originalFolderId,
       isDeleted: false,
       deletedAt: null,
       originalFolderId: null,
@@ -324,8 +243,6 @@ class RecordingEntity extends Equatable {
   }
 
   // ==== FACTORY CONSTRUCTORS ====
-
-  /// Create a new recording entity
   factory RecordingEntity.create({
     required String name,
     required String filePath,
@@ -356,8 +273,6 @@ class RecordingEntity extends Equatable {
       tags: tags,
     );
   }
-
-  /// Create from raw data (for database/API)
   factory RecordingEntity.fromData({
     required String id,
     required String name,
@@ -394,9 +309,6 @@ class RecordingEntity extends Equatable {
     );
   }
 
-  // ==== DATA CONVERSION METHODS ====
-
-  /// Convert to raw data (for database/API)
   Map<String, dynamic> toData() {
     return {
       'id': id,
@@ -417,29 +329,14 @@ class RecordingEntity extends Equatable {
     };
   }
 
-  // ==== COMPARISON METHODS ====
-
-  /// Compare recordings by creation date (newest first)
-  static int compareByCreatedDate(RecordingEntity a, RecordingEntity b) {
-    return b.createdAt.compareTo(a.createdAt);
-  }
-
-  /// Compare recordings by name (alphabetical)
-  static int compareByName(RecordingEntity a, RecordingEntity b) {
-    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-  }
-
-  /// Compare recordings by duration (longest first)
-  static int compareByDuration(RecordingEntity a, RecordingEntity b) {
-    return b.duration.compareTo(a.duration);
-  }
-
-  /// Compare recordings by file size (largest first)
-  static int compareByFileSize(RecordingEntity a, RecordingEntity b) {
-    return b.fileSize.compareTo(a.fileSize);
-  }
-
-  // ==== EQUATABLE IMPLEMENTATION ====
+  static int compareByCreatedDate(RecordingEntity a, RecordingEntity b) =>
+      b.createdAt.compareTo(a.createdAt);
+  static int compareByName(RecordingEntity a, RecordingEntity b) =>
+      a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  static int compareByDuration(RecordingEntity a, RecordingEntity b) =>
+      b.duration.compareTo(a.duration);
+  static int compareByFileSize(RecordingEntity a, RecordingEntity b) =>
+      b.fileSize.compareTo(a.fileSize);
 
   @override
   List<Object?> get props => [
@@ -463,9 +360,7 @@ class RecordingEntity extends Equatable {
     originalFolderId,
     waveformData,
   ];
-
   @override
-  String toString() {
-    return 'RecordingEntity{id: $id, name: $name, duration: $durationFormatted, size: $fileSizeFormatted}';
-  }
+  String toString() =>
+      'RecordingEntity{id: $id, name: $name, duration: $durationFormatted, size: $fileSizeFormatted}';
 }

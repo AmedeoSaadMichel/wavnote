@@ -53,12 +53,12 @@ class AudioRecordingException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -124,12 +124,12 @@ class AudioPlaybackException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -192,12 +192,12 @@ class FileSystemException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -267,12 +267,12 @@ class DatabaseException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -351,12 +351,12 @@ class PermissionException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -397,12 +397,12 @@ class ValidationException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -450,12 +450,12 @@ class NetworkException extends WavNoteException {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
   }) : super(
-    message: message,
-    code: code,
-    originalError: originalError,
-    stackTrace: stackTrace,
-    context: context,
-  );
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
 
   @override
   String get userMessage {
@@ -486,6 +486,41 @@ enum NetworkErrorType {
   syncFailed,
 }
 
+// ==== SYSTEM EXCEPTIONS ====
+
+/// Exception thrown when system-level operations fail
+class SystemException extends WavNoteException {
+  final SystemErrorType errorType;
+
+  const SystemException({
+    required String message,
+    required this.errorType,
+    String? code,
+    dynamic originalError,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? context,
+  }) : super(
+         message: message,
+         code: code,
+         originalError: originalError,
+         stackTrace: stackTrace,
+         context: context,
+       );
+
+  @override
+  bool get isCritical => errorType == SystemErrorType.unknown;
+}
+
+/// Types of system errors
+enum SystemErrorType {
+  permissionDenied,
+  networkError,
+  validationError,
+  invalidArgument,
+  invalidState,
+  unknown,
+}
+
 // ==== HELPER FUNCTIONS ====
 
 /// Create an AudioRecordingException for common scenarios
@@ -496,8 +531,7 @@ AudioRecordingException createAudioRecordingException({
   StackTrace? stackTrace,
   Map<String, dynamic>? context,
 }) {
-  String message = customMessage ?? _getDefaultAudioRecordingMessage(type);
-
+  String message = customMessage ?? 'Audio recording error';
   return AudioRecordingException(
     message: message,
     errorType: type,
@@ -515,8 +549,7 @@ AudioPlaybackException createAudioPlaybackException({
   StackTrace? stackTrace,
   Map<String, dynamic>? context,
 }) {
-  String message = customMessage ?? _getDefaultAudioPlaybackMessage(type);
-
+  String message = customMessage ?? 'Audio playback error';
   return AudioPlaybackException(
     message: message,
     errorType: type,
@@ -534,9 +567,10 @@ FileSystemException createFileSystemException({
   dynamic originalError,
   StackTrace? stackTrace,
 }) {
-  String message = customMessage ?? _getDefaultFileSystemMessage(type);
-  Map<String, dynamic>? context = filePath != null ? {'filePath': filePath} : null;
-
+  String message = customMessage ?? 'File system error';
+  Map<String, dynamic>? context = filePath != null
+      ? {'filePath': filePath}
+      : null;
   return FileSystemException(
     message: message,
     errorType: type,
@@ -544,74 +578,4 @@ FileSystemException createFileSystemException({
     stackTrace: stackTrace,
     context: context,
   );
-}
-
-// Private helper functions for default messages
-String _getDefaultAudioRecordingMessage(AudioRecordingErrorType type) {
-  switch (type) {
-    case AudioRecordingErrorType.microphonePermissionDenied:
-      return 'Microphone permission denied';
-    case AudioRecordingErrorType.microphoneUnavailable:
-      return 'Microphone unavailable';
-    case AudioRecordingErrorType.audioServiceInitializationFailed:
-      return 'Audio service initialization failed';
-    case AudioRecordingErrorType.recordingStartFailed:
-      return 'Recording start failed';
-    case AudioRecordingErrorType.recordingStopFailed:
-      return 'Recording stop failed';
-    case AudioRecordingErrorType.unsupportedAudioFormat:
-      return 'Unsupported audio format';
-    case AudioRecordingErrorType.insufficientStorage:
-      return 'Insufficient storage space';
-    case AudioRecordingErrorType.audioDeviceError:
-      return 'Audio device error';
-    case AudioRecordingErrorType.recordingInterrupted:
-      return 'Recording interrupted';
-  }
-}
-
-String _getDefaultAudioPlaybackMessage(AudioPlaybackErrorType type) {
-  switch (type) {
-    case AudioPlaybackErrorType.audioFileNotFound:
-      return 'Audio file not found';
-    case AudioPlaybackErrorType.audioFileCorrupted:
-      return 'Audio file corrupted';
-    case AudioPlaybackErrorType.unsupportedAudioFormat:
-      return 'Unsupported audio format';
-    case AudioPlaybackErrorType.playbackInitializationFailed:
-      return 'Playback initialization failed';
-    case AudioPlaybackErrorType.playbackStartFailed:
-      return 'Playback start failed';
-    case AudioPlaybackErrorType.audioServiceUnavailable:
-      return 'Audio service unavailable';
-    case AudioPlaybackErrorType.audioDeviceError:
-      return 'Audio device error';
-    case AudioPlaybackErrorType.playbackInterrupted:
-      return 'Playback interrupted';
-  }
-}
-
-String _getDefaultFileSystemMessage(FileSystemErrorType type) {
-  switch (type) {
-    case FileSystemErrorType.fileNotFound:
-      return 'File not found';
-    case FileSystemErrorType.accessDenied:
-      return 'Access denied';
-    case FileSystemErrorType.insufficientStorage:
-      return 'Insufficient storage';
-    case FileSystemErrorType.fileAlreadyExists:
-      return 'File already exists';
-    case FileSystemErrorType.invalidFileName:
-      return 'Invalid file name';
-    case FileSystemErrorType.fileCorrupted:
-      return 'File corrupted';
-    case FileSystemErrorType.directoryCreationFailed:
-      return 'Directory creation failed';
-    case FileSystemErrorType.fileDeletionFailed:
-      return 'File deletion failed';
-    case FileSystemErrorType.fileMoveFailed:
-      return 'File move failed';
-    case FileSystemErrorType.fileCopyFailed:
-      return 'File copy failed';
-  }
 }

@@ -22,7 +22,7 @@ abstract class RecordingState extends Equatable {
         this is RecordingPermissionStatus ||
         this is RecordingCompleted ||
         this is RecordingCancelled ||
-        this is RecordingLoaded; // Can start recording while viewing recordings
+        this is RecordingLoaded;
   }
 
   /// Whether can stop recording
@@ -90,12 +90,8 @@ class RecordingInProgress extends RecordingState {
   final String? title;
   final String? originalFilePathForOverwrite;
   final Duration? overwriteStartTime;
-  final String?
-  seekBasePath; // path del file base tagliato se è avvenuto un seek-trim
-  /// Dati waveform troncati dopo un seek-and-resume; null per registrazioni normali.
+  final String? seekBasePath;
   final List<double>? truncatedWaveData;
-
-  /// Dati waveform completi per il player, non vengono mai troncati.
   final List<double>? waveformDataForPlayer;
 
   const RecordingInProgress({
@@ -115,6 +111,9 @@ class RecordingInProgress extends RecordingState {
     this.truncatedWaveData,
     this.waveformDataForPlayer,
   });
+
+  // Getter per risolvere il path assoluto
+  Future<String> get resolvedFilePath => AppFileUtils.resolve(filePath);
 
   @override
   List<Object?> get props => [
@@ -183,10 +182,7 @@ class RecordingPaused extends RecordingState {
   final Duration duration;
   final DateTime startTime;
 
-  /// true mentre il playback di anteprima è attivo (ascolto del registrato).
   final bool isPlayingPreview;
-
-  /// Indice della barra di seek nella waveform (single source of truth).
   final int seekBarIndex;
 
   final String? seekBasePath;
@@ -194,7 +190,6 @@ class RecordingPaused extends RecordingState {
   final Duration? overwriteStartTime;
   final List<double>? truncatedWaveData;
 
-  /// File path del preview assemblato, riutilizzato per playback multipli.
   final String? previewFilePath;
 
   const RecordingPaused({
@@ -215,6 +210,12 @@ class RecordingPaused extends RecordingState {
     this.truncatedWaveData,
     this.previewFilePath,
   });
+
+  // Getter per risolvere i path assoluti
+  Future<String> get resolvedFilePath => AppFileUtils.resolve(filePath);
+  Future<String?> get resolvedPreviewFilePath async => previewFilePath != null
+      ? await AppFileUtils.resolve(previewFilePath!)
+      : null;
 
   @override
   List<Object?> get props => [

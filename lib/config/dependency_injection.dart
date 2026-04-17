@@ -31,6 +31,14 @@ import '../services/audio/audio_service_coordinator.dart';
 import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
 
+// Nuovi import per la riproduzione audio
+import '../services/audio/i_audio_playback_engine.dart';
+import '../services/audio/audio_playback_engine_impl.dart';
+import '../services/audio/i_audio_preparation_service.dart';
+import '../services/audio/audio_preparation_service.dart'; // Implementazione concreta
+import '../services/audio/audio_cache_manager.dart'; // Cache Manager
+import '../presentation/screens/recording/controllers/recording_playback_coordinator.dart';
+
 /// Global service locator — use sl<T>() to resolve dependencies
 final GetIt sl = GetIt.instance;
 
@@ -48,6 +56,37 @@ Future<void> setupDependencies() async {
 
   if (!sl.isRegistered<ILocationRepository>()) {
     sl.registerLazySingleton<ILocationRepository>(() => GeolocationService());
+  }
+
+  // Nuove registrazioni per il playback audio (Engine e PreparationService sono Singleton)
+  if (!sl.isRegistered<IAudioPlaybackEngine>()) {
+    sl.registerLazySingleton<IAudioPlaybackEngine>(
+      () => AudioPlaybackEngineImpl(),
+    );
+  }
+
+  if (!sl.isRegistered<AudioCacheManager>()) {
+    sl.registerLazySingleton<AudioCacheManager>(() => AudioCacheManager());
+  }
+
+  if (!sl.isRegistered<IAudioPreparationService>()) {
+    sl.registerLazySingleton<IAudioPreparationService>(
+      () => AudioPreparationService(
+        engine: sl<IAudioPlaybackEngine>(),
+        cacheManager: sl<AudioCacheManager>(),
+      ),
+    );
+  }
+
+  // RecordingPlaybackCoordinator è ora un factory per istanze per ogni schermata.
+  // Verrà creato e inizializzato dalla schermata stessa.
+  if (!sl.isRegistered<RecordingPlaybackCoordinator>()) {
+    sl.registerFactory<RecordingPlaybackCoordinator>(
+      () => RecordingPlaybackCoordinator(
+        engine: sl<IAudioPlaybackEngine>(),
+        preparationService: sl<IAudioPreparationService>(),
+      ),
+    );
   }
 
   // ── Repositories ──────────────────────────────────────────
@@ -72,12 +111,22 @@ Future<void> setupDependencies() async {
   }
 
   // ── Audio initialization ───────────────────────────────────
-  // Initialize the audio coordinator eagerly so it is ready
-  // before the first BLoC is created. The guard inside
-  // AudioServiceCoordinator.initialize() makes this idempotent.
-  final audioInitialized = await sl<IAudioServiceRepository>().initialize();
-  if (!audioInitialized) {
-    // Non-fatal: app continues, recording will fail gracefully
-    assert(false, 'AudioServiceCoordinator failed to initialize');
+  // Inizializza i servizi audio singleton (Engine e PreparationService)
+  final engineInitialized = await sl<IAudioPlaybackEngine>().initialize();
+  if (!engineInitialized) {
+    assert(false, 'AudioPlaybackEngine failed to initialize');
   }
+  // Il PreparationService non necessita di una initialize esplicita al momento se è singleton.
+  // sl<IAudioPreparationService>().initialize(); // Se avesse un metodo initialize
+
+  // Il RecordingPlaybackCoordinator, essendo un factory, sarà inizializzato
+  // dalla schermata che lo richiede.
+
+  // TODO: Valutare la rimozione o la riorganizzazione di questa sezione
+  // Inizializzazione del vecchio AudioServiceCoordinator, potrebbe non essere più necessario per il playback
+  // final audioInitialized = await sl<IAudioServiceRepository>().initialize();
+  // if (!audioInitialized) {
+  //   // Non-fatal: app continues, recording will fail gracefully
+  //   assert(false, 'AudioServiceCoordinator failed to initialize');
+  // }
 }
