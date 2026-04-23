@@ -97,7 +97,7 @@ class RecordingCard extends StatefulWidget {
   final VoidCallback? onSelectionToggle; // Callback for selection toggle
 
   const RecordingCard({
-    Key? key,
+    super.key,
     required this.recording,
     required this.isExpanded,
     this.onTap,
@@ -121,7 +121,7 @@ class RecordingCard extends StatefulWidget {
     this.isEditMode = false,
     this.isSelected = false,
     this.onSelectionToggle,
-  }) : super(key: key);
+  });
 
   @override
   State<RecordingCard> createState() => _RecordingCardState();

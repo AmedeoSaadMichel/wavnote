@@ -12,14 +12,14 @@ class PullToSearchList extends StatefulWidget {
   final EdgeInsets? padding;
 
   const PullToSearchList({
-    Key? key,
+    super.key,
     required this.itemBuilder,
     required this.itemCount,
     required this.onSearchChanged,
     this.searchQuery = '',
     this.emptyState,
     this.padding,
-  }) : super(key: key);
+  });
 
   @override
   State<PullToSearchList> createState() => _PullToSearchListState();

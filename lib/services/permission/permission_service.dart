@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart' as ph; // Alias
 import 'package:flutter/foundation.dart';
 import '../../core/errors/exceptions.dart';
-import '../../core/errors/failure_types/system_failures.dart';
 
 class PermissionService {
   static const String _tag = 'PermissionService';

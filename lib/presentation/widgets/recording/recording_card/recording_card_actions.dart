@@ -15,7 +15,7 @@ class RecordingCardActions extends StatelessWidget {
   final VoidCallback onToggleFavorite;
 
   const RecordingCardActions({
-    Key? key,
+    super.key,
     required this.isSwipeActionsVisible,
     required this.isFavoriteActionVisible,
     required this.isFavorite,
@@ -25,7 +25,7 @@ class RecordingCardActions extends StatelessWidget {
     required this.onMoreActions,
     required this.onMoveToFolder,
     required this.onToggleFavorite,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

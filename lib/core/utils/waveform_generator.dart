@@ -133,8 +133,7 @@ class WaveformGenerator {
           break;
         case WaveformPattern.balanced:
         case WaveformPattern.auto:
-        default:
-          amplitude = _generateBalancedPattern(random, position, i);
+        amplitude = _generateBalancedPattern(random, position, i);
           break;
       }
 

@@ -74,7 +74,7 @@ class FileUtils {
   static Future<String> generateRecordingPath(String folderId, AudioFormat format) async {
     final folderDir = await getFolderDirectory(folderId);
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final fileName = 'recording_${timestamp}${format.fileExtension}';
+    final fileName = 'recording_$timestamp${format.fileExtension}';
 
     return path.join(folderDir.path, fileName);
   }
@@ -87,7 +87,7 @@ class FileUtils {
       ) async {
     final folderDir = await getFolderDirectory(folderId);
     final safeName = AppConstants.getSafeFileName(recordingName);
-    final fileName = '${safeName}${format.fileExtension}';
+    final fileName = '$safeName${format.fileExtension}';
 
     // Ensure unique filename
     String finalPath = path.join(folderDir.path, fileName);

@@ -8,7 +8,6 @@ import '../../domain/entities/recording_entity.dart';
 import 'file_manager_service.dart';
 import 'metadata_service.dart';
 import '../../core/errors/exceptions.dart';
-import '../../core/errors/failure_types/data_failures.dart';
 
 /// Export Service - File Sharing and Distribution
 class ExportService {

@@ -1,10 +1,8 @@
 // File: test/unit/services/audio_recorder_service_test.dart
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'dart:async';
 
 import 'package:wavnote/services/audio/audio_recorder_service.dart';
-import 'package:wavnote/core/enums/audio_format.dart';
 
 // Note: This test focuses on memory leak prevention in disposal methods
 // Full testing would require mocking Flutter Sound components

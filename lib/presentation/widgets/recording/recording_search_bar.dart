@@ -9,12 +9,12 @@ class RecordingSearchBar extends StatefulWidget {
   final bool showVoiceIcon;
 
   const RecordingSearchBar({
-    Key? key,
+    super.key,
     this.hintText = 'Titles',
     required this.onSearchChanged,
     this.onVoiceSearch,
     this.showVoiceIcon = true,
-  }) : super(key: key);
+  });
 
   @override
   State<RecordingSearchBar> createState() => _RecordingSearchBarState();

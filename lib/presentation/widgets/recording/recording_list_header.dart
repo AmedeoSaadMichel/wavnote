@@ -15,12 +15,12 @@ class RecordingListHeader extends StatelessWidget {
   final VoidCallback? onMoveSelected;
 
   const RecordingListHeader({
-    Key? key,
+    super.key,
     required this.folderName,
     required this.onBack,
     this.onShowFormatDialog,
     this.onMoveSelected,
-  }) : super(key: key);
+  });
 
   /// Show confirmation dialog for deleting selected recordings
   void _showDeleteConfirmation(BuildContext context, RecordingLoaded recordingState) {

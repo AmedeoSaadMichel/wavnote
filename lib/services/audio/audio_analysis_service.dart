@@ -2,7 +2,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math' as math;
-import 'package:audio_waveforms/audio_waveforms.dart';
 
 /// Service for analyzing audio files and extracting real waveform data
 /// 
@@ -37,7 +36,7 @@ class AudioAnalysisService {
         return _generateFallbackWaveform(sampleCount);
       }
 
-      print('📊 File size: ${fileSize} bytes');
+      print('📊 File size: $fileSize bytes');
 
       // Try to extract REAL audio data using audio_waveforms
       final waveformData = await _extractAudioAmplitudes(filePath, sampleCount);

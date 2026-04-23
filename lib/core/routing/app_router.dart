@@ -55,7 +55,6 @@ import '../../presentation/screens/recording/recording_list_screen.dart'; // Rec
 
 // Domain imports
 import '../../domain/entities/folder_entity.dart'; // Folder business entity
-import '../../core/enums/folder_type.dart'; // Folder type enum
 
 // BLoC imports
 import '../../presentation/bloc/folder/folder_bloc.dart'; // Folder state management

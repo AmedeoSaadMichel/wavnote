@@ -210,10 +210,12 @@ class RecordingModel {
 
   bool get isValid {
     try {
-      if (id.isEmpty || name.isEmpty || filePath.isEmpty || folderId.isEmpty)
+      if (id.isEmpty || name.isEmpty || filePath.isEmpty || folderId.isEmpty) {
         return false;
-      if (formatIndex < 0 || formatIndex >= AudioFormat.values.length)
+      }
+      if (formatIndex < 0 || formatIndex >= AudioFormat.values.length) {
         return false;
+      }
       if (durationSeconds < 0 || fileSize < 0 || sampleRate <= 0) return false;
       DateTime.parse(createdAt);
       if (updatedAt != null) DateTime.parse(updatedAt!);

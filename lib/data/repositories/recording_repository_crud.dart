@@ -8,10 +8,7 @@ import '../database/database_helper.dart';
 import '../models/recording_model.dart';
 import 'recording_repository_base.dart';
 import '../../core/errors/failures.dart';
-import '../../core/errors/failure_utils.dart';
 import '../../core/errors/exceptions.dart';
-import '../../core/errors/failure_types/data_failures.dart';
-import '../../core/errors/failure_types/system_failures.dart';
 import '../../core/utils/app_file_utils.dart'; // Import necessario
 
 /// CRUD operations for recording repository

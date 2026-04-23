@@ -203,13 +203,13 @@ class RecordingWaveformWidget extends StatelessWidget {
   final bool animated;
 
   const RecordingWaveformWidget({
-    Key? key,
+    super.key,
     required this.amplitudes,
     this.waveColor = Colors.red,
     this.backgroundColor = Colors.transparent,
     this.height = 40.0,
     this.animated = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,13 +1,9 @@
 // File: data/repositories/recording_repository_bulk.dart
-import 'package:flutter/foundation.dart';
 import 'package:dartz/dartz.dart';
 import '../database/database_helper.dart';
 import 'recording_repository_base.dart';
 import '../../core/errors/failures.dart';
-import '../../core/errors/failure_utils.dart';
 import '../../core/errors/exceptions.dart'; // Importa per i tipi di errore
-import '../../core/errors/failure_types/data_failures.dart';
-import '../../core/errors/failure_types/system_failures.dart';
 
 /// Bulk operations for recording repository
 class RecordingRepositoryBulk extends RecordingRepositoryBase {

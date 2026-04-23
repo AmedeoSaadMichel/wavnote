@@ -7,7 +7,6 @@ import 'package:geocoding/geocoding.dart';
 
 import '../../domain/repositories/i_location_repository.dart';
 import '../../core/errors/exceptions.dart';
-import '../../core/errors/failure_types/system_failures.dart';
 
 class GeolocationService implements ILocationRepository {
   static const String _tag = 'GeolocationService';

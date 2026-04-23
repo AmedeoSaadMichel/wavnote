@@ -56,7 +56,7 @@
 // testabile e con messaggi chiari per l'utente, mantenendo una netta separazione
 // delle responsabilità tra i layer.
 import 'package:equatable/equatable.dart';
-import 'package:dartz/dartz.dart'; // Importa dartz per Either e Unit
+// Importa dartz per Either e Unit
 
 // Export specific failure types for public API
 export 'failure_types/audio_failures.dart';

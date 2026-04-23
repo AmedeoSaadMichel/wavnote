@@ -36,11 +36,19 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | `test/unit/blocs/recording_lifecycle_bloc_test.dart` | Test del BLoC eliminato |
 | `test/unit/usecases/recording_lifecycle_usecase_test.dart` | Test del use case eliminato |
 
+## Nuovi servizi introdotti da refactor `77a722a` (non ancora integrati nel BLoC)
+
+| Area | Nota | Priorità |
+|------|------|---------|
+| `IAudioPlaybackEngine` / `AudioPlaybackEngineImpl` | Nuovo layer playback registrato nel DI ma non usato dal BLoC — il BLoC usa ancora `IAudioServiceRepository.startPlaying`. Valutare migrazione in sessione dedicata con test prima. | 🟡 Media |
+| `IAudioPreparationService` / `AudioPreparationService` | Idem — registrato ma non consumato. | 🟡 Media |
+| `RecordingPlaybackCoordinator` | Factory registrato nel DI ma non istanziato da nessuna schermata. | 🟡 Media |
+
 ## File uncommitted (da git status)
 
 | File | Stato | Note |
 |------|-------|------|
 | `ios/Runner.xcodeproj/project.pbxproj` | Modificato | Probabilmente legate al setup AVAudioEngine / SwiftLogPlugin |
 | `ios/SwiftLogPlugin.swift` | Eliminato | Bridge Swift era nativo, ora gestito diversamente |
-| `lib/presentation/bloc/recording/recording_bloc_lifecycle.dart` | Modificato | Refactoring lifecycle in corso |
-| `lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart` | Modificato | UI bottom sheet in corso |
+| `lib/presentation/bloc/recording/recording_bloc_lifecycle.dart` | Modificato | Fix playback rotto dopo refactor 2026-04-17 |
+| `lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart` | Modificato | UI bottom sheet con sessionCounter |

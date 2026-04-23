@@ -13,7 +13,6 @@ import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart';
-import 'package:wavnote/core/errors/failures.dart';
 import 'package:wavnote/domain/repositories/i_audio_trimmer_repository.dart';
 import 'package:wavnote/domain/usecases/recording/overwrite_recording_usecase.dart';
 import 'package:wavnote/config/dependency_injection.dart';

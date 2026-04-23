@@ -9,17 +9,12 @@ class FileSystemFailure extends Failure {
   final FileSystemErrorType errorType;
 
   const FileSystemFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.error,
+    super.context,
+  });
 
   /// Create failure from exception
   factory FileSystemFailure.fromException(FileSystemException exception) {
@@ -130,17 +125,12 @@ class DatabaseFailure extends Failure {
   final DatabaseErrorType errorType;
 
   const DatabaseFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.error,
+    super.context,
+  });
 
   /// Create failure from exception
   factory DatabaseFailure.fromException(DatabaseException exception) {
@@ -252,18 +242,13 @@ class ValidationFailure extends Failure {
   final String field;
 
   const ValidationFailure({
-    required String message,
+    required super.message,
     required this.errorType,
     required this.field,
-    String? code,
-    FailureSeverity severity = FailureSeverity.warning,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.warning,
+    super.context,
+  });
 
   /// Create failure from exception
   factory ValidationFailure.fromException(ValidationException exception) {

@@ -9,6 +9,7 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | Motore nativo AVAudioEngine (iOS/macOS) | `services/audio/audio_engine_service.dart` | ✅ Completato (fix flusso dati ampiezza) |
 | Fallback package `record` (non iOS) | `services/audio/audio_recorder_service.dart` | ✅ Presente (non attivo su iOS) |
 | Overdubbing / seek-and-overwrite | `domain/usecases/recording/overwrite_recording_usecase.dart` | ✅ Completato |
+| Playback preview durante pausa overdub | `audio_service_coordinator.dart` (`_nativePlaybackActive` + native engine) | ✅ Fix ripristinato 2026-04-17 |
 | Playback audio (seek, rewind, forward) | `services/audio/audio_player_service.dart` + `recording_list_logic.dart` | ✅ Completato |
 | Trim audio | `services/audio/audio_trimmer_service.dart` + channel `wavnote/audio_trimmer` | ✅ Presente |
 | Formati WAV / M4A / FLAC | `core/enums/audio_format.dart` | ✅ Completato |

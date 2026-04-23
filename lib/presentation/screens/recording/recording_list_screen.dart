@@ -16,13 +16,13 @@ import '../../widgets/recording/pull_to_search_list.dart';
 import '../../widgets/common/skeleton_screen.dart';
 // import '../../../services/audio/audio_player_service.dart'; // Rimosso o commentato
 import 'recording_list_logic.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_router.dart';
 // import '../../../core/utils/performance_logger.dart'; // Rimosso: import non utilizzato
 
 // Nuovi import per il playback
 import 'controllers/recording_playback_coordinator.dart';
 import 'controllers/recording_playback_view_state.dart';
+import '../playback/playback_screen.dart';
 
 /// Recording List Screen with Single AudioPlayer Architecture
 ///
@@ -34,7 +34,7 @@ import 'controllers/recording_playback_view_state.dart';
 class RecordingListScreen extends StatefulWidget {
   final FolderEntity folder;
 
-  const RecordingListScreen({Key? key, required this.folder}) : super(key: key);
+  const RecordingListScreen({super.key, required this.folder});
 
   @override
   State<RecordingListScreen> createState() => _RecordingListScreenState();
@@ -356,7 +356,12 @@ class _RecordingListScreenState extends State<RecordingListScreen>
                     recording: recording,
                     isExpanded: isExpanded,
                     onTap: () => expandRecording(recording),
-                    onShowWaveform: () {},
+                    onShowWaveform: () {
+                      final nav = Navigator.of(this.context);
+                      nav.push(MaterialPageRoute(
+                        builder: (_) => PlaybackScreen(recording: recording),
+                      ));
+                    },
                     onDelete: () => deleteRecording(recording),
                     onMoveToFolder: () => moveRecordingToFolder(recording),
                     onMoreActions: () => showMoreActions(recording),
@@ -564,7 +569,12 @@ class _RecordingListScreenState extends State<RecordingListScreen>
               recording: recording,
               isExpanded: isExpanded,
               onTap: () => expandRecording(recording),
-              onShowWaveform: () {},
+              onShowWaveform: () {
+                final nav = Navigator.of(this.context);
+                nav.push(MaterialPageRoute(
+                  builder: (_) => PlaybackScreen(recording: recording),
+                ));
+              },
               onDelete: () => deleteRecording(recording),
               onMoveToFolder: () => moveRecordingToFolder(recording),
               onMoreActions: () => showMoreActions(recording),

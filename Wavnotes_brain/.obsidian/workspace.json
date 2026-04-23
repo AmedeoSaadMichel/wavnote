@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "bd2b302e7b4a7f9a",
+        "id": "b401da883ef204b7",
         "type": "tabs",
         "children": [
           {
-            "id": "80fee6cdb3ebc1b1",
+            "id": "733c0bb6e787ce26",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "_index.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "_index"
             }
           }
         ]
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "_index.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for _index"
             }
           },
           {
@@ -176,19 +181,26 @@
       "bases:Create new base": false
     }
   },
-  "active": "80fee6cdb3ebc1b1",
+  "active": "733c0bb6e787ce26",
   "lastOpenFiles": [
-    "templates/adr.md",
-    "log/sessions/2026-04-16-debug-waveform.md",
+    "project/glossary.md",
+    "project/hot.md",
+    "analysis/2026-04-23-project-state.md",
+    "_index.md",
+    "templates/analysis.md",
+    "analysis",
     "templates/session.md",
+    "templates/adr.md",
+    "project/current_task.md",
+    "project/tech-debt.md",
+    "project/features.md",
+    "log/sessions/2026-04-17-fix-playback-after-refactor.md",
+    "log/sessions/2026-04-16-debug-waveform.md",
     "log/sessions/2026-04-14-overdub-unit-testing.md",
     "log/sessions/2026-04-16-Inizio-Sessione.md",
     "log/sessions/2026-04-14-playback-fixes-e-clock-service.md",
     "log/sessions/2026-04-14-playback-logic-fixes.md",
     "log/sessions/2026-04-15-fix-race-condition-playback.md",
-    "_index.md",
-    "project/tech-debt.md",
-    "project/features.md",
     "project/CLAUDE.md",
     "project/adr/YYYY-MM-DD-titolo.md",
     "log/sessions/2026-04-14-audio-clock-architecture.md",
@@ -199,11 +211,9 @@
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain.md",
     "log/sessions/2026-04-13-verifica-stophook.md",
     "log/sessions/2026-04-13-allora-ora-ho-obsidian-come-second-brain-2.md",
-    "log/sessions/2026-04-13-controlla-perche-il-device-non-sta-regis.md",
     "Untitled.base",
     "X.base",
     "Untitled 1.base",
-    "Welcome.md",
     "log/daily",
     "log/sessions",
     "project/adr",

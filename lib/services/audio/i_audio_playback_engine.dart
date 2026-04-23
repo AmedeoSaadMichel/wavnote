@@ -1,6 +1,5 @@
 // File: lib/services/audio/i_audio_playback_engine.dart
 
-import 'package:just_audio/just_audio.dart';
 import 'audio_playback_state.dart';
 
 abstract class IAudioPlaybackEngine {

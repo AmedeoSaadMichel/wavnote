@@ -128,17 +128,23 @@ lib/
 ## Come usare questa vault
 
 **Inizio sessione:**
-1. Leggi `_index.md` → vai diretto alla nota necessaria
-2. Non esplorare liberamente il vault
-3. Usa `project/CLAUDE.md` per capire il contesto senza rileggere il codice
+1. Leggi `_index.md` → identifica il tipo di task → leggi `project/hot.md`
+2. Carica solo i file previsti dal context budget (vedi `_index.md`)
+3. Non esplorare liberamente il vault — hot.md ha già il contesto essenziale
 
 **Durante la sessione:**
 - Nuova decisione architetturale → crea `project/adr/YYYY-MM-DD-titolo.md` dal template
 - Feature completata/modificata → aggiorna `project/features.md`
 - Workaround aggiunto → aggiungi a `project/tech-debt.md`
+- Termine nuovo o non ovvio → aggiungi a `project/glossary.md`
+- Analisi richiesta dall'utente → crea `analysis/YYYY-MM-DD-topic.md` dal template
 
-**Fine sessione (solo se >20 min o decisioni architetturali):**
-- Crea `log/sessions/YYYY-MM-DD-topic.md` dal template `templates/session`
-- Assicurati che ogni file di log creato contenga link espliciti (es. `[[project/features]]`) per mantenere il Graph di Obsidian connesso
-- Aggiorna `features.md` e `tech-debt.md`
-- Non scrivere mai in `_index.md` durante la sessione, solo a fine sessione se è cambiata la struttura
+**Fine sessione (SEMPRE):**
+- **Aggiorna `project/hot.md`** con: stato corrente, cosa è stato fatto, file toccati, decisioni prese, prossimo step
+- Se sessione >20 min o decisioni architetturali: crea `log/sessions/YYYY-MM-DD-topic.md`
+- Aggiorna `features.md` e `tech-debt.md` se toccati
+- Aggiorna `_index.md` solo se è cambiata la struttura del vault
+
+**Routine giornaliera (se sessione dura più giorni):**
+- Una volta al giorno, aggiorna `project/hot.md` con lo stato corrente anche senza chiudere la sessione
+- Marca la data in fondo a `hot.md`

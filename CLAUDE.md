@@ -25,17 +25,29 @@ Eccezione: termini tecnici standard (BLoC, widget, repository, ecc.) restano in 
 
 ## SECOND BRAIN — LEGGI ALL'INIZIO DI OGNI SESSIONE
 
-Nell'ordine, prima di toccare qualsiasi file di codice:
+**Sequenza obbligatoria** (prima di toccare qualsiasi file di codice):
 
-1. `Wavnotes_brain/_index.md`
-2. `Wavnotes_brain/project/CLAUDE.md`
-3. `Wavnotes_brain/project/tech-debt.md`
-4. `Wavnotes_brain/project/features.md` — solo se la sessione riguarda una feature specifica
+1. `Wavnotes_brain/_index.md` — mappa + context budget
+2. `Wavnotes_brain/project/hot.md` — **sempre**, contesto recente in ~500 token
+3. File specifici in base al tipo di task:
 
-**A fine sessione** (>20 min o decisioni architetturali):
+| Task | File aggiuntivi |
+|------|----------------|
+| Bug fix | `project/tech-debt.md` |
+| Nuova feature | `project/features.md` + analisi recente in `analysis/` |
+| Refactoring | `project/CLAUDE.md` + `project/adr/` |
+| Termine sconosciuto | `project/glossary.md` |
+| Analisi generale | `project/features.md` + `project/tech-debt.md` |
+
+**A fine sessione (SEMPRE):**
+- Aggiorna `Wavnotes_brain/project/hot.md` con stato corrente, file toccati, decisioni, prossimo step.
+- Se sessione >20 min o decisioni architetturali: crea `Wavnotes_brain/log/sessions/YYYY-MM-DD-topic.md`.
 - Aggiorna `features.md` e/o `tech-debt.md` se toccati.
-- Crea `Wavnotes_brain/log/sessions/YYYY-MM-DD-topic.md` dal template `templates/session.md`.
-- Per decisioni architetturali: `Wavnotes_brain/project/adr/YYYY-MM-DD-titolo.md`.
+- Per decisioni architetturali: crea `Wavnotes_brain/project/adr/YYYY-MM-DD-titolo.md`.
+- Analisi richiesta dall'utente: salva in `Wavnotes_brain/analysis/YYYY-MM-DD-topic.md`.
+
+**Routine giornaliera (se sessione dura più giorni):**
+- Una volta al giorno aggiorna `project/hot.md` anche senza chiudere la sessione.
 
 ---
 

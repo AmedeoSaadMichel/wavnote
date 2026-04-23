@@ -1,6 +1,5 @@
 // File: presentation/widgets/common/skeleton_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import '/core/utils/performance_logger.dart';
 
 /// Skeleton loading screen that mimics the main app content

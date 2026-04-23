@@ -45,9 +45,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
-// Config imports
-import '../../../config/dependency_injection.dart';
-
 // Domain imports
 import '../../../domain/entities/folder_entity.dart'; // Folder business entity
 import '../../../domain/repositories/i_folder_repository.dart';

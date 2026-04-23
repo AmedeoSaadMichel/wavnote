@@ -21,7 +21,7 @@ abstract class WavNoteException implements Exception {
 
   @override
   String toString() {
-    final buffer = StringBuffer('${runtimeType}: $message');
+    final buffer = StringBuffer('$runtimeType: $message');
     if (code != null) buffer.write(' (Code: $code)');
     if (context?.isNotEmpty == true) {
       buffer.write(' Context: $context');
@@ -46,19 +46,13 @@ class AudioRecordingException extends WavNoteException {
   final AudioRecordingErrorType errorType;
 
   const AudioRecordingException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -117,19 +111,13 @@ class AudioPlaybackException extends WavNoteException {
   final AudioPlaybackErrorType errorType;
 
   const AudioPlaybackException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -185,19 +173,13 @@ class FileSystemException extends WavNoteException {
   final FileSystemErrorType errorType;
 
   const FileSystemException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -260,19 +242,13 @@ class DatabaseException extends WavNoteException {
   final DatabaseErrorType errorType;
 
   const DatabaseException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -344,19 +320,13 @@ class PermissionException extends WavNoteException {
   final PermissionErrorType errorType;
 
   const PermissionException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -389,20 +359,14 @@ class ValidationException extends WavNoteException {
   final String field;
 
   const ValidationException({
-    required String message,
+    required super.message,
     required this.errorType,
     required this.field,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -443,19 +407,13 @@ class NetworkException extends WavNoteException {
   final NetworkErrorType errorType;
 
   const NetworkException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   String get userMessage {
@@ -493,19 +451,13 @@ class SystemException extends WavNoteException {
   final SystemErrorType errorType;
 
   const SystemException({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-    Map<String, dynamic>? context,
-  }) : super(
-         message: message,
-         code: code,
-         originalError: originalError,
-         stackTrace: stackTrace,
-         context: context,
-       );
+    super.code,
+    super.originalError,
+    super.stackTrace,
+    super.context,
+  });
 
   @override
   bool get isCritical => errorType == SystemErrorType.unknown;

@@ -1,4 +1,6 @@
 // File: test/unit/overdub_logic_test.dart
+// ignore_for_file: constant_identifier_names
+
 import 'package:flutter_test/flutter_test.dart';
 
 // Mock delle strutture dati da overdub_logic.md

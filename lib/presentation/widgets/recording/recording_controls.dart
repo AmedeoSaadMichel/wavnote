@@ -13,7 +13,7 @@ class RecordingControls extends StatelessWidget {
   final VoidCallback onDelete;
 
   const RecordingControls({
-    Key? key,
+    super.key,
     required this.isPlaying,
     required this.isLoading,
     required this.onShowWaveform,
@@ -21,7 +21,7 @@ class RecordingControls extends StatelessWidget {
     required this.onPlayPause,
     required this.onSkipForward,
     required this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

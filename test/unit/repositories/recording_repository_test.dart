@@ -15,8 +15,6 @@
 // - Database error handling and recovery
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-
 import 'package:wavnote/data/repositories/recording_repository.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/core/enums/audio_format.dart';

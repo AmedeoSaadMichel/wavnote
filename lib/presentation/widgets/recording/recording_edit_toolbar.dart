@@ -11,10 +11,10 @@ class RecordingEditToolbar extends StatelessWidget {
   final VoidCallback onMoveSelected;
 
   const RecordingEditToolbar({
-    Key? key,
+    super.key,
     required this.onDeleteSelected,
     required this.onMoveSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

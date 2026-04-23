@@ -41,7 +41,7 @@ import '../services/audio/audio_preparation_service.dart'; // Implementazione co
 import '../services/audio/audio_cache_manager.dart'; // Cache Manager
 import '../presentation/screens/recording/controllers/recording_playback_coordinator.dart';
 
-/// Global service locator — use sl<T>() to resolve dependencies
+/// Global service locator — use `sl<T>()` to resolve dependencies
 final GetIt sl = GetIt.instance;
 
 /// Register all app-wide singletons and initialize audio.

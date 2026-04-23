@@ -4,9 +4,6 @@ import 'package:dartz/dartz.dart';
 
 import 'package:wavnote/core/errors/failures.dart';
 import 'package:wavnote/core/errors/exceptions.dart';
-import 'package:wavnote/core/errors/failure_types/audio_failures.dart';
-import 'package:wavnote/core/errors/failure_types/data_failures.dart';
-import 'package:wavnote/core/errors/failure_types/system_failures.dart';
 
 /// Utility functions for error handling and Failure conversion.
 class FailureUtils {
@@ -74,12 +71,12 @@ class FailureUtils {
     }
   }
 
-  /// Creates an Either<Failure, Unit> from a given Failure.
+  /// Creates an `Either<Failure, Unit>` from a given Failure.
   static Either<Failure, Unit> leftUnit(Failure failure) {
     return Left(failure);
   }
 
-  /// Creates an Either<Failure, Unit> for a successful operation.
+  /// Creates an `Either<Failure, Unit>` for a successful operation.
   static Either<Failure, Unit> rightUnit() {
     return const Right(unit);
   }

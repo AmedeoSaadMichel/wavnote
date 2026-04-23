@@ -9,17 +9,12 @@ class AudioRecordingFailure extends Failure {
   final AudioRecordingErrorType errorType;
 
   const AudioRecordingFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity,
+    super.context,
+  });
 
   /// Create failure from exception
   factory AudioRecordingFailure.fromException(AudioRecordingException exception) {
@@ -123,17 +118,12 @@ class AudioPlaybackFailure extends Failure {
   final AudioPlaybackErrorType errorType;
 
   const AudioPlaybackFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.error,
+    super.context,
+  });
 
   /// Create failure from exception
   factory AudioPlaybackFailure.fromException(AudioPlaybackException exception) {

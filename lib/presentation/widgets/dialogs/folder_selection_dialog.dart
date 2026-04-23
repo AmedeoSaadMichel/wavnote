@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/folder_entity.dart';
-import '../../../core/enums/folder_type.dart';
 import '../../bloc/folder/folder_bloc.dart';
 
 /// Dialog for selecting a folder to move recordings to

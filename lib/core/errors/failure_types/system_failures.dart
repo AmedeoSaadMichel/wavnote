@@ -9,17 +9,12 @@ class PermissionFailure extends Failure {
   final PermissionErrorType errorType;
 
   const PermissionFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.error,
+    super.context,
+  });
 
   /// Create failure from exception
   factory PermissionFailure.fromException(PermissionException exception) {
@@ -84,17 +79,12 @@ class NetworkFailure extends Failure {
   final NetworkErrorType errorType;
 
   const NetworkFailure({
-    required String message,
+    required super.message,
     required this.errorType,
-    String? code,
-    FailureSeverity severity = FailureSeverity.error,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: severity,
-    context: context,
-  );
+    super.code,
+    super.severity = FailureSeverity.error,
+    super.context,
+  });
 
   /// Create failure from exception
   factory NetworkFailure.fromException(NetworkException exception) {
@@ -162,15 +152,10 @@ class NetworkFailure extends Failure {
 /// Generic failure for unknown or unexpected errors
 class UnexpectedFailure extends Failure {
   const UnexpectedFailure({
-    required String message,
-    String? code,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: FailureSeverity.error,
-    context: context,
-  );
+    required super.message,
+    super.code,
+    super.context,
+  }) : super(severity: FailureSeverity.error);
 
   /// Create failure from generic exception
   factory UnexpectedFailure.fromException(Exception exception) {
@@ -190,15 +175,10 @@ class UnexpectedFailure extends Failure {
 /// Cache failure for caching operations
 class CacheFailure extends Failure {
   const CacheFailure({
-    required String message,
-    String? code,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    code: code,
-    severity: FailureSeverity.warning,
-    context: context,
-  );
+    required super.message,
+    super.code,
+    super.context,
+  }) : super(severity: FailureSeverity.warning);
 
   @override
   String get userMessage => 'Cache operation failed. The app may run slower.';
@@ -236,13 +216,9 @@ class CombinedFailure extends Failure {
 /// Success result (not a failure, but useful for consistent return types)
 class Success extends Failure {
   const Success({
-    required String message,
-    Map<String, dynamic>? context,
-  }) : super(
-    message: message,
-    severity: FailureSeverity.info,
-    context: context,
-  );
+    required super.message,
+    super.context,
+  }) : super(severity: FailureSeverity.info);
 
   @override
   String get userMessage => message;

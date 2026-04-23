@@ -1,4 +1,6 @@
 // File: test/unit/playback_logic_test.dart
+// ignore_for_file: constant_identifier_names
+
 import 'package:flutter_test/flutter_test.dart';
 
 // Simulazione dei casi di playback (basata sulla logica in playback_logic.md)

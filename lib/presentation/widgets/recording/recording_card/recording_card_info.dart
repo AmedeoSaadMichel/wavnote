@@ -13,13 +13,13 @@ class RecordingCardInfo extends StatelessWidget {
   final VoidCallback? onToggleFavorite;
 
   const RecordingCardInfo({
-    Key? key,
+    super.key,
     required this.recording,
     required this.currentFolderId,
     this.folderNames,
     this.showFavoriteIcon = true,
     this.onToggleFavorite,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

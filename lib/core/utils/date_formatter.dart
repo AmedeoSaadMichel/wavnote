@@ -77,36 +77,36 @@ class DateFormatter {
     // Minutes ago (1-59 minutes)
     if (difference.inHours < 1) {
       final minutes = difference.inMinutes;
-      return '${minutes} minute${minutes == 1 ? '' : 's'} ago';
+      return '$minutes minute${minutes == 1 ? '' : 's'} ago';
     }
 
     // Hours ago (1-23 hours)
     if (difference.inDays < 1) {
       final hours = difference.inHours;
-      return '${hours} hour${hours == 1 ? '' : 's'} ago';
+      return '$hours hour${hours == 1 ? '' : 's'} ago';
     }
 
     // Days ago (1-6 days)
     if (difference.inDays < 7) {
       final days = difference.inDays;
-      return '${days} day${days == 1 ? '' : 's'} ago';
+      return '$days day${days == 1 ? '' : 's'} ago';
     }
 
     // Weeks ago (1-3 weeks)
     if (difference.inDays < 30) {
       final weeks = (difference.inDays / 7).floor();
-      return '${weeks} week${weeks == 1 ? '' : 's'} ago';
+      return '$weeks week${weeks == 1 ? '' : 's'} ago';
     }
 
     // Months ago (1-11 months)
     if (difference.inDays < 365) {
       final months = (difference.inDays / 30).floor();
-      return '${months} month${months == 1 ? '' : 's'} ago';
+      return '$months month${months == 1 ? '' : 's'} ago';
     }
 
     // Years ago (1+ years)
     final years = (difference.inDays / 365).floor();
-    return '${years} year${years == 1 ? '' : 's'} ago';
+    return '$years year${years == 1 ? '' : 's'} ago';
   }
 
   /// Get smart date description based on context
@@ -168,7 +168,7 @@ class DateFormatter {
     final seconds = duration.inSeconds.remainder(60);
 
     if (hours > 0) {
-      return '${hours}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     } else {
       return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     }
@@ -193,16 +193,16 @@ class DateFormatter {
     final parts = <String>[];
 
     if (days > 0) {
-      parts.add('${days} day${days == 1 ? '' : 's'}');
+      parts.add('$days day${days == 1 ? '' : 's'}');
     }
     if (hours > 0) {
-      parts.add('${hours} hour${hours == 1 ? '' : 's'}');
+      parts.add('$hours hour${hours == 1 ? '' : 's'}');
     }
     if (minutes > 0) {
-      parts.add('${minutes} minute${minutes == 1 ? '' : 's'}');
+      parts.add('$minutes minute${minutes == 1 ? '' : 's'}');
     }
     if (seconds > 0 && parts.isEmpty) {
-      parts.add('${seconds} second${seconds == 1 ? '' : 's'}');
+      parts.add('$seconds second${seconds == 1 ? '' : 's'}');
     }
 
     if (parts.isEmpty) {

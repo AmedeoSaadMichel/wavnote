@@ -21,18 +21,21 @@ class FolderRepository implements IFolderRepository {
         id: 'all_recordings',
         name: 'All Recordings',
         iconCodePoint: Icons.graphic_eq.codePoint,
+        // ignore: deprecated_member_use
         colorValue: Colors.cyan.value,
       ),
       FolderEntity.defaultFolder(
         id: 'favourites',
         name: 'Favourites',
         iconCodePoint: Icons.favorite.codePoint,
+         // ignore: deprecated_member_use
         colorValue: Colors.red.value,
       ),
       FolderEntity.defaultFolder(
         id: 'recently_deleted',
         name: 'Recently Deleted',
         iconCodePoint: Icons.delete.codePoint,
+         // ignore: deprecated_member_use
         colorValue: Colors.yellow.value,
       ),
     ];

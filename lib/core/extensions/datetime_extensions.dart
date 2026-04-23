@@ -45,12 +45,12 @@ extension DateTimeExtensions on DateTime {
     final thisDate = DateTime(year, month, day);
 
     if (thisDate == today) {
-      return 'Today at ${timeOnlyFormat}';
+      return 'Today at $timeOnlyFormat';
     } else if (thisDate == yesterday) {
-      return 'Yesterday at ${timeOnlyFormat}';
+      return 'Yesterday at $timeOnlyFormat';
     } else if (year == now.year) {
       final monthName = DateFormatter.getShortMonthName(month);
-      return '$monthName $day at ${timeOnlyFormat}';
+      return '$monthName $day at $timeOnlyFormat';
     } else {
       return dateTimeFormat;
     }

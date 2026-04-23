@@ -3,6 +3,8 @@
 // EventChannel non può essere testato con un vero canale nativo in unit test;
 // usiamo TestDefaultBinaryMessengerBinding per iniettare messaggi fake.
 
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

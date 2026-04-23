@@ -432,10 +432,10 @@ class AudioMetadata {
   String? get formattedDuration => duration?.formatted;
 
   /// Get formatted bitrate
-  String? get formattedBitrate => bitrate != null ? '${bitrate} kbps' : null;
+  String? get formattedBitrate => bitrate != null ? '$bitrate kbps' : null;
 
   /// Get formatted sample rate
-  String? get formattedSampleRate => sampleRate != null ? '${sampleRate} Hz' : null;
+  String? get formattedSampleRate => sampleRate != null ? '$sampleRate Hz' : null;
 
   /// Get audio quality description
   String get qualityDescription {

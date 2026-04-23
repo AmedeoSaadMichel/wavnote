@@ -9,7 +9,6 @@ import '../../core/errors/failures.dart';
 import '../../core/errors/failure_utils.dart';
 import '../../core/errors/exceptions.dart'; // Importa per le Enum di errore
 import '../../core/errors/failure_types/data_failures.dart';
-import '../../core/errors/failure_types/system_failures.dart';
 
 /// Utility operations for recording repository
 class RecordingRepositoryUtils extends RecordingRepositoryBase {

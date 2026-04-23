@@ -247,10 +247,11 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is RecordingLoaded) {
       final s = state as RecordingLoaded;
       final selected = Set<String>.from(s.selectedRecordings);
-      if (selected.contains(event.recordingId))
+      if (selected.contains(event.recordingId)) {
         selected.remove(event.recordingId);
-      else
+      } else {
         selected.add(event.recordingId);
+      }
       emit(s.copyWith(selectedRecordings: selected));
     }
   }
@@ -259,8 +260,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     ClearRecordingSelection event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingLoaded)
+    if (state is RecordingLoaded) {
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
+    }
   }
 
   void _onSelectAllRecordings(
@@ -279,29 +281,33 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     DeselectAllRecordings event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingLoaded)
+    if (state is RecordingLoaded) {
       emit((state as RecordingLoaded).copyWith(selectedRecordings: <String>{}));
+    }
   }
 
   void _onUpdateRecordingTitle(
     UpdateRecordingTitle event,
     Emitter<RecordingState> emit,
   ) {
-    if (state is RecordingInProgress)
+    if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(title: event.title));
+    }
   }
 
   Future<void> _refreshTitleInBackground() async {
     try {
       final loc = await _locationRepository.getRecordingLocationName();
-      if (loc.isNotEmpty && !isClosed && state is RecordingInProgress)
+      if (loc.isNotEmpty && !isClosed && state is RecordingInProgress) {
         add(UpdateRecordingTitle(title: loc));
+      }
     } catch (_) {}
   }
 
   void _refreshFolderCounts() {
-    if (_folderBloc != null && !isClosed)
-      _folderBloc!.add(const RefreshFolders());
+    if (_folderBloc != null && !isClosed) {
+      _folderBloc.add(const RefreshFolders());
+    }
   }
 
   void _startAmplitudeUpdates() {

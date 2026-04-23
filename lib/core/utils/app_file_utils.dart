@@ -1,5 +1,4 @@
 // File: lib/core/utils/app_file_utils.dart
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -20,8 +19,9 @@ class AppFileUtils {
 
   /// Converte un path assoluto in relativo per la memorizzazione nel DB
   static Future<String> toRelative(String absolutePath) async {
-    if (absolutePath.isEmpty || !p.isAbsolute(absolutePath))
+    if (absolutePath.isEmpty || !p.isAbsolute(absolutePath)) {
       return absolutePath;
+    }
 
     final base = await getApplicationDocumentsPath();
     try {

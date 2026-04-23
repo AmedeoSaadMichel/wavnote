@@ -6,11 +6,9 @@
 // Comprehensive test suite for the FolderRepository class using the actual
 // interface methods and entity structure.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:wavnote/domain/entities/folder_entity.dart';
 import 'package:wavnote/core/enums/folder_type.dart';
 import 'package:wavnote/domain/repositories/i_folder_repository.dart';
 

@@ -13,12 +13,12 @@ class RecordingWaveformSection extends StatefulWidget {
   final Function(double) onPositionChanged;
 
   const RecordingWaveformSection({
-    Key? key,
+    super.key,
     required this.recording,
     required this.waveformPosition,
     required this.currentPosition,
     required this.onPositionChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<RecordingWaveformSection> createState() => _RecordingWaveformSectionState();

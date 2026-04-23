@@ -71,8 +71,9 @@ class RecordingEntity extends Equatable {
 
   String get fileSizeFormatted {
     if (fileSize < 1024) return '${fileSize}B';
-    if (fileSize < 1024 * 1024)
+    if (fileSize < 1024 * 1024) {
       return '${(fileSize / 1024).toStringAsFixed(1)}KB';
+    }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)}MB';
   }
 
@@ -80,8 +81,9 @@ class RecordingEntity extends Equatable {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    if (hours > 0)
+    if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -104,10 +106,10 @@ class RecordingEntity extends Equatable {
     final difference = now.difference(createdAt);
     if (difference.inDays > 365) {
       final years = (difference.inDays / 365).floor();
-      return '${years} year${years > 1 ? 's' : ''} ago';
+      return '$years year${years > 1 ? 's' : ''} ago';
     } else if (difference.inDays > 30) {
       final months = (difference.inDays / 30).floor();
-      return '${months} month${months > 1 ? 's' : ''} ago';
+      return '$months month${months > 1 ? 's' : ''} ago';
     } else if (difference.inDays > 0) {
       return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
     } else if (difference.inHours > 0) {
@@ -134,10 +136,12 @@ class RecordingEntity extends Equatable {
   String? getNameValidationError(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'Recording name cannot be empty';
-    if (trimmed.length > 100)
+    if (trimmed.length > 100) {
       return 'Recording name cannot exceed 100 characters';
-    if (_containsInvalidCharacters(trimmed))
+    }
+    if (_containsInvalidCharacters(trimmed)) {
       return 'Recording name contains invalid characters';
+    }
     return null;
   }
 
@@ -200,14 +204,16 @@ class RecordingEntity extends Equatable {
   RecordingEntity toggleFavorite() =>
       copyWith(isFavorite: !isFavorite, updatedAt: DateTime.now());
   RecordingEntity rename(String newName) {
-    if (!isValidName(newName))
+    if (!isValidName(newName)) {
       throw ArgumentError('Invalid recording name: $newName');
+    }
     return copyWith(name: newName.trim(), updatedAt: DateTime.now());
   }
 
   RecordingEntity moveToFolder(String newFolderId) {
-    if (!canBeMovedToFolder(newFolderId))
+    if (!canBeMovedToFolder(newFolderId)) {
       throw ArgumentError('Cannot move recording to folder: $newFolderId');
+    }
     return copyWith(folderId: newFolderId, updatedAt: DateTime.now());
   }
 

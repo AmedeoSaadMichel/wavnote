@@ -56,8 +56,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       if (pausedState.previewFilePath != null) {
         try {
           final absolutePreviewPath = await pausedState.resolvedPreviewFilePath;
-          if (absolutePreviewPath != null)
+          if (absolutePreviewPath != null) {
             File(absolutePreviewPath).deleteSync();
+          }
         } catch (_) {}
       }
     }
@@ -109,7 +110,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final insertionDurationMs = part2ResultEntity.duration.inMilliseconds;
 
       try {
-        await _trimmerService.overwriteAudioSegment(
+        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
+        // await _trimmerService.overwriteAudioSegment(
+        //   originalPath: await AppFileUtils.resolve(seekBasePath),
+        //   insertionPath: part2Path,
+        //   startTime: overwriteStartTime ?? Duration.zero,
+        //   overwriteDuration: Duration(milliseconds: insertionDurationMs),
+        //   outputPath: finalWavPath,
+        //   format: 'wav',
+        // );
+        final owResult1 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(seekBasePath),
           insertionPath: part2Path,
           startTime: overwriteStartTime ?? Duration.zero,
@@ -117,6 +127,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           outputPath: finalWavPath,
           format: 'wav',
         );
+        if (owResult1.isLeft()) throw Exception(owResult1.fold((f) => f.message, (_) => ''));
 
         // Delete partial files
         try {
@@ -170,9 +181,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         if (matchingRecordings.isNotEmpty) {
           int highestNumber = 0;
           for (final r in matchingRecordings) {
-            if (r.name == locationName)
+            if (r.name == locationName) {
               highestNumber = highestNumber > 1 ? highestNumber : 1;
-            else {
+            } else {
               final escaped = RegExp.escape(locationName);
               final match = RegExp('^$escaped (\\d+)\$').firstMatch(r.name);
               if (match != null) {
@@ -470,7 +481,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final tempPath =
           "${s.originalFilePathForOverwrite ?? s.filePath}_merged_${DateTime.now().millisecondsSinceEpoch}.wav";
       try {
-        await _trimmerService.overwriteAudioSegment(
+        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
+        // await _trimmerService.overwriteAudioSegment(
+        //   originalPath: await AppFileUtils.resolve(s.seekBasePath!),
+        //   insertionPath: await AppFileUtils.resolve(overdubEntity.filePath),
+        //   startTime: s.overwriteStartTime ?? Duration.zero,
+        //   overwriteDuration: overdubEntity.duration,
+        //   outputPath: tempPath,
+        //   format: 'wav',
+        // );
+        final owResult2 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(s.seekBasePath!),
           insertionPath: await AppFileUtils.resolve(overdubEntity.filePath),
           startTime: s.overwriteStartTime ?? Duration.zero,
@@ -478,6 +498,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           outputPath: tempPath,
           format: 'wav',
         );
+        if (owResult2.isLeft()) throw Exception(owResult2.fold((f) => f.message, (_) => ''));
         try {
           File(await AppFileUtils.resolve(s.seekBasePath!)).deleteSync();
           File(await AppFileUtils.resolve(overdubEntity.filePath)).deleteSync();
@@ -571,7 +592,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           "${s.originalFilePathForOverwrite ?? s.filePath}_temp_concat_${DateTime.now().millisecondsSinceEpoch}.wav";
 
       try {
-        await _trimmerService.overwriteAudioSegment(
+        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
+        // await _trimmerService.overwriteAudioSegment(
+        //   originalPath: await AppFileUtils.resolve(s.seekBasePath!),
+        //   insertionPath: baseWavPath,
+        //   startTime: s.overwriteStartTime ?? Duration.zero,
+        //   overwriteDuration: baseRecordingEntity.duration,
+        //   outputPath: tempConcatPath,
+        //   format: 'wav',
+        // );
+        final owResult3 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(s.seekBasePath!),
           insertionPath: baseWavPath,
           startTime: s.overwriteStartTime ?? Duration.zero,
@@ -579,6 +609,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           outputPath: tempConcatPath,
           format: 'wav',
         );
+        if (owResult3.isLeft()) throw Exception(owResult3.fold((f) => f.message, (_) => ''));
         pathToOverwrite = tempConcatPath;
         try {
           File(await AppFileUtils.resolve(s.seekBasePath!)).deleteSync();
@@ -685,7 +716,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           final newIndex = position.inMilliseconds ~/ 100;
           if (state is RecordingPaused) {
             final current = (state as RecordingPaused).seekBarIndex;
-            if (newIndex != current)
+            if (newIndex != current) {
               add(
                 UpdateSeekBarIndex(
                   seekBarIndex: newIndex,
@@ -693,6 +724,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
                   isFromPlayback: true,
                 ),
               );
+            }
           }
         });
     _previewCompletionSubscription?.cancel();
@@ -735,8 +767,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
   Future<String?> _assemblePreviewFile(RecordingPaused state) async {
     if (state.seekBasePath == null ||
-        state.originalFilePathForOverwrite == null)
+        state.originalFilePathForOverwrite == null) {
       return null;
+    }
     final tempPreviewPath =
         "${state.originalFilePathForOverwrite}_preview_${DateTime.now().millisecondsSinceEpoch}.wav";
     try {
@@ -758,14 +791,24 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         // Usa direttamente la durata del segmento
         final overwriteDuration = state.duration;
 
-        await _trimmerService.overwriteAudioSegment(
+        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
+        // await _trimmerService.overwriteAudioSegment(
+        //   originalPath: await AppFileUtils.resolve(state.seekBasePath!),
+        //   insertionPath: await state.resolvedFilePath,
+        //   startTime: state.overwriteStartTime ?? Duration.zero,
+        //   overwriteDuration: overwriteDuration,
+        //   outputPath: tempPreviewPath,
+        //   format: 'wav',
+        // );
+        final owResult4 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(state.seekBasePath!),
           insertionPath: await state.resolvedFilePath,
           startTime: state.overwriteStartTime ?? Duration.zero,
-          overwriteDuration: overwriteDuration, // <-- usa il valore direttamente
+          overwriteDuration: overwriteDuration,
           outputPath: tempPreviewPath,
           format: 'wav',
         );
+        if (owResult4.isLeft()) throw Exception(owResult4.fold((f) => f.message, (_) => ''));
       }
       return tempPreviewPath;
     } catch (e) {
