@@ -22,7 +22,8 @@
 ## Note permanenti
 | File | Contenuto |
 |------|-----------|
-| [[project/hot]] | **Hot cache** — stato corrente, ultima sessione, prossimo step |
+| [[project/hot]] | **Hot cache** — backlog prioritizzato, cosa c'è da fare |
+| [[project/architecture]] | **Architettura** — ogni modulo e cartella spiegati |
 | [[project/CLAUDE]] | Stack, struttura, convenzioni, come usare questa vault |
 | [[project/features]] | Tabella feature con stato attuale |
 | [[project/tech-debt]] | TODO e workaround aperti nel codice |
