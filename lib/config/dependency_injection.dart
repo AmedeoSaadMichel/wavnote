@@ -1,4 +1,4 @@
-// File: config/dependency_injection.dart
+// File: lib/config/dependency_injection.dart
 //
 // Dependency Injection - Config Layer
 // ====================================
@@ -16,6 +16,7 @@
 //   final audio = sl<AudioServiceCoordinator>();
 //   final repo  = sl<RecordingRepository>();
 
+import 'dart:io';
 import 'package:get_it/get_it.dart';
 
 import '../data/repositories/recording_repository.dart';
@@ -30,12 +31,14 @@ import '../domain/repositories/i_settings_repository.dart';
 import '../services/audio/audio_recorder_service.dart';
 import '../services/audio/audio_engine_service.dart';
 import '../services/audio/audio_service_coordinator.dart';
+import '../services/audio/recording_service_repository.dart';
 import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
 
 // Nuovi import per la riproduzione audio
 import '../services/audio/i_audio_playback_engine.dart';
 import '../services/audio/audio_playback_engine_impl.dart';
+import '../services/audio/audio_engine_playback_adapter.dart';
 import '../services/audio/i_audio_preparation_service.dart';
 import '../services/audio/audio_preparation_service.dart'; // Implementazione concreta
 import '../services/audio/audio_cache_manager.dart'; // Cache Manager
@@ -57,12 +60,6 @@ Future<void> setupDependencies() async {
     sl.registerLazySingleton<AudioEngineService>(() => AudioEngineService());
   }
 
-  if (!sl.isRegistered<IAudioServiceRepository>()) {
-    sl.registerLazySingleton<IAudioServiceRepository>(
-      () => AudioServiceCoordinator(),
-    );
-  }
-
   if (!sl.isRegistered<ILocationRepository>()) {
     sl.registerLazySingleton<ILocationRepository>(() => GeolocationService());
   }
@@ -70,12 +67,30 @@ Future<void> setupDependencies() async {
   // Nuove registrazioni per il playback audio (Engine e PreparationService sono Singleton)
   if (!sl.isRegistered<IAudioPlaybackEngine>()) {
     sl.registerLazySingleton<IAudioPlaybackEngine>(
-      () => AudioPlaybackEngineImpl(),
+      () => (Platform.isIOS || Platform.isMacOS)
+          ? AudioEnginePlaybackAdapter(engineService: sl<AudioEngineService>())
+          : AudioPlaybackEngineImpl(),
     );
   }
 
   if (!sl.isRegistered<AudioCacheManager>()) {
     sl.registerLazySingleton<AudioCacheManager>(() => AudioCacheManager());
+  }
+
+  if (!sl.isRegistered<AudioServiceCoordinator>()) {
+    sl.registerLazySingleton<AudioServiceCoordinator>(
+      () => AudioServiceCoordinator(
+        engineService: sl<AudioEngineService>(),
+      ),
+    );
+  }
+
+  if (!sl.isRegistered<IAudioServiceRepository>()) {
+    sl.registerLazySingleton<IAudioServiceRepository>(
+      () => RecordingServiceRepository(
+        coordinator: sl<AudioServiceCoordinator>(),
+      ),
+    );
   }
 
   if (!sl.isRegistered<IAudioPreparationService>()) {

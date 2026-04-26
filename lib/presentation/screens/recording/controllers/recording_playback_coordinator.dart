@@ -55,6 +55,10 @@ class RecordingPlaybackCoordinator {
     _completionSub?.cancel();
 
     _positionSub = _engine.positionStream.listen((position) {
+      // Ignora i tick di posizione quando nessuna card è in riproduzione attiva.
+      // Durante il preview overdub il motore emette comunque tick, causando
+      // il rebuild di tutti i ValueListenableBuilder delle card ogni ~100ms.
+      if (_activeRecording == null) return;
       state.value = state.value.copyWith(position: position);
     });
 
@@ -85,7 +89,9 @@ class RecordingPlaybackCoordinator {
           newStatus = RecordingPlaybackStatus.ready;
           break;
         case AudioPlaybackState.buffering:
-          newStatus = RecordingPlaybackStatus.preparing;
+          // Non degradare da 'playing': evita il flash sull'icona durante buffering transitorio
+          final wasPlaying = state.value.status == RecordingPlaybackStatus.playing;
+          newStatus = wasPlaying ? RecordingPlaybackStatus.playing : RecordingPlaybackStatus.preparing;
           isBuffering = true;
           break;
         case AudioPlaybackState.error:
@@ -192,10 +198,16 @@ class RecordingPlaybackCoordinator {
     }
   }
 
+  Future<void> pausePlayback() async {
+    if (_activeRecording == null) return;
+    await _engine.pause();
+  }
+
   // ... (seekToPercent, skipForward, skipBackward invariati) ...
   Future<void> seekToPercent(double percent) async {
-    if (_activeRecording == null || state.value.duration == Duration.zero)
+    if (_activeRecording == null || state.value.duration == Duration.zero) {
       return;
+    }
     final newPosition = Duration(
       milliseconds: (state.value.duration.inMilliseconds * percent).round(),
     );
@@ -207,9 +219,23 @@ class RecordingPlaybackCoordinator {
     await _engine.seek(clampedPosition);
   }
 
+  Future<void> seekToPosition(Duration position) async {
+    if (_activeRecording == null) return;
+
+    final maxDuration = state.value.duration;
+    final clampedPosition = position < Duration.zero
+        ? Duration.zero
+        : (maxDuration > Duration.zero && position > maxDuration
+              ? maxDuration
+              : position);
+
+    await _engine.seek(clampedPosition);
+  }
+
   Future<void> skipForward() async {
-    if (_activeRecording == null || state.value.duration == Duration.zero)
+    if (_activeRecording == null || state.value.duration == Duration.zero) {
       return;
+    }
     final newPosition = state.value.position + const Duration(seconds: 10);
     final clampedPosition = newPosition > state.value.duration
         ? state.value.duration
@@ -226,7 +252,17 @@ class RecordingPlaybackCoordinator {
     await _engine.seek(clampedPosition);
   }
 
+  /// Getter pubblici per i consumer (RecordingListLogic, PlaybackScreen)
+  bool get isServiceReady => _isInitialized;
+  RecordingEntity? get expandedRecording => _expandedRecording;
+  String? get expandedRecordingId => state.value.expandedRecordingId;
+  String? get activeRecordingId => state.value.activeRecordingId;
+
+  /// Alias esplicito per i consumer che fermano la riproduzione senza collassare UI
+  Future<void> stopPlayback() => collapseRecording();
+
   Future<void> dispose() async {
+    await collapseRecording(); // stop engine + clear state
     await _positionSub?.cancel();
     await _durationSub?.cancel();
     await _playbackStateSub?.cancel();

@@ -94,7 +94,7 @@ class FullscreenPlaybackControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: _buildControlButton(
-        icon: isPlayingPreview ? Icons.stop : Icons.play_arrow,
+        icon: isPlayingPreview ? Icons.stop_rounded : Icons.play_arrow,
         onPressed: onPlay ?? () {},
         title: isPlayingPreview ? 'Stop' : 'Play',
         isLarge: true,

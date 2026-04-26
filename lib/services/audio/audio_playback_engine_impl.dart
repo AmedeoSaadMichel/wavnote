@@ -40,8 +40,11 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
   @override
   Future<bool> initialize() async {
     try {
-      debugPrint('🔧 AUDIO_ENGINE: Initialize called');
+      if (kDebugMode) debugPrint('🔧 AUDIO_ENGINE: Initialize called');
       if (_isServiceInitialized) return true;
+
+      // Pulisce eventuale istanza precedente in errore prima di ricrearla
+      if (_audioPlayer != null) await _audioPlayer!.dispose();
 
       _audioPlayer = AudioPlayer();
       await _initializePlayerListeners();
@@ -50,6 +53,7 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
       _playbackStateStreamController.add(AudioPlaybackState.idle);
       return true;
     } catch (e) {
+      _isServiceInitialized = false;
       throw AudioPlaybackException(
         message: 'Failed to initialize audio engine',
         errorType: AudioPlaybackErrorType.playbackInitializationFailed,
@@ -85,7 +89,7 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
         }
       });
     } catch (e) {
-      debugPrint('❌ Error setting up player listeners: $e');
+      if (kDebugMode) debugPrint('❌ Error setting up player listeners: $e');
     }
   }
 
@@ -115,9 +119,9 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
     }
 
     try {
-      if (!await _validateAudioFile(filePath)) {
+      if (filePath.isEmpty) {
         throw AudioPlaybackException(
-          message: 'Invalid audio file',
+          message: 'Invalid audio file path (empty)',
           errorType: AudioPlaybackErrorType.audioFileNotFound,
           context: {'filePath': filePath},
         );
@@ -127,6 +131,8 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
         AudioSource.file(filePath),
         initialPosition: initialPosition,
       );
+      await _audioPlayer!.setSpeed(_playbackSpeed);
+      await _audioPlayer!.setVolume(_playbackVolume);
       _currentlyPlayingFile = filePath;
       _playbackPosition = initialPosition ?? Duration.zero;
       _playbackStateStreamController.add(AudioPlaybackState.loaded);
@@ -149,8 +155,6 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
       );
     }
     try {
-      await _audioPlayer!.setSpeed(_playbackSpeed);
-      await _audioPlayer!.setVolume(_playbackVolume);
       await _audioPlayer!.play();
       _startAmplitudeSimulation();
     } catch (e) {
@@ -265,16 +269,6 @@ class AudioPlaybackEngineImpl implements IAudioPlaybackEngine {
       _audioPlayer?.playerState.processingState != ProcessingState.idle;
 
   bool _ensureInitialized() => _isServiceInitialized && _audioPlayer != null;
-
-  Future<bool> _validateAudioFile(String path) async {
-    try {
-      if (path.isEmpty) return false;
-      final file = File(path);
-      return await file.exists() && await file.length() > 0;
-    } catch (e) {
-      return false;
-    }
-  }
 
   void _startAmplitudeSimulation() {
     _amplitudeSimulationTimer?.cancel();

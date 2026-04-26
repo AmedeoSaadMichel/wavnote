@@ -7,9 +7,53 @@ import FlutterMacOS
 import AVFoundation
 import Logging
 
+// Event Channel per notificare Dart del completamento del playback.
+class PlaybackStreamHandler: NSObject, FlutterStreamHandler {
+    private var eventSink: FlutterEventSink?
+
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        self.eventSink = events
+        return nil
+    }
+
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        self.eventSink = nil
+        return nil
+    }
+
+    func sendPlaybackComplete() {
+        eventSink?(["event": "playbackCompleted"])
+    }
+}
+
+// Event Channel per i tick di clock recording/playback su macOS.
+class ClockStreamHandler: NSObject, FlutterStreamHandler {
+    private var eventSink: FlutterEventSink?
+
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        self.eventSink = events
+        return nil
+    }
+
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        self.eventSink = nil
+        return nil
+    }
+
+    func sendRecordingTick(positionMs: Int, amplitude: Double) {
+        eventSink?(["type": "recordingTick", "positionMs": positionMs, "amplitude": amplitude])
+    }
+
+    func sendPlaybackTick(positionMs: Int, durationMs: Int) {
+        eventSink?(["type": "playbackTick", "positionMs": positionMs, "durationMs": durationMs])
+    }
+}
+
 public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
     private let logger = Logger(label: "com.wavnote.macos.audio_engine")
+    private let playbackStreamHandler = PlaybackStreamHandler()
+    private let clockStreamHandler = ClockStreamHandler()
 
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
@@ -41,6 +85,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
     private var voiceProcessingEnabled = false
     private static let maxSampleRate = 48000
+    private var lastClockEmitTime: CFTimeInterval = 0
+    private var playbackClockTimer: DispatchSourceTimer?
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
@@ -49,6 +95,18 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         )
         let instance = AudioEnginePlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
+
+        let playbackEventChannel = FlutterEventChannel(
+            name: "com.wavnote/audio_engine/playback_events",
+            binaryMessenger: registrar.messenger
+        )
+        playbackEventChannel.setStreamHandler(instance.playbackStreamHandler)
+
+        let clockEventChannel = FlutterEventChannel(
+            name: "com.wavnote/audio_engine/clock_events",
+            binaryMessenger: registrar.messenger
+        )
+        clockEventChannel.setStreamHandler(instance.clockStreamHandler)
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -323,6 +381,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     for i in 0..<n { sq += ch[i] * ch[i] }
                     let amp = min(sqrt(sq / Float(max(n, 1))) * 10.0, 1.0)
                     self.currentAmplitude = amp
+
+                    let now = CFAbsoluteTimeGetCurrent()
+                    if now - self.lastClockEmitTime >= 0.1 {
+                        self.lastClockEmitTime = now
+                        let positionMs = Int(Double(self.audioFile?.length ?? 0) / outputFormat.sampleRate * 1000)
+                        self.clockStreamHandler.sendRecordingTick(
+                            positionMs: positionMs,
+                            amplitude: Double(amp)
+                        )
+                    }
                 }
             }
 
@@ -501,6 +569,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         audioEngine?.stop()
         audioFile = nil
         audioPlayer?.stop()
+        stopPlaybackClockTimer()
         playbackEngine?.stop()
         playbackEngine = nil
         audioFileForPlayback = nil
@@ -630,11 +699,15 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private func startPlaybackInternal(path: String, position: Int?, result: @escaping FlutterResult) {
         self.logger.debug("🔊 [NATIVE-macOS] startPlaybackInternal — path=\(path)")
         do {
-            if playbackEngine != nil {
-                audioPlayer?.stop()
-                playbackEngine?.stop()
-                playbackEngine = nil
-            }
+            // Rilascia sempre le risorse CoreAudio precedenti prima di riaprire il file.
+            // Stessa fix applicata al plugin iOS: il gate su playbackEngine != nil causava
+            // il bug 2003334207 sulla riapertura dello stesso file al secondo tentativo.
+            audioPlayer?.stop()
+            audioPlayer?.reset()       // dequeue sincrono → libera ref interno a ExtAudioFile
+            playbackEngine?.stop()
+            playbackEngine = nil
+            audioPlayer = nil          // forza ARC a rilasciare il nodo
+            audioFileForPlayback = nil
             audioFileForPlayback = try AVAudioFile(forReading: URL(fileURLWithPath: path))
             guard let file = audioFileForPlayback else {
                 result(FlutterError(code: "FILE_ERROR", message: "Could not open audio file", details: nil))
@@ -664,6 +737,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 if frameCount < 4410 {
                     self.logger.debug("🔊 [NATIVE-macOS] startPlaybackInternal: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
                     self.isPlaying = false
+                    self.handlePlaybackCompleted()
                     result(true)
                     return
                 }
@@ -676,6 +750,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                             guard self.playbackGeneration == gen else { return }
                             self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
                             self.isPlaying = false
+                            self.handlePlaybackCompleted()
                         }
                     }
                 } else {
@@ -688,6 +763,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                                 guard self.playbackGeneration == gen else { return }
                                 self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
                                 self.isPlaying = false
+                                self.handlePlaybackCompleted()
                             }
                         }
                     }
@@ -702,6 +778,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                             guard self.playbackGeneration == gen else { return }
                             self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
                             self.isPlaying = false
+                            self.handlePlaybackCompleted()
                         }
                     }
                 } else {
@@ -714,6 +791,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                                 guard self.playbackGeneration == gen else { return }
                                 self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
                                 self.isPlaying = false
+                                self.handlePlaybackCompleted()
                             }
                         }
                     }
@@ -726,6 +804,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             
             isPlaying = true
             isPlaybackPaused = false
+            startPlaybackClockTimer()
             result(true)
         } catch {
             self.logger.error("🔊 [NATIVE-macOS] startPlaybackInternal ERROR: \(error)")
@@ -735,11 +814,14 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
 
     private func stopPlayback(result: @escaping FlutterResult) {
         audioPlayer?.stop()
+        audioPlayer?.reset()   // dequeue pending content → libera ref interno a ExtAudioFile
         playbackEngine?.stop()
         playbackEngine = nil
+        audioPlayer = nil      // nil esplicito (mancava in macOS come in iOS)
         audioFileForPlayback = nil
         isPlaying = false
         isPlaybackPaused = false
+        stopPlaybackClockTimer()
         if let tmp = playbackTempPath {
             try? FileManager.default.removeItem(atPath: tmp)
             playbackTempPath = nil
@@ -750,12 +832,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private func pausePlayback(result: @escaping FlutterResult) {
         audioPlayer?.pause()
         isPlaying = false
+        isPlaybackPaused = true
+        stopPlaybackClockTimer()
         result(true)
     }
 
     private func resumePlayback(result: @escaping FlutterResult) {
         audioPlayer?.play()
         isPlaying = true
+        isPlaybackPaused = false
+        startPlaybackClockTimer()
         result(true)
     }
 
@@ -781,6 +867,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         if frameCount < 4410 {
              self.logger.debug("🔊 [NATIVE-macOS] seekTo: fine file raggiunta (frameCount=\(frameCount)), emulo completamento")
              self.isPlaying = false
+             self.handlePlaybackCompleted()
              result(true)
              return
         }
@@ -801,6 +888,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     guard self.playbackGeneration == gen else { return }
                     self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (dataPlayedBack)")
                     self.isPlaying = false
+                    self.handlePlaybackCompleted()
                 }
             }
         } else {
@@ -813,6 +901,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                         guard self.playbackGeneration == gen else { return }
                         self.logger.info("🔊 [NATIVE-macOS] playback completato naturalmente (fallback)")
                         self.isPlaying = false
+                        self.handlePlaybackCompleted()
                     }
                 }
             }
@@ -823,35 +912,65 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         player.play()
         
         isPlaying = true
+        isPlaybackPaused = false
         result(true)
     }
 
     private func getPlaybackPosition(result: @escaping FlutterResult) {
-        guard let p = audioPlayer, let f = audioFileForPlayback else { result(0); return }
-        
-        let sampleRate = f.processingFormat.sampleRate
-        var renderedFrames: Int64 = 0
-        
-        if let nodeTime = p.lastRenderTime, let playerTime = p.playerTime(forNodeTime: nodeTime) {
-            // Latenza tra node e device (hardware buffer delay)
-            let outputLatency = playbackEngine?.outputNode.presentationLatency ?? 0
-            let frameLatency = Int64(outputLatency * sampleRate)
-            
-            // Sottraiamo la latenza in frame per avere la posizione esatta all'altoparlante
-            let adjustedSampleTime = max(0, Int64(playerTime.sampleTime) - frameLatency)
-            renderedFrames = adjustedSampleTime
-            // NSLog("🔊 [NATIVE-macOS] pos: sampleTime=\(playerTime.sampleTime) rendered=\(renderedFrames) latency=\(frameLatency)")
-        }
-        
-        let totalFrames = seekOffsetFrames + renderedFrames
-        let clampedFrames = min(totalFrames, f.length)
-        
-        result(Int(Double(clampedFrames) / sampleRate * 1000))
+        result(currentPlaybackPositionMs())
     }
 
     private func getPlaybackDuration(result: @escaping FlutterResult) {
-        guard let f = audioFileForPlayback else { result(0); return }
-        result(Int(Double(f.length) / f.processingFormat.sampleRate * 1000))
+        result(currentPlaybackDurationMs())
+    }
+
+    private func currentPlaybackPositionMs() -> Int {
+        guard let p = audioPlayer, let f = audioFileForPlayback else { return 0 }
+
+        let sampleRate = f.processingFormat.sampleRate
+        var renderedFrames: Int64 = 0
+
+        if let nodeTime = p.lastRenderTime, let playerTime = p.playerTime(forNodeTime: nodeTime) {
+            let outputLatency = playbackEngine?.outputNode.presentationLatency ?? 0
+            let frameLatency = Int64(outputLatency * sampleRate)
+            let adjustedSampleTime = max(0, Int64(playerTime.sampleTime) - frameLatency)
+            renderedFrames = adjustedSampleTime
+        }
+
+        let totalFrames = seekOffsetFrames + renderedFrames
+        let clampedFrames = min(totalFrames, f.length)
+        return Int(Double(clampedFrames) / sampleRate * 1000)
+    }
+
+    private func currentPlaybackDurationMs() -> Int {
+        guard let f = audioFileForPlayback else { return 0 }
+        return Int(Double(f.length) / f.processingFormat.sampleRate * 1000)
+    }
+
+    private func startPlaybackClockTimer() {
+        stopPlaybackClockTimer()
+
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(100))
+        timer.setEventHandler { [weak self] in
+            guard let self = self, self.isPlaying else { return }
+            self.clockStreamHandler.sendPlaybackTick(
+                positionMs: self.currentPlaybackPositionMs(),
+                durationMs: self.currentPlaybackDurationMs()
+            )
+        }
+        playbackClockTimer = timer
+        timer.resume()
+    }
+
+    private func stopPlaybackClockTimer() {
+        playbackClockTimer?.cancel()
+        playbackClockTimer = nil
+    }
+
+    private func handlePlaybackCompleted() {
+        stopPlaybackClockTimer()
+        playbackStreamHandler.sendPlaybackComplete()
     }
 
     // MARK: - Helpers

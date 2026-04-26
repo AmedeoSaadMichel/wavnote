@@ -32,9 +32,18 @@
 | File | Topic |
 |------|-------|
 | [[analysis/2026-04-23-project-state]] | Stato generale progetto — architettura audio, waveform, fullscreen player |
+| [[analysis/2026-04-23-post-refactor-improvements]] | Migliorie codice post-refactor — audio playback/preparation layer, top 10 azioni |
 
 > **Regola:** ogni analisi fornita in sessione va qui, con link interni a features/tech-debt.  
 > Template: [[templates/analysis]]
+
+## Logiche di sistema
+| File | Contenuto |
+|------|-----------|
+| [[logics/overdub_logic]] | Diagramma di flusso e spiegazione della logica di overdub |
+| [[logics/playback_logic]] | Diagramma di flusso e spiegazione della logica di playback |
+
+> **Regola:** Se la logica di uno strumento o funzionalità non è chiara, consulta prima il file `.md` corrispondente qui.
 
 ## Decision Records
 `project/adr/` — vuoto, pronto per le prossime ADR

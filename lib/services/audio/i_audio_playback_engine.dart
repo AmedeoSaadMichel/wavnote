@@ -16,8 +16,11 @@ abstract class IAudioPlaybackEngine {
   Stream<Duration?> get durationStream;
   Stream<AudioPlaybackState> get playbackStateStream;
   Stream<void> get completionStream;
-  Stream<double>
-  get amplitudeStream; // Aggiunto per coerenza con il codice esistente
+
+  /// ⚠️ Ampiezza SIMULATA — just_audio non espone nativamente i dati PCM real-time.
+  /// Per visualizzare la vera waveform, usa i dati pre-caricati dal DB
+  /// o estraili tramite WaveformProcessingService.
+  Stream<double> get amplitudeStream;
 
   Duration get currentPosition;
   Duration get currentDuration;

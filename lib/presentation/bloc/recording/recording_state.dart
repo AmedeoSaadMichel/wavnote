@@ -73,11 +73,21 @@ class RecordingInitial extends RecordingState {
 
 /// State when recording is starting
 class RecordingStarting extends RecordingState {
-  const RecordingStarting();
+  final List<RecordingEntity> recordings;
+  final List<double>? truncatedWaveData;
+
+  const RecordingStarting({
+    this.recordings = const [],
+    this.truncatedWaveData,
+  });
+
+  @override
+  List<Object?> get props => [recordings, truncatedWaveData];
 }
 
 /// State when recording is in progress
 class RecordingInProgress extends RecordingState {
+  final List<RecordingEntity> recordings;
   final String filePath;
   final String? folderId;
   final String? folderName;
@@ -110,6 +120,7 @@ class RecordingInProgress extends RecordingState {
     this.seekBasePath,
     this.truncatedWaveData,
     this.waveformDataForPlayer,
+    this.recordings = const [],
   });
 
   // Getter per risolvere il path assoluto
@@ -117,22 +128,23 @@ class RecordingInProgress extends RecordingState {
 
   @override
   List<Object?> get props => [
-    filePath,
-    folderId,
-    folderName,
-    format,
-    sampleRate,
-    bitRate,
-    duration,
-    amplitude,
-    startTime,
-    title,
-    originalFilePathForOverwrite,
-    overwriteStartTime,
-    seekBasePath,
-    truncatedWaveData,
-    waveformDataForPlayer,
-  ];
+        filePath,
+        folderId,
+        folderName,
+        format,
+        sampleRate,
+        bitRate,
+        duration,
+        amplitude,
+        startTime,
+        title,
+        originalFilePathForOverwrite,
+        overwriteStartTime,
+        seekBasePath,
+        truncatedWaveData,
+        waveformDataForPlayer,
+        recordings,
+      ];
 
   RecordingInProgress copyWith({
     String? filePath,
@@ -149,6 +161,8 @@ class RecordingInProgress extends RecordingState {
     Duration? overwriteStartTime,
     String? seekBasePath,
     List<double>? truncatedWaveData,
+    List<double>? waveformDataForPlayer,
+    List<RecordingEntity>? recordings,
   }) {
     return RecordingInProgress(
       filePath: filePath ?? this.filePath,
@@ -166,12 +180,15 @@ class RecordingInProgress extends RecordingState {
       overwriteStartTime: overwriteStartTime ?? this.overwriteStartTime,
       seekBasePath: seekBasePath ?? this.seekBasePath,
       truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
+      waveformDataForPlayer: waveformDataForPlayer ?? this.waveformDataForPlayer,
+      recordings: recordings ?? this.recordings,
     );
   }
 }
 
 /// State when recording is paused
 class RecordingPaused extends RecordingState {
+  final List<RecordingEntity> recordings;
   final String filePath;
   final String? folderId;
   final String? folderName;
@@ -209,6 +226,7 @@ class RecordingPaused extends RecordingState {
     this.overwriteStartTime,
     this.truncatedWaveData,
     this.previewFilePath,
+    this.recordings = const [],
   });
 
   // Getter per risolvere i path assoluti
@@ -219,23 +237,24 @@ class RecordingPaused extends RecordingState {
 
   @override
   List<Object?> get props => [
-    filePath,
-    folderId,
-    folderName,
-    title,
-    format,
-    sampleRate,
-    bitRate,
-    duration,
-    startTime,
-    isPlayingPreview,
-    seekBarIndex,
-    seekBasePath,
-    originalFilePathForOverwrite,
-    overwriteStartTime,
-    truncatedWaveData,
-    previewFilePath,
-  ];
+        filePath,
+        folderId,
+        folderName,
+        title,
+        format,
+        sampleRate,
+        bitRate,
+        duration,
+        startTime,
+        isPlayingPreview,
+        seekBarIndex,
+        seekBasePath,
+        originalFilePathForOverwrite,
+        overwriteStartTime,
+        truncatedWaveData,
+        previewFilePath,
+        recordings,
+      ];
 
   RecordingPaused copyWith({
     String? filePath,
@@ -254,6 +273,7 @@ class RecordingPaused extends RecordingState {
     Duration? overwriteStartTime,
     List<double>? truncatedWaveData,
     String? previewFilePath,
+    List<RecordingEntity>? recordings,
   }) {
     return RecordingPaused(
       filePath: filePath ?? this.filePath,
@@ -273,13 +293,23 @@ class RecordingPaused extends RecordingState {
       overwriteStartTime: overwriteStartTime ?? this.overwriteStartTime,
       truncatedWaveData: truncatedWaveData ?? this.truncatedWaveData,
       previewFilePath: previewFilePath ?? this.previewFilePath,
+      recordings: recordings ?? this.recordings,
     );
   }
 }
 
 /// State when recording is stopping
 class RecordingStopping extends RecordingState {
-  const RecordingStopping();
+  final List<RecordingEntity> recordings;
+  final List<double>? truncatedWaveData;
+
+  const RecordingStopping({
+    required this.recordings,
+    this.truncatedWaveData,
+  });
+
+  @override
+  List<Object?> get props => [recordings, truncatedWaveData];
 }
 
 /// State when recording is completed
@@ -318,11 +348,11 @@ class RecordingLoaded extends RecordingState {
 
   @override
   List<Object?> get props => [
-    recordings,
-    isEditMode,
-    selectedRecordings,
-    timestamp,
-  ];
+        recordings,
+        isEditMode,
+        selectedRecordings,
+        timestamp,
+      ];
 
   RecordingLoaded copyWith({
     List<RecordingEntity>? recordings,

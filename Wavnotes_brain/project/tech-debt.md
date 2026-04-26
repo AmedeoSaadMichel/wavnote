@@ -2,6 +2,13 @@
 
 _Aggiorna a fine sessione se aggiungi o risolvi un item._
 
+## Bug confermati (da analisi 2026-04-26)
+
+| # | Area | Descrizione sintetica | Priorità |
+|---|------|-----------------------|---------|
+| B1 | Fullscreen bottom sheet | **Sfarfallio play/pause preview**: multiple emissioni BLoC in cascata (`PlayRecordingPreview` → `_updateCardIds` → `UpdateSeekBarIndex` ogni 100ms) + `AnimatedSwitcher` con `FadeTransition` 400ms che risponde ad ogni rebuild. Finestra async in `_playRecordingPreview()` tra emit sincrono e start effettivo del player. | 🟡 Media |
+| B2 | Overdub / seek-and-resume | **✅ Risolto 2026-04-26**: Tre fix — (1) `pathToOverwrite` ora usa `baseRecordingEntity.filePath` (WAV nativo) invece di `s.filePath` (estensione logica non esistente su disco); (2) `isSeekResume` usa `!identical` per catturare tutti i seek-resume; (3) `waveformDataForPlayer` aggiunto a `RecordingInProgress.copyWith`. Da verificare su device con M4A/FLAC. | ✅ Risolto |
+
 ## TODO aperti nel codice
 
 | # | File | Riga | Descrizione | Priorità |
@@ -10,6 +17,8 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | 2 | `main.dart` | 258 | Bottone "Retry" nella error screen non funzionale (nessuna logica implementata) | 🟡 Media |
 | 3 | `recording_list_logic.dart` | 627 | `TODO: Implement seek to position (0.0-1.0)` — seek da UI non implementato | 🟡 Media |
 | 4 | `lib/presentation/bloc/recording/recording_bloc.dart` | 159 | Rimuovere log di debug `🔍 BLoC received amplitude: ...` dopo aver verificato il corretto funzionamento | 🟢 Bassa |
+| 5 | `recording_compact_view.dart` / `recording_bottom_sheet_main.dart` | — | Nessun feedback visivo durante `RecordingStarting` (~3s di AVAudioSession init): l'utente ri-clicca pensando che il tap non sia stato registrato, genera registrazione 0ms e `RecordingError`. Fix: disabilitare il bottone record + mostrare spinner/pulse durante `isStarting`. | 🟡 Media |
+| 6 | `lib/presentation/screens/recording/recording_list_screen.dart` | builder fallback su `RecordingStopping` | Durante lo stop della registrazione la lista passa per `RecordingStopping`, ma il builder non gestisce questo stato e mostra temporaneamente `RecordingListSkeleton`. **✅ Risolto 2026-04-24**: Preservata la lista dei file negli stati di transizione (`Starting`, `InProgress`, `Paused`, `Stopping`). | ✅ Risolto |
 
 ## Workaround architetturali noti (post ADR-001)
 
@@ -40,9 +49,10 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 
 | Area | Nota | Priorità |
 |------|------|---------|
-| `IAudioPlaybackEngine` / `AudioPlaybackEngineImpl` | Nuovo layer playback registrato nel DI ma non usato dal BLoC — il BLoC usa ancora `IAudioServiceRepository.startPlaying`. Valutare migrazione in sessione dedicata con test prima. | 🟡 Media |
-| `IAudioPreparationService` / `AudioPreparationService` | Idem — registrato ma non consumato. | 🟡 Media |
-| `RecordingPlaybackCoordinator` | Factory registrato nel DI ma non istanziato da nessuna schermata. | 🟡 Media |
+| `IAudioPlaybackEngine` / `AudioPlaybackEngineImpl` | **Parzialmente integrato 2026-04-23**: usato da `AudioServiceCoordinator`, `RecordingListScreen` e `PlaybackScreen`. Il BLoC continua comunque a passare da `IAudioServiceRepository`, che ora delega all'engine condiviso. Verificare con test/device il comportamento multi-schermata. | 🟡 Media |
+| `IAudioPreparationService` / `AudioPreparationService` | **Parzialmente integrato 2026-04-23**: consumato dal `RecordingPlaybackCoordinator` per list/player/preview bottom sheet. Mancano ancora test unitari dedicati. | 🟡 Media |
+| `RecordingPlaybackCoordinator` | **Integrato 2026-04-23** in `RecordingListScreen`, `PlaybackScreen` e preview bottom sheet. Resta da validare manualmente il comportamento quando due schermate osservano lo stesso engine singleton. | 🟡 Media |
+| `IAudioServiceRepository` | Contratto ancora “misto”: contiene API playback legacy, ma `RecordingServiceRepository` le espone come non supportate per impedire nuovi usi. Valutare split formale dell'interfaccia in sessione dedicata. | 🟡 Media |
 
 ## File uncommitted (da git status)
 

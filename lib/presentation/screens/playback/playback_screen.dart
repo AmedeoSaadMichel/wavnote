@@ -1,12 +1,12 @@
 // File: lib/presentation/screens/playback/playback_screen.dart
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../domain/entities/recording_entity.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
-import '../recording/controllers/recording_playback_controller.dart';
+import '../recording/controllers/recording_playback_coordinator.dart';
 import 'playback_eye_widget.dart';
 
 const _yellow = Color(0xFFE8D04A);
@@ -30,7 +30,7 @@ class PlaybackScreen extends StatefulWidget {
 }
 
 class _PlaybackScreenState extends State<PlaybackScreen> {
-  late final RecordingPlaybackController _ctrl;
+  late final RecordingPlaybackCoordinator _playbackCoordinator;
   late final List<double> _waveData;
   double _speed = 1.0;
   bool _showSpeed = false;
@@ -38,12 +38,15 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = RecordingPlaybackController(
-      audioService: GetIt.I<IAudioServiceRepository>(),
-    );
-    _ctrl.audioStateManager.addListener(_onAudioState);
+    _playbackCoordinator = GetIt.I<RecordingPlaybackCoordinator>();
+    _playbackCoordinator.state.addListener(_onAudioState);
     _waveData = _buildWaveData();
-    _ctrl.expandRecording(widget.recording);
+    unawaited(_initializePlayback());
+  }
+
+  Future<void> _initializePlayback() async {
+    await _playbackCoordinator.initialize();
+    await _playbackCoordinator.expandRecording(widget.recording);
   }
 
   void _onAudioState() {
@@ -66,10 +69,19 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
   }
 
   double get _progress {
-    final dur = _ctrl.duration;
+    final dur = _duration;
     if (dur == Duration.zero) return 0;
-    return (_ctrl.position.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+    return (_position.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
   }
+
+  Duration get _position => _playbackCoordinator.state.value.position;
+
+  Duration get _duration {
+    final duration = _playbackCoordinator.state.value.duration;
+    return duration == Duration.zero ? widget.recording.duration : duration;
+  }
+
+  bool get _isCurrentlyPlaying => _playbackCoordinator.state.value.isPlaying;
 
   String _fmt(Duration d) {
     final m = d.inMinutes.toString().padLeft(2, '0');
@@ -79,13 +91,15 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
 
   Future<void> _skip(int seconds) async {
     final newPos = Duration(
-      milliseconds: (_ctrl.position.inMilliseconds + seconds * 1000).clamp(
+      milliseconds: (_position.inMilliseconds + seconds * 1000).clamp(
         0,
-        _ctrl.duration.inMilliseconds,
+        _duration.inMilliseconds,
       ),
     );
-    _ctrl.audioStateManager.seekTo(newPos);
-    await GetIt.I<IAudioServiceRepository>().seekTo(newPos);
+    if (_duration == Duration.zero) return;
+    await _playbackCoordinator.seekToPercent(
+      newPos.inMilliseconds / _duration.inMilliseconds,
+    );
   }
 
   // Scrub delta: trascinare a sinistra = avanzare, a destra = tornare indietro
@@ -94,13 +108,14 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
     if (n <= 1) return;
     final delta = -dx / _kBarStep / (n - 1);
     final newProgress = (_progress + delta).clamp(0.0, 1.0);
-    _ctrl.seekToPosition(newProgress);
+    _playbackCoordinator.seekToPercent(newProgress);
   }
 
   @override
   void dispose() {
-    _ctrl.audioStateManager.removeListener(_onAudioState);
-    _ctrl.dispose();
+    _playbackCoordinator.state.removeListener(_onAudioState);
+    unawaited(_playbackCoordinator.stopPlayback());
+    unawaited(_playbackCoordinator.dispose());
     super.dispose();
   }
 
@@ -111,7 +126,7 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
     final timeStr =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final durStr = _fmt(widget.recording.duration);
-    final curStr = _fmt(_ctrl.position);
+    final curStr = _fmt(_position);
     final title = widget.recording.locationName?.isNotEmpty == true
         ? widget.recording.locationName!
         : widget.recording.name;
@@ -251,8 +266,8 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
             top: screenH * 0.46 - 60,
             right: 28,
             child: _GlowIconButton(
-              playing: _ctrl.isCurrentlyPlaying,
-              onTap: () => _ctrl.togglePlaybackForRecording(widget.recording),
+              playing: _isCurrentlyPlaying,
+              onTap: _playbackCoordinator.togglePlayback,
             ),
           ),
 
@@ -288,14 +303,14 @@ class _PlaybackScreenState extends State<PlaybackScreen> {
                     PlaybackEyeWidget(
                       dir: EyeDir.back,
                       color: _yellow,
-                      playing: _ctrl.isCurrentlyPlaying,
+                      playing: _isCurrentlyPlaying,
                       onTap: () => _skip(-15),
                     ),
                     const SizedBox(width: 34),
                     PlaybackEyeWidget(
                       dir: EyeDir.fwd,
                       color: _yellow,
-                      playing: _ctrl.isCurrentlyPlaying,
+                      playing: _isCurrentlyPlaying,
                       onTap: () => _skip(15),
                     ),
                   ],
@@ -571,16 +586,14 @@ class _WaveformPainter extends CustomPainter {
 
       if (x < -barW || x > size.width + barW) continue;
 
+      if (barIndexF < 0 || barIndexF >= n - 1) continue;
+
       // Altezza: interpola tra barre adiacenti per scroll fluido
       double h;
-      if (barIndexF < 0 || barIndexF >= n - 1) {
-        h = 0.08 * maxH;
-      } else {
-        final lo = barIndexF.floor().clamp(0, n - 1);
-        final hi = (lo + 1).clamp(0, n - 1);
-        final frac = barIndexF - lo;
-        h = (waveData[lo] * (1 - frac) + waveData[hi] * frac) * maxH;
-      }
+      final lo = barIndexF.floor().clamp(0, n - 1);
+      final hi = (lo + 1).clamp(0, n - 1);
+      final frac = barIndexF - lo;
+      h = (waveData[lo] * (1 - frac) + waveData[hi] * frac) * maxH;
       h = h.clamp(4.0, maxH);
 
       final rect = RRect.fromRectAndRadius(

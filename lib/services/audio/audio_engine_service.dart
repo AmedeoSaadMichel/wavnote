@@ -118,11 +118,8 @@ class AudioEngineService {
             switch (type) {
               case 'recordingTick':
                 final posMs = (event['positionMs'] as num?)?.toInt() ?? 0;
-                final amp =
-                    ((event['amplitude'] as num?)?.toDouble() ?? 0.0).clamp(
-                      0.0,
-                      1.0,
-                    );
+                final amp = ((event['amplitude'] as num?)?.toDouble() ?? 0.0)
+                    .clamp(0.0, 1.0);
                 _lastAmplitude = amp;
                 _recordingTickController?.add((
                   position: Duration(milliseconds: posMs),

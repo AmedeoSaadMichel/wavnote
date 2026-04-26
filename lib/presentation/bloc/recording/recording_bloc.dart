@@ -45,8 +45,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
-  StreamSubscription<void>? _previewCompletionSubscription;
-  StreamSubscription<Duration>? _previewPositionSubscription;
 
   RecordingBloc({
     required IAudioServiceRepository audioService,
@@ -128,8 +126,6 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   Future<void> close() async {
     await _amplitudeSubscription?.cancel();
     await _durationSubscription?.cancel();
-    await _previewCompletionSubscription?.cancel();
-    await _previewPositionSubscription?.cancel();
 
     if (_audioService.needsDisposal) {
       try {

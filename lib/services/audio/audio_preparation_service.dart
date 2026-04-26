@@ -26,13 +26,15 @@ class AudioPreparationService implements IAudioPreparationService {
   @override
   Future<AudioPreparationResult> prepare(RecordingEntity recording) async {
     final absolutePath = await recording.resolvedFilePath;
-    debugPrint('🔄 AUDIO_PREP_SVC: Preparing $absolutePath');
+    if (kDebugMode) debugPrint('🔄 AUDIO_PREP_SVC: Preparing $absolutePath');
 
     // Se il file è già quello caricato nell'engine e l'engine lo considera pronto
     if (_engine.currentFilePath == absolutePath && _engine.isLoaded) {
-      debugPrint(
-        '✅ AUDIO_PREP_SVC: File already loaded and prepared: $absolutePath',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '✅ AUDIO_PREP_SVC: File already loaded and prepared: $absolutePath',
+        );
+      }
       return AudioPreparationResult(
         result: Right(_engine.currentDuration),
         preparedFilePath: absolutePath,
@@ -48,9 +50,11 @@ class AudioPreparationService implements IAudioPreparationService {
           : recording.duration;
 
       _preparedFiles[absolutePath] = duration;
-      debugPrint(
-        '✅ AUDIO_PREP_SVC: File prepared successfully: $absolutePath (Duration: $duration)',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '✅ AUDIO_PREP_SVC: File prepared successfully: $absolutePath (Duration: $duration)',
+        );
+      }
 
       return AudioPreparationResult(
         result: Right(duration),

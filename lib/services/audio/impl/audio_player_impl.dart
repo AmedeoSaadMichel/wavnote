@@ -9,7 +9,6 @@ import '../../../core/utils/file_utils.dart';
 /// Handles playback operations separately from recording.
 /// Exposes streams for position and completion events.
 class AudioPlayerImpl {
-
   final AudioPlayer _player = AudioPlayer();
 
   StreamController<Duration>? _positionController;
@@ -37,21 +36,17 @@ class AudioPlayerImpl {
       );
 
       // Detect playback completion
-      _stateSubscription = _player.playerStateStream.listen(
-        (state) {
-          if (state.processingState == ProcessingState.completed) {
-            _isPlaying = false;
-            _isPlaybackPaused = false;
-            _completionController?.add(null);
-          }
-        },
-        onError: (_) {},
-      );
+      _stateSubscription = _player.playerStateStream.listen((state) {
+        if (state.processingState == ProcessingState.completed) {
+          _isPlaying = false;
+          _isPlaybackPaused = false;
+          _completionController?.add(null);
+        }
+      }, onError: (_) {});
 
       _isInitialized = true;
       debugPrint('✅ AudioPlayerImpl initialized');
       return true;
-
     } catch (e) {
       debugPrint('❌ AudioPlayerImpl init failed: $e');
       return false;
@@ -91,7 +86,6 @@ class AudioPlayerImpl {
 
       debugPrint('▶️ AudioPlayerImpl: playback started — $absolutePath');
       return true;
-
     } catch (e) {
       debugPrint('❌ AudioPlayerImpl: startPlaying failed: $e');
       return false;
@@ -174,8 +168,7 @@ class AudioPlayerImpl {
   bool get isPlaybackPaused => _isPlaybackPaused;
   bool get isInitialized => _isInitialized;
 
-  Future<Duration> getCurrentPlaybackPosition() async =>
-      _player.position;
+  Future<Duration> getCurrentPlaybackPosition() async => _player.position;
 
   Future<Duration> getCurrentPlaybackDuration() async =>
       _player.duration ?? Duration.zero;

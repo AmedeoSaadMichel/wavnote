@@ -1,4 +1,4 @@
-// File: services/audio/audio_player_service.dart
+// File: lib/services/audio/audio_player_service.dart
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -17,6 +17,10 @@ import 'audio_cache_manager.dart';
 /// Focused specifically on playback operations while implementing the full
 /// IAudioServiceRepository interface for compatibility.
 /// Stripped of UI logic and caching (now handled by AudioCacheManager and Presentation layer).
+@Deprecated(
+  'Usare IAudioPlaybackEngine/AudioPlaybackEngineImpl via DI. '
+  'Questo service resta solo per compatibilità temporanea.',
+)
 class AudioPlayerService implements IAudioServiceRepository {
   // Singleton instance
   static AudioPlayerService? _instance;

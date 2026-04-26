@@ -6,8 +6,51 @@
   "hideUnresolved": false,
   "showOrphans": true,
   "collapse-color-groups": false,
-  "colorGroups": [],
-  "collapse-display": true,
+  "colorGroups": [
+    {
+      "query": "path:log/sessions  ",
+      "color": {
+        "a": 1,
+        "rgb": 14701138
+      }
+    },
+    {
+      "query": "path:project  ",
+      "color": {
+        "a": 1,
+        "rgb": 14725458
+      }
+    },
+    {
+      "query": "path:analysis  ",
+      "color": {
+        "a": 1,
+        "rgb": 12668415
+      }
+    },
+    {
+      "query": "path:logics  ",
+      "color": {
+        "a": 1,
+        "rgb": 5431378
+      }
+    },
+    {
+      "query": "path:templates  ",
+      "color": {
+        "a": 1,
+        "rgb": 5431473
+      }
+    },
+    {
+      "query": "file: _index",
+      "color": {
+        "a": 1,
+        "rgb": 5419488
+      }
+    }
+  ],
+  "collapse-display": false,
   "showArrow": true,
   "textFadeMultiplier": -3,
   "nodeSizeMultiplier": 1.39433159722222,
@@ -17,6 +60,6 @@
   "repelStrength": 20,
   "linkStrength": 0.768576388888889,
   "linkDistance": 479,
-  "scale": 0.3856959435367462,
-  "close": false
+  "scale": 0.47566815476452523,
+  "close": true
 }

@@ -209,10 +209,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       _seekBarIndex = widget.blocSeekBarIndex!;
     }
 
-    // Detecta seek-and-resume: truncatedWaveData passa da null → non-null
-    // (il RecordingStarting intermedio mantiene null, RecordingInProgress post-seek ha i dati)
+    // Detecta seek-and-resume: truncatedWaveData è una reference diversa (NUOVA lista)
+    // !identical cattura sia il primo overdub (null→non-null) che i successivi (lista vecchia→lista nuova)
     final isSeekResume =
-        widget.truncatedWaveData != null && oldWidget.truncatedWaveData == null;
+        widget.truncatedWaveData != null &&
+        !identical(widget.truncatedWaveData, oldWidget.truncatedWaveData);
 
     // Pre-imposta futureBarsCount appena inizia la transizione (isStarting true),
     // PRIMA che truncatedWaveData arrivi. Questo impedisce al painter di considerare
@@ -585,7 +586,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   sessionCounter: widget.sessionCounter,
                 )
               : RecordingCompactView(
-                  key: const ValueKey('compact'),
+                  key: ValueKey(widget.sessionCounter),
                   title: widget.title,
                   elapsed: widget.elapsed,
                   isRecording: widget.isRecording,
@@ -593,6 +594,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   waveData: _waveData,
                   waveSegments: _waveSegments,
                   pulseAnimation: _pulseAnimation,
+                  sessionCounter: widget.sessionCounter,
                   onToggle: () {
                     if (widget.isPaused) {
                       widget.onResume?.call(

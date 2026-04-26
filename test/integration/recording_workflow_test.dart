@@ -1,5 +1,5 @@
 // File: test/integration/recording_workflow_test.dart
-// 
+//
 // Recording Workflow Integration Tests - SIMPLIFIED VERSION
 // =========================================================
 //
@@ -38,7 +38,7 @@ void main() {
       // Set up default mock behaviors
       when(() => mockRecordingBloc.state).thenReturn(const RecordingInitial());
       when(() => mockFolderBloc.state).thenReturn(const FolderInitial());
-      
+
       when(() => mockRecordingBloc.stream).thenAnswer(
         (_) => Stream.fromIterable([const RecordingInitial()]),
       );
@@ -71,13 +71,13 @@ void main() {
 
       // Test recording start workflow
       await _testRecordingStart(tester, mockRecordingBloc);
-      
+
       // Test recording pause workflow
       await _testRecordingPause(tester, mockRecordingBloc);
-      
+
       // Test recording resume workflow
       await _testRecordingResume(tester, mockRecordingBloc);
-      
+
       // Test recording stop workflow
       await _testRecordingStop(tester, mockRecordingBloc);
     });
@@ -99,7 +99,7 @@ void main() {
 
       // Test recording with M4A format
       await _testRecordingWithFormat(tester, mockRecordingBloc, AudioFormat.m4a);
-      
+
       // Test recording with WAV format
       await _testRecordingWithFormat(tester, mockRecordingBloc, AudioFormat.wav);
     });
@@ -171,7 +171,7 @@ void main() {
       for (int i = 0; i < 3; i++) {
         await _testRecordingStart(tester, mockRecordingBloc);
         await _testRecordingStop(tester, mockRecordingBloc);
-        
+
         // Wait between recordings
         await tester.pump(const Duration(milliseconds: 100));
       }
@@ -203,16 +203,16 @@ void main() {
 Future<void> _testRecordingStart(WidgetTester tester, MockRecordingBloc mockBloc) async {
   // Simulate recording start
   when(() => mockBloc.state).thenReturn(
-    const RecordingStarting(),
+    const RecordingStarting(recordings: []),
   );
-  
+
   // Trigger state change
   when(() => mockBloc.stream).thenAnswer(
-    (_) => Stream.fromIterable([const RecordingStarting()]),
+    (_) => Stream.fromIterable([const RecordingStarting(recordings: [])]),
   );
-  
+
   await tester.pump();
-  
+
   // Then transition to in progress
   when(() => mockBloc.state).thenReturn(
     RecordingInProgress(
@@ -226,7 +226,7 @@ Future<void> _testRecordingStart(WidgetTester tester, MockRecordingBloc mockBloc
       startTime: DateTime.now(),
     ),
   );
-  
+
   await tester.pump();
 }
 
@@ -243,7 +243,7 @@ Future<void> _testRecordingPause(WidgetTester tester, MockRecordingBloc mockBloc
       startTime: DateTime.now(),
     ),
   );
-  
+
   await tester.pump();
 }
 
@@ -261,30 +261,30 @@ Future<void> _testRecordingResume(WidgetTester tester, MockRecordingBloc mockBlo
       startTime: DateTime.now(),
     ),
   );
-  
+
   await tester.pump();
 }
 
 Future<void> _testRecordingStop(WidgetTester tester, MockRecordingBloc mockBloc) async {
   // Simulate recording stop
   when(() => mockBloc.state).thenReturn(
-    const RecordingStopping(),
+    const RecordingStopping(recordings: []),
   );
-  
+
   await tester.pump();
-  
+
   // Then transition to completed
   final testRecording = TestHelpers.createTestRecording();
   when(() => mockBloc.state).thenReturn(
     RecordingCompleted(recording: testRecording),
   );
-  
+
   await tester.pump();
 }
 
 Future<void> _testRecordingWithFormat(
-  WidgetTester tester, 
-  MockRecordingBloc mockBloc, 
+  WidgetTester tester,
+  MockRecordingBloc mockBloc,
   AudioFormat format,
 ) async {
   // Test recording with specific format
@@ -300,7 +300,7 @@ Future<void> _testRecordingWithFormat(
       startTime: DateTime.now(),
     ),
   );
-  
+
   await tester.pump();
 }
 
@@ -308,7 +308,7 @@ Future<void> _testStatePersistence(WidgetTester tester, MockRecordingBloc mockBl
   // Test that state changes are properly handled
   final states = [
     const RecordingInitial(),
-    const RecordingStarting(),
+    const RecordingStarting(recordings: []),
     RecordingInProgress(
       filePath: '/test/recording.m4a',
       folderId: 'test_folder',
@@ -319,14 +319,14 @@ Future<void> _testStatePersistence(WidgetTester tester, MockRecordingBloc mockBl
       amplitude: 0.5,
       startTime: DateTime.now(),
     ),
-    const RecordingStopping(),
+    const RecordingStopping(recordings: []),
     RecordingCompleted(recording: TestHelpers.createTestRecording()),
   ];
-  
+
   for (final state in states) {
     when(() => mockBloc.state).thenReturn(state);
     await tester.pump();
-    
+
     // Verify state transition
     expect(find.byType(MainScreen), findsOneWidget);
   }

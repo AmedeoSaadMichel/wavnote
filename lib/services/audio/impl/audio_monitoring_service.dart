@@ -8,7 +8,6 @@ import '../../../core/constants/app_constants.dart';
 /// Provides real-time updates for UI visualization and feedback.
 /// Separated from core recording logic for better maintainability.
 class AudioMonitoringService {
-
   // Stream controllers
   StreamController<double>? _amplitudeController;
 
@@ -37,8 +36,10 @@ class AudioMonitoringService {
 
     _amplitudeTimer?.cancel();
     _amplitudeTimer = Timer.periodic(
-      Duration(milliseconds: AppConstants.amplitudeUpdateInterval.inMilliseconds),
-          (timer) {
+      Duration(
+        milliseconds: AppConstants.amplitudeUpdateInterval.inMilliseconds,
+      ),
+      (timer) {
         if (_isMonitoring) {
           // Generate realistic amplitude simulation
           final amplitude = _generateRealisticAmplitude();

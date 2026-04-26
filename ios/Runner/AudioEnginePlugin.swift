@@ -816,11 +816,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private func startPlaybackInternal(path: String, position: Int?, result: @escaping FlutterResult) {
         self.logger.debug("🔊 [NATIVE] startPlaybackInternal — path=\(path)")
         do {
-            if playbackEngine != nil {
-                audioPlayer?.stop()
-                playbackEngine?.stop()
-                playbackEngine = nil
-            }
+            // Rilascia sempre le risorse CoreAudio precedenti prima di riaprire il file.
+            // Il gate su playbackEngine != nil causava il bug: dopo stopPlayback il playbackEngine
+            // è nil ma audioPlayer mantiene ancora un ExtAudioFile handle aperto → errore 2003334207
+            // sulla riapertura dello stesso file (es. preview overdub al secondo tentativo).
+            audioPlayer?.stop()
+            audioPlayer?.reset()       // dequeue sincrono: libera il ref interno a ExtAudioFile
+            playbackEngine?.stop()
+            playbackEngine = nil
+            audioPlayer = nil          // forza ARC a rilasciare il nodo
+            audioFileForPlayback = nil // drop ref esplicito (già nil se stopPlayback era stato chiamato)
             audioFileForPlayback = try AVAudioFile(forReading: URL(fileURLWithPath: path))
             guard let file = audioFileForPlayback else {
                 result(FlutterError(code: "FILE_ERROR", message: "Could not open audio file", details: nil))
@@ -901,8 +906,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         self.logger.debug("⏹️ [NATIVE] stopPlayback")
         stopPlaybackClock()
         audioPlayer?.stop()
+        audioPlayer?.reset()   // dequeue pending content → rilascia il ref interno a ExtAudioFile
         playbackEngine?.stop()
         playbackEngine = nil
+        audioPlayer = nil      // rilascia il nodo esplicitamente (stopPlayback non lo faceva)
         audioFileForPlayback = nil
         isPlaying = false
         isPlaybackPaused = false

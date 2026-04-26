@@ -1,4 +1,4 @@
-// File: presentation/screens/recording/recording_list_logic.dart
+// File: lib/presentation/screens/recording/recording_list_logic.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/recording_entity.dart';
@@ -8,60 +8,37 @@ import '../../bloc/recording/recording_bloc.dart';
 import '../../bloc/folder/folder_bloc.dart';
 import '../../bloc/settings/settings_bloc.dart';
 import '../../../services/permission/permission_service.dart';
-import '../../../services/audio/audio_player_service.dart';
 import '../../widgets/dialogs/folder_selection_dialog.dart';
 
 /// Mixin containing all business logic for RecordingListScreen
 mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   FolderEntity get folder;
+  @override
   BuildContext get context;
 
-  // Audio player service access
-  AudioPlayerService get audioPlayerService => AudioPlayerService.instance;
   int? _previousRecordingCount;
   Map<String, String> _folderNames = {};
   String _searchQuery = '';
 
   String get searchQuery => _searchQuery;
 
+  void initializePlaybackStateListener() {}
+
+  String? get expandedPlaybackRecordingId => null;
+
+  RecordingEntity? getExpandedPlaybackRecording(
+    List<RecordingEntity> recordings,
+  ) => null;
+
+  void resetExpandedPlaybackState() {}
+
+  Future<void> stopExpandedPlayback() async {}
+
   void initializeRecordingList() {
     print(
       '🚀 VERBOSE: initializeRecordingList() called for folder: ${folder.id} (${folder.name})',
     );
-    // ESSENTIAL: setState callback needed for expansion state changes
-
-    // Only initialize if not already initialized
-    if (!audioPlayerService.isServiceReady) {
-      print('🔧 INIT: Service not ready, initializing...');
-      audioPlayerService.initialize().then((_) {
-        // Then set the expansion callback
-        audioPlayerService.setExpansionCallback(() {
-          print(
-            '🔄 CALLBACK: _onExpansionChanged triggered, checking if mounted',
-          );
-          if (mounted) {
-            print('🔄 CALLBACK: Widget is mounted, calling setState');
-            setState(() {});
-          } else {
-            print('⚠️ CALLBACK: Widget is not mounted, skipping setState');
-          }
-        });
-      });
-    } else {
-      print('✅ INIT: Service already ready, just setting expansion callback');
-      // Service is already initialized, just set the callback
-      audioPlayerService.setExpansionCallback(() {
-        print(
-          '🔄 CALLBACK: _onExpansionChanged triggered, checking if mounted',
-        );
-        if (mounted) {
-          print('🔄 CALLBACK: Widget is mounted, calling setState');
-          setState(() {});
-        } else {
-          print('⚠️ CALLBACK: Widget is not mounted, skipping setState');
-        }
-      });
-    }
+    initializePlaybackStateListener();
 
     _loadFolderNames();
 
@@ -251,14 +228,13 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
       _previousRecordingCount = currentCount;
 
       // Ensure audio service expansion state is synced with current recordings
-      final expandedRecording = audioPlayerService
-          .getCurrentlyExpandedRecording(state.recordings);
-      if (audioPlayerService.expandedRecordingId != null &&
+      final expandedRecording = getExpandedPlaybackRecording(state.recordings);
+      if (expandedPlaybackRecordingId != null &&
           expandedRecording == null) {
         print(
           '⚠️ Expanded recording not found in current list, resetting audio service state',
         );
-        audioPlayerService.resetExpansionState();
+        resetExpandedPlaybackState();
       }
     } else if (state is RecordingError) {
       print('❌ Recording error: ${state.message}');
@@ -273,54 +249,36 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
 
   // Audio player management
   Future<void> expandRecording(RecordingEntity recording) async {
-    print('🎯 EXPAND: expandRecording called for: ${recording.name}');
-    try {
-      await audioPlayerService.expandRecording(recording);
-      print(
-        '🎯 EXPAND: Successfully called audioPlayerService.expandRecording',
+    throw UnsupportedError('expandRecording deve essere implementato dalla UI');
+  }
+
+  Future<void> togglePlayback() async =>
+      throw UnsupportedError('togglePlayback deve essere implementato dalla UI');
+
+  void seekToPosition(double percent) =>
+      throw UnsupportedError(
+        'seekToPosition deve essere implementato dalla UI',
       );
-    } catch (e) {
-      print('🎯 EXPAND: Error in expandRecording: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not play recording: ${recording.name}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> togglePlayback() async {
-    await audioPlayerService.togglePlayback();
-  }
-
-  void seekToPosition(double percent) {
-    audioPlayerService.seekToPosition(percent);
-  }
 
   RecordingEntity? getExpandedRecording() {
     final recordingBloc = context.read<RecordingBloc>();
     final state = recordingBloc.state;
     if (state is RecordingLoaded) {
-      return audioPlayerService.getCurrentlyExpandedRecording(state.recordings);
+      return getExpandedPlaybackRecording(state.recordings);
     }
     return null;
   }
 
-  void skipBackward() {
-    audioPlayerService.skipBackward();
-  }
+  void skipBackward() =>
+      throw UnsupportedError('skipBackward deve essere implementato dalla UI');
 
-  void skipForward() {
-    audioPlayerService.skipForward();
-  }
+  void skipForward() =>
+      throw UnsupportedError('skipForward deve essere implementato dalla UI');
 
   // Recording actions
   Future<void> deleteRecording(RecordingEntity recording) async {
-    if (audioPlayerService.expandedRecordingId == recording.id) {
-      await audioPlayerService.stopPlaying();
+    if (expandedPlaybackRecordingId == recording.id) {
+      await stopExpandedPlayback();
       if (mounted) {
         setState(() {});
       }
@@ -442,8 +400,8 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   void restoreRecording(RecordingEntity recording) {
     print('♻️ Restore tapped for: ${recording.name}');
 
-    if (audioPlayerService.expandedRecordingId == recording.id) {
-      audioPlayerService.stopPlaying();
+    if (expandedPlaybackRecordingId == recording.id) {
+      stopExpandedPlayback();
       if (mounted) {
         setState(() {});
       }
@@ -569,6 +527,11 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
       '   canStopRecording: ${recordingBloc.state is RecordingInProgress || recordingBloc.state is RecordingPaused}',
     );
 
+    if (recordingBloc.state is RecordingPaused &&
+        (recordingBloc.state as RecordingPaused).isPlayingPreview) {
+      stopRecordingPreview();
+    }
+
     context.read<RecordingBloc>().add(
       const StopRecording(),
     ); // No synthetic waveform data
@@ -584,6 +547,9 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
     print('▶️ Resume recording tapped (seekBar: $seekBarIndex)');
     final recordingBloc = context.read<RecordingBloc>();
     if (recordingBloc.state is RecordingPaused) {
+      if ((recordingBloc.state as RecordingPaused).isPlayingPreview) {
+        stopRecordingPreview();
+      }
       recordingBloc.add(
         ResumeWithAutoStop(
           seekBarIndex: seekBarIndex,

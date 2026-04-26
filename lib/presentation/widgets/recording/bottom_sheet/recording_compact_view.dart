@@ -19,6 +19,7 @@ class RecordingCompactView extends StatelessWidget {
   final List<int> waveSegments;
   final Animation<double> pulseAnimation;
   final VoidCallback onToggle;
+  final int sessionCounter;
 
   const RecordingCompactView({
     super.key,
@@ -30,6 +31,7 @@ class RecordingCompactView extends StatelessWidget {
     this.waveSegments = const [],
     required this.pulseAnimation,
     required this.onToggle,
+    this.sessionCounter = 0,
   });
 
   String get _formattedTime => elapsed.formatted;
@@ -74,10 +76,7 @@ class RecordingCompactView extends StatelessWidget {
         ),
 
         // ── Bottone record ───────────────────────────────────────────
-        SizedBox(
-          height: 110,
-          child: Center(child: _buildRecordButton()),
-        ),
+        SizedBox(height: 110, child: Center(child: _buildRecordButton())),
         const SizedBox(height: 8),
       ],
     );
@@ -134,6 +133,7 @@ class RecordingCompactView extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return RecordingWaveform(
+                  key: ValueKey(sessionCounter),
                   amplitude: amplitude,
                   waveData: waveData,
                   waveSegments: waveSegments,

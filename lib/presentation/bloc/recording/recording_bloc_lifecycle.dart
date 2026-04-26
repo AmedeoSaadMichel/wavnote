@@ -6,7 +6,10 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     StartRecording event,
     Emitter<RecordingState> emit,
   ) async {
-    emit(const RecordingStarting());
+    final recordings = state is RecordingLoaded
+        ? (state as RecordingLoaded).recordings
+        : <RecordingEntity>[];
+    emit(RecordingStarting(recordings: recordings));
     final result = await _startRecordingUseCase.execute(
       folderId: event.folderId ?? 'all_recordings',
       format: event.format,
@@ -28,6 +31,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           amplitude: 0.0,
           startTime: data.startTime,
           title: data.title,
+          recordings: recordings,
         ),
       );
       _refreshTitleInBackground();
@@ -43,11 +47,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     // Ferma il preview se era in esecuzione
     if (state is RecordingPaused &&
         (state as RecordingPaused).isPlayingPreview) {
-      _previewPositionSubscription?.cancel();
-      _previewPositionSubscription = null;
-      _previewCompletionSubscription?.cancel();
-      _previewCompletionSubscription = null;
-      await _audioService.stopPlaying();
+      emit((state as RecordingPaused).copyWith(isPlayingPreview: false));
     }
 
     // Pulisci il file preview se esiste
@@ -90,7 +90,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         ? s.truncatedWaveData
         : (s as RecordingPaused).truncatedWaveData;
 
-    emit(const RecordingStopping());
+    final List<RecordingEntity> recordings;
+    if (s is RecordingInProgress) {
+      recordings = s.recordings;
+    } else if (s is RecordingPaused) {
+      recordings = s.recordings;
+    } else {
+      // Fallback, though this state should not be reached if canStopRecording is enforced.
+      recordings = [];
+    }
+    emit(RecordingStopping(recordings: recordings, truncatedWaveData: truncatedWaveData));
     _stopAmplitudeUpdates();
     _stopDurationUpdates();
 
@@ -316,6 +325,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       filePath: s.filePath,
       folderId: s.folderId,
       folderName: s.folderName,
+      recordings: s.recordings,
       title: s.title,
       format: s.format,
       sampleRate: s.sampleRate,
@@ -360,6 +370,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         RecordingInProgress(
           filePath: s.filePath,
           folderId: s.folderId,
+          recordings: s.recordings,
           folderName: s.folderName,
           format: s.format,
           sampleRate: s.sampleRate,
@@ -387,12 +398,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final s = state as RecordingPaused;
 
     if (s.isPlayingPreview) {
-      _previewPositionSubscription?.cancel();
-      _previewPositionSubscription = null;
-      _previewCompletionSubscription?.cancel();
-      _previewCompletionSubscription = null;
-      await _audioService.stopPlaying();
-
       try {
         final dir = File(await s.resolvedFilePath).parent;
         final files = dir.listSync();
@@ -437,6 +442,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
             RecordingInProgress(
               filePath: s.filePath,
               folderId: s.folderId,
+              recordings: s.recordings,
               folderName: s.folderName,
               format: s.format,
               sampleRate: s.sampleRate,
@@ -472,7 +478,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     Emitter<RecordingState> emit,
     RecordingPaused s,
   ) async {
-    emit(const RecordingStarting());
+    emit(RecordingStarting(recordings: s.recordings, truncatedWaveData: s.truncatedWaveData));
     final overdubEntity = await _audioService.stopRecording(raw: true);
     final String consolidatedPath;
     final Duration consolidatedDuration;
@@ -542,6 +548,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       RecordingInProgress(
         filePath: await AppFileUtils.toRelative(newPath),
         folderId: s.folderId,
+        recordings: s.recordings,
         folderName: s.folderName,
         format: s.format,
         sampleRate: s.sampleRate,
@@ -567,7 +574,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
-    emit(const RecordingStarting());
+    emit(RecordingStarting(recordings: s.recordings, truncatedWaveData: s.truncatedWaveData));
 
     if (s.previewFilePath != null) {
       try {
@@ -580,7 +587,16 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     final int rawDurationMs = event.seekBarIndex * 100;
     final durationMs = rawDurationMs < 100 ? 100 : rawDurationMs;
 
-    String pathToOverwrite = s.seekBasePath ?? s.filePath;
+    // Il native engine registra sempre in WAV ma s.filePath può avere estensione
+    // diversa (.m4a, .flac). baseRecordingEntity.filePath punta al WAV effettivo.
+    String pathToOverwrite;
+    if (s.seekBasePath != null) {
+      pathToOverwrite = s.seekBasePath!;
+    } else if (baseRecordingEntity != null && baseRecordingEntity.filePath.isNotEmpty) {
+      pathToOverwrite = await AppFileUtils.toRelative(baseRecordingEntity.filePath);
+    } else {
+      pathToOverwrite = s.filePath;
+    }
 
     if (baseRecordingEntity != null &&
         baseRecordingEntity.filePath.isNotEmpty &&
@@ -638,6 +654,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         RecordingInProgress(
           filePath: await AppFileUtils.toRelative(newRecordingPath),
           folderId: s.folderId,
+          recordings: s.recordings,
           folderName: s.folderName,
           format: s.format,
           sampleRate: s.sampleRate,
@@ -668,9 +685,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     try {
       _stopAmplitudeUpdates();
       _stopDurationUpdates();
-      _previewPositionSubscription?.cancel();
-      _previewCompletionSubscription?.cancel();
-      if (await _audioService.isPlaying()) await _audioService.stopPlaying();
 
       if (state is RecordingPaused) {
         final pausedState = state as RecordingPaused;
@@ -694,45 +708,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
-
-    if (await _audioService.isPlaying()) await _audioService.stopPlaying();
-
-    final seekMs = s.seekBarIndex * 100;
-    final playbackPath =
-        await s.resolvedPreviewFilePath ?? await s.resolvedFilePath;
-    final initialPosition = seekMs > 0 ? Duration(milliseconds: seekMs) : null;
-
-    final started = await _audioService.startPlaying(
-      playbackPath,
-      initialPosition: initialPosition,
-    );
-    if (!started) return;
-
     emit(s.copyWith(isPlayingPreview: true));
-    _previewPositionSubscription?.cancel();
-    _previewPositionSubscription = _audioService
-        .getPlaybackPositionStream()
-        .listen((position) {
-          final newIndex = position.inMilliseconds ~/ 100;
-          if (state is RecordingPaused) {
-            final current = (state as RecordingPaused).seekBarIndex;
-            if (newIndex != current) {
-              add(
-                UpdateSeekBarIndex(
-                  seekBarIndex: newIndex,
-                  stopPreview: false,
-                  isFromPlayback: true,
-                ),
-              );
-            }
-          }
-        });
-    _previewCompletionSubscription?.cancel();
-    _previewCompletionSubscription = _audioService
-        .getPlaybackCompletionStream()
-        .listen(
-          (_) => add(const StopRecordingPreview(isNaturalCompletion: true)),
-        );
   }
 
   Future<void> _onStopRecordingPreview(
@@ -741,9 +717,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
-    _previewPositionSubscription?.cancel();
-    _previewCompletionSubscription?.cancel();
-    await _audioService.stopPlaying();
 
     Duration? finalDuration;
     try {
@@ -761,6 +734,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       s.copyWith(
         isPlayingPreview: false,
         duration: finalDuration ?? s.duration,
+        seekBarIndex: event.isNaturalCompletion
+            ? s.seekBarIndex
+            : (event.stoppedSeekBarIndex ?? s.seekBarIndex),
       ),
     );
   }
@@ -852,14 +828,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
     if (s.isPlayingPreview) {
       if (event.stopPreview) {
-        debugPrint('⏹ Stop preview due to waveform drag');
-        add(const StopRecordingPreview(isNaturalCompletion: false));
-      } else if (!event.isFromPlayback) {
-        final seekPosition = Duration(milliseconds: clampedIndex * 100);
-        debugPrint(
-          '🔊 Seek during playback to: ${seekPosition.inMilliseconds}ms',
-        );
-        await _audioService.seekTo(seekPosition);
+        debugPrint('⏹ Preview stop richiesto dalla UI durante drag waveform');
       }
     }
 

@@ -4,14 +4,14 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 
 /// Service for analyzing audio files and extracting real waveform data
-/// 
+///
 /// This service reads actual audio files and extracts amplitude data
 /// to generate real waveforms instead of fake synthetic ones.
 class AudioAnalysisService {
   static const String _tag = 'AudioAnalysisService';
 
   /// Extract real waveform data from an audio file
-  /// 
+  ///
   /// [filePath] - Path to the audio file to analyze
   /// [sampleCount] - Number of waveform samples to generate (default: 200)
   /// Returns a list of amplitude values between 0.0 and 1.0
@@ -21,7 +21,7 @@ class AudioAnalysisService {
   }) async {
     try {
       print('🎵 Attempting to extract REAL waveform from: $filePath');
-      
+
       // Check if file exists
       final file = File(filePath);
       if (!await file.exists()) {
@@ -40,15 +40,16 @@ class AudioAnalysisService {
 
       // Try to extract REAL audio data using audio_waveforms
       final waveformData = await _extractAudioAmplitudes(filePath, sampleCount);
-      
+
       if (waveformData.isNotEmpty) {
-        print('🎉 SUCCESS: Using REAL waveform data from actual audio content!');
+        print(
+          '🎉 SUCCESS: Using REAL waveform data from actual audio content!',
+        );
         return waveformData;
       } else {
         print('⚠️ REAL extraction failed, falling back to synthetic waveform');
         return _generateFallbackWaveform(sampleCount);
       }
-
     } catch (e) {
       print('❌ Error extracting waveform from $filePath: $e');
       return _generateFallbackWaveform(sampleCount);
@@ -56,9 +57,12 @@ class AudioAnalysisService {
   }
 
   /// Extract REAL audio amplitudes by analyzing the raw audio file
-  /// 
+  ///
   /// This analyzes the actual audio file content to extract real amplitude data
-  Future<List<double>> _extractAudioAmplitudes(String filePath, int sampleCount) async {
+  Future<List<double>> _extractAudioAmplitudes(
+    String filePath,
+    int sampleCount,
+  ) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
@@ -73,52 +77,55 @@ class AudioAnalysisService {
       }
 
       print('🎵 Analyzing raw audio file data...');
-      
+
       // Read the raw audio file bytes
       final bytes = await file.readAsBytes();
       print('📊 Read ${bytes.length} bytes from audio file');
-      
+
       // For M4A/AAC files, skip the header and analyze the audio data portion
       final audioDataStart = _findAudioDataStart(bytes);
       final audioBytes = bytes.sublist(audioDataStart);
-      
-      print('📊 Audio data starts at byte $audioDataStart, analyzing ${audioBytes.length} audio bytes');
-      
+
+      print(
+        '📊 Audio data starts at byte $audioDataStart, analyzing ${audioBytes.length} audio bytes',
+      );
+
       // Extract amplitude samples by analyzing byte patterns
       final amplitudes = _extractAmplitudesFromBytes(audioBytes, sampleCount);
-      
+
       if (amplitudes.isNotEmpty) {
-        print('✅ Successfully extracted ${amplitudes.length} REAL amplitude samples from file analysis');
+        print(
+          '✅ Successfully extracted ${amplitudes.length} REAL amplitude samples from file analysis',
+        );
         return amplitudes;
       } else {
         print('⚠️ No amplitude data could be extracted from file');
         return [];
       }
-
     } catch (e) {
       print('❌ Error extracting REAL audio amplitudes: $e');
       return [];
     }
   }
-  
+
   /// Extract amplitude values from raw audio bytes
   List<double> _extractAmplitudesFromBytes(Uint8List bytes, int sampleCount) {
     if (bytes.length < sampleCount * 2) {
       print('⚠️ Not enough audio data for analysis');
       return [];
     }
-    
+
     final amplitudes = <double>[];
     final step = bytes.length ~/ sampleCount;
-    
+
     for (int i = 0; i < sampleCount; i++) {
       final byteIndex = i * step;
-      
+
       // Analyze a chunk of bytes around this position
       final chunkSize = (step / 2).round().clamp(1, 100);
       var sum = 0.0;
       var count = 0;
-      
+
       for (int j = 0; j < chunkSize && byteIndex + j < bytes.length; j++) {
         // Convert byte to amplitude (0-255 -> 0.0-1.0)
         final byteValue = bytes[byteIndex + j];
@@ -127,101 +134,142 @@ class AudioAnalysisService {
         sum += amplitude;
         count++;
       }
-      
+
       final avgAmplitude = count > 0 ? sum / count : 0.0;
       amplitudes.add(avgAmplitude.clamp(0.0, 1.0));
     }
-    
+
     // Apply smoothing to reduce noise
     return _smoothWaveform(amplitudes);
   }
 
   /// Generate a realistic-looking waveform based on file characteristics
-  List<double> _generateRealisticWaveform(String filePath, int fileSize, int sampleCount) {
+  List<double> _generateRealisticWaveform(
+    String filePath,
+    int fileSize,
+    int sampleCount,
+  ) {
     // Use file path, size AND current time for truly unique patterns
     final pathHash = filePath.hashCode;
     final sizeHash = fileSize.hashCode;
     final timeHash = DateTime.now().millisecondsSinceEpoch;
     final combinedSeed = pathHash ^ sizeHash ^ timeHash;
     final random = math.Random(combinedSeed);
-    
+
     final List<double> amplitudes = [];
-    
+
     // Define different "segments" of the recording for variety
     final segmentCount = 4 + random.nextInt(3); // 4-6 segments
     final segmentSize = sampleCount / segmentCount;
-    
+
     for (int segment = 0; segment < segmentCount; segment++) {
       // Each segment has different characteristics
-      final segmentIntensity = 0.3 + random.nextDouble() * 0.6; // Vary overall volume
-      final segmentActivity = 0.5 + random.nextDouble() * 0.5; // How "busy" this segment is
-      final pauseProbability = random.nextDouble() * 0.15; // Chance of pauses in this segment
-      
+      final segmentIntensity =
+          0.3 + random.nextDouble() * 0.6; // Vary overall volume
+      final segmentActivity =
+          0.5 + random.nextDouble() * 0.5; // How "busy" this segment is
+      final pauseProbability =
+          random.nextDouble() * 0.15; // Chance of pauses in this segment
+
       final segmentStart = (segment * segmentSize).round();
-      final segmentEnd = ((segment + 1) * segmentSize).round().clamp(0, sampleCount);
-      
+      final segmentEnd = ((segment + 1) * segmentSize).round().clamp(
+        0,
+        sampleCount,
+      );
+
       for (int i = segmentStart; i < segmentEnd; i++) {
         final position = i / sampleCount;
-        final segmentPosition = (i - segmentStart) / (segmentEnd - segmentStart);
-        
+        final segmentPosition =
+            (i - segmentStart) / (segmentEnd - segmentStart);
+
         // Base amplitude varies per segment
         double amplitude = segmentIntensity * (0.4 + random.nextDouble() * 0.6);
-        
+
         // Add speech-like patterns with segment-specific variation
         amplitude *= _getSpeechPattern(position, random, segmentActivity);
-        
+
         // Add natural fade in/out
         amplitude *= _getFadeEnvelope(position);
-        
+
         // Add segment-specific variation
-        amplitude *= _getSegmentVariation(segmentPosition, random, segmentActivity);
-        
+        amplitude *= _getSegmentVariation(
+          segmentPosition,
+          random,
+          segmentActivity,
+        );
+
         // Segment-specific silence gaps
         if (random.nextDouble() < pauseProbability) {
           amplitude *= 0.05; // Much quieter segments
         }
-        
+
         // Random emphasis within segments
         if (random.nextDouble() < 0.1 * segmentActivity) {
           amplitude *= 1.2 + random.nextDouble() * 0.6; // Vary emphasis
         }
-        
+
         amplitudes.add(amplitude.clamp(0.0, 1.0));
       }
     }
-    
+
     // Apply realistic smoothing and dynamics
     return _applyRealisticProcessing(amplitudes);
   }
 
   /// Get speech-like amplitude patterns
-  double _getSpeechPattern(double position, math.Random random, [double activity = 1.0]) {
+  double _getSpeechPattern(
+    double position,
+    math.Random random, [
+    double activity = 1.0,
+  ]) {
     // Create syllable-like patterns - more active segments have more syllables
-    final syllableFreq = (10 + random.nextDouble() * 15) * activity; // 10-25 syllables, scaled by activity
-    final syllablePattern = math.sin(position * math.pi * syllableFreq) * activity;
-    
+    final syllableFreq =
+        (10 + random.nextDouble() * 15) *
+        activity; // 10-25 syllables, scaled by activity
+    final syllablePattern =
+        math.sin(position * math.pi * syllableFreq) * activity;
+
     // Create word-like groupings
-    final wordFreq = (2 + random.nextDouble() * 5) * activity; // 2-7 words, scaled by activity
+    final wordFreq =
+        (2 + random.nextDouble() * 5) *
+        activity; // 2-7 words, scaled by activity
     final wordPattern = math.sin(position * math.pi * wordFreq);
-    
+
     // Create sentence-like longer patterns
-    final sentenceFreq = 0.5 + random.nextDouble() * 1.5; // 0.5-2 sentences per recording
+    final sentenceFreq =
+        0.5 + random.nextDouble() * 1.5; // 0.5-2 sentences per recording
     final sentencePattern = math.sin(position * math.pi * sentenceFreq);
-    
+
     // Combine patterns with different weights
-    return 0.6 + (syllablePattern * 0.2) + (wordPattern * 0.15) + (sentencePattern * 0.05);
+    return 0.6 +
+        (syllablePattern * 0.2) +
+        (wordPattern * 0.15) +
+        (sentencePattern * 0.05);
   }
 
   /// Get segment-specific variation to create different "moods" or intensities
-  double _getSegmentVariation(double segmentPosition, math.Random random, double activity) {
+  double _getSegmentVariation(
+    double segmentPosition,
+    math.Random random,
+    double activity,
+  ) {
     // Create variation within each segment
-    final microVariation = math.sin(segmentPosition * math.pi * (8 + random.nextDouble() * 12));
-    final mediumVariation = math.sin(segmentPosition * math.pi * (3 + random.nextDouble() * 4));
-    
+    final microVariation = math.sin(
+      segmentPosition * math.pi * (8 + random.nextDouble() * 12),
+    );
+    final mediumVariation = math.sin(
+      segmentPosition * math.pi * (3 + random.nextDouble() * 4),
+    );
+
     // Segments can have different "energy" curves
-    final energyCurve = math.sin(segmentPosition * math.pi + random.nextDouble() * math.pi);
-    
-    return 0.8 + (microVariation * 0.1 * activity) + (mediumVariation * 0.08) + (energyCurve * 0.12);
+    final energyCurve = math.sin(
+      segmentPosition * math.pi + random.nextDouble() * math.pi,
+    );
+
+    return 0.8 +
+        (microVariation * 0.1 * activity) +
+        (mediumVariation * 0.08) +
+        (energyCurve * 0.12);
   }
 
   /// Get natural fade envelope
@@ -244,7 +292,8 @@ class AudioAnalysisService {
   double _getDetailVariation(double position, math.Random random) {
     // High frequency variation
     final detail1 = math.sin(position * math.pi * 50) * 0.3;
-    final detail2 = math.sin(position * math.pi * 80 + random.nextDouble()) * 0.2;
+    final detail2 =
+        math.sin(position * math.pi * 80 + random.nextDouble()) * 0.2;
     return detail1 + detail2;
   }
 
@@ -254,7 +303,7 @@ class AudioAnalysisService {
     final compressed = amplitudes.map((amp) {
       return math.pow(amp, 0.7).toDouble(); // Gentle compression
     }).toList();
-    
+
     // Apply smoothing with varying window size
     final smoothed = <double>[];
     for (int i = 0; i < compressed.length; i++) {
@@ -262,10 +311,12 @@ class AudioAnalysisService {
         smoothed.add(compressed[i]);
       } else {
         // Variable smoothing based on amplitude
-        final windowSize = compressed[i] > 0.7 ? 1 : 2; // Less smoothing for loud parts
+        final windowSize = compressed[i] > 0.7
+            ? 1
+            : 2; // Less smoothing for loud parts
         double sum = compressed[i].toDouble();
         int count = 1;
-        
+
         for (int j = 1; j <= windowSize; j++) {
           if (i - j >= 0) {
             sum += compressed[i - j];
@@ -276,16 +327,16 @@ class AudioAnalysisService {
             count++;
           }
         }
-        
+
         smoothed.add(sum / count);
       }
     }
-    
+
     return smoothed;
   }
 
   /// Find the approximate start of audio data in the file
-  /// 
+  ///
   /// This skips over file headers and metadata to find actual audio samples
   int _findAudioDataStart(Uint8List bytes) {
     // For M4A files, look for 'mdat' atom which contains the media data
@@ -293,12 +344,13 @@ class AudioAnalysisService {
       if (bytes[i] == 0x6D && // 'm'
           bytes[i + 1] == 0x64 && // 'd'
           bytes[i + 2] == 0x61 && // 'a'
-          bytes[i + 3] == 0x74) { // 't'
+          bytes[i + 3] == 0x74) {
+        // 't'
         // Found 'mdat', audio data starts after this
         return i + 8; // Skip 'mdat' header
       }
     }
-    
+
     // Fallback: skip first 25% of file (approximate header size)
     return (bytes.length * 0.25).round();
   }
@@ -308,14 +360,15 @@ class AudioAnalysisService {
     if (amplitudes.length < 3) return amplitudes;
 
     final List<double> smoothed = [];
-    
+
     for (int i = 0; i < amplitudes.length; i++) {
       if (i == 0 || i == amplitudes.length - 1) {
         // Keep first and last values unchanged
         smoothed.add(amplitudes[i]);
       } else {
         // Apply simple 3-point moving average
-        final avg = (amplitudes[i - 1] + amplitudes[i] + amplitudes[i + 1]) / 3.0;
+        final avg =
+            (amplitudes[i - 1] + amplitudes[i] + amplitudes[i + 1]) / 3.0;
         smoothed.add(avg);
       }
     }
@@ -324,14 +377,14 @@ class AudioAnalysisService {
   }
 
   /// Generate fallback waveform when real extraction fails
-  /// 
+  ///
   /// This creates a synthetic waveform as a last resort
   List<double> _generateFallbackWaveform(int sampleCount) {
     print('⚠️ Using SYNTHETIC fallback waveform (not real audio data)');
-    
+
     // Use current time as seed for some variation
     final random = math.Random(DateTime.now().millisecondsSinceEpoch);
-    
+
     // Use the same realistic generation approach as the main method
     return _generateRealisticWaveform(
       'fallback_${DateTime.now().millisecondsSinceEpoch}',
@@ -350,7 +403,7 @@ class AudioAnalysisService {
   Map<String, dynamic> getFileInfo(String filePath) {
     final file = File(filePath);
     final extension = filePath.toLowerCase().split('.').last;
-    
+
     return {
       'exists': file.existsSync(),
       'format': extension,

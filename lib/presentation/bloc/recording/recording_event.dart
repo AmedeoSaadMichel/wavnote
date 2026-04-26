@@ -295,9 +295,13 @@ class PlayRecordingPreview extends RecordingEvent {
 /// false quando l'utente clicca pausa manualmente.
 class StopRecordingPreview extends RecordingEvent {
   final bool isNaturalCompletion;
-  const StopRecordingPreview({this.isNaturalCompletion = false});
+  final int? stoppedSeekBarIndex;
+  const StopRecordingPreview({
+    this.isNaturalCompletion = false,
+    this.stoppedSeekBarIndex,
+  });
   @override
-  List<Object> get props => [isNaturalCompletion];
+  List<Object?> get props => [isNaturalCompletion, stoppedSeekBarIndex];
 }
 
 /// Event to start an overwrite operation.
