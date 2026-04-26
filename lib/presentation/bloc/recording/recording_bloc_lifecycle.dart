@@ -119,15 +119,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final insertionDurationMs = part2ResultEntity.duration.inMilliseconds;
 
       try {
-        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
-        // await _trimmerService.overwriteAudioSegment(
-        //   originalPath: await AppFileUtils.resolve(seekBasePath),
-        //   insertionPath: part2Path,
-        //   startTime: overwriteStartTime ?? Duration.zero,
-        //   overwriteDuration: Duration(milliseconds: insertionDurationMs),
-        //   outputPath: finalWavPath,
-        //   format: 'wav',
-        // );
         final owResult1 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(seekBasePath),
           insertionPath: part2Path,
@@ -487,15 +478,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       final tempPath =
           "${s.originalFilePathForOverwrite ?? s.filePath}_merged_${DateTime.now().millisecondsSinceEpoch}.wav";
       try {
-        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
-        // await _trimmerService.overwriteAudioSegment(
-        //   originalPath: await AppFileUtils.resolve(s.seekBasePath!),
-        //   insertionPath: await AppFileUtils.resolve(overdubEntity.filePath),
-        //   startTime: s.overwriteStartTime ?? Duration.zero,
-        //   overwriteDuration: overdubEntity.duration,
-        //   outputPath: tempPath,
-        //   format: 'wav',
-        // );
         final owResult2 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(s.seekBasePath!),
           insertionPath: await AppFileUtils.resolve(overdubEntity.filePath),
@@ -608,15 +590,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           "${s.originalFilePathForOverwrite ?? s.filePath}_temp_concat_${DateTime.now().millisecondsSinceEpoch}.wav";
 
       try {
-        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
-        // await _trimmerService.overwriteAudioSegment(
-        //   originalPath: await AppFileUtils.resolve(s.seekBasePath!),
-        //   insertionPath: baseWavPath,
-        //   startTime: s.overwriteStartTime ?? Duration.zero,
-        //   overwriteDuration: baseRecordingEntity.duration,
-        //   outputPath: tempConcatPath,
-        //   format: 'wav',
-        // );
         final owResult3 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(s.seekBasePath!),
           insertionPath: baseWavPath,
@@ -767,15 +740,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         // Usa direttamente la durata del segmento
         final overwriteDuration = state.duration;
 
-        // [LEGACY] chiamata diretta al trimmer — rimpiazzata da _overwriteRecordingUseCase
-        // await _trimmerService.overwriteAudioSegment(
-        //   originalPath: await AppFileUtils.resolve(state.seekBasePath!),
-        //   insertionPath: await state.resolvedFilePath,
-        //   startTime: state.overwriteStartTime ?? Duration.zero,
-        //   overwriteDuration: overwriteDuration,
-        //   outputPath: tempPreviewPath,
-        //   format: 'wav',
-        // );
         final owResult4 = await _overwriteRecordingUseCase.execute(
           originalPath: await AppFileUtils.resolve(state.seekBasePath!),
           insertionPath: await state.resolvedFilePath,
