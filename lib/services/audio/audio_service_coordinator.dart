@@ -21,7 +21,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/recording_entity.dart';
-import '../../domain/repositories/i_audio_service_repository.dart';
+import '../../domain/entities/audio_types.dart';
 import '../../core/enums/audio_format.dart';
 import 'audio_recorder_service.dart';
 import 'audio_engine_service.dart';

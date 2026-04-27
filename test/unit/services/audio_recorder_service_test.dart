@@ -8,6 +8,8 @@ import 'package:wavnote/services/audio/audio_recorder_service.dart';
 // Full testing would require mocking Flutter Sound components
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('AudioRecorderService Memory Management', () {
     late AudioRecorderService service;
 
@@ -109,12 +111,10 @@ void main() {
       
       // Initial state should be not recording
       expect(await service.isRecording(), isFalse);
-      expect(await service.isPlaying(), isFalse);
-      
+
       // After disposal, state should be reset
       await service.dispose();
       expect(await service.isRecording(), isFalse);
-      expect(await service.isPlaying(), isFalse);
     });
 
     test('should handle multiple dispose calls safely', () async {

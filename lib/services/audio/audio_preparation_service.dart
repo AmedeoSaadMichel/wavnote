@@ -2,7 +2,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:wavnote/core/errors/failure_utils.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
-import 'package:wavnote/services/audio/audio_cache_manager.dart';
 import 'package:dartz/dartz.dart';
 import 'package:wavnote/core/errors/failures.dart';
 
@@ -12,16 +11,11 @@ import 'i_audio_preparation_service.dart';
 
 class AudioPreparationService implements IAudioPreparationService {
   final IAudioPlaybackEngine _engine;
-  final AudioCacheManager _cacheManager;
 
-  // Mappa per tenere traccia dei file preparati e della loro durata
   final Map<String, Duration> _preparedFiles = {};
 
-  AudioPreparationService({
-    required IAudioPlaybackEngine engine,
-    required AudioCacheManager cacheManager,
-  }) : _engine = engine,
-       _cacheManager = cacheManager;
+  AudioPreparationService({required IAudioPlaybackEngine engine})
+    : _engine = engine;
 
   @override
   Future<AudioPreparationResult> prepare(RecordingEntity recording) async {

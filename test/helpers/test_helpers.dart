@@ -15,6 +15,7 @@
 // - Database testing helpers with in-memory databases
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
@@ -27,7 +28,7 @@ import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/domain/entities/folder_entity.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/core/enums/folder_type.dart';
-import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
+import 'package:wavnote/domain/repositories/i_audio_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_location_repository.dart';
 
@@ -46,9 +47,25 @@ class TestHelpers {
     registerFallbackValue(const Duration(seconds: 30));
     registerFallbackValue(DateTime(2023, 1, 1));
     registerFallbackValue(FolderType.defaultFolder);
+    registerFallbackValue(createTestRecording());
+    registerFallbackValue(createTestFolder());
 
     // Ensure widget binding is initialized for tests
     TestWidgetsFlutterBinding.ensureInitialized();
+
+    const pathProviderChannel = MethodChannel(
+      'plugins.flutter.io/path_provider',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+          switch (call.method) {
+            case 'getApplicationDocumentsDirectory':
+            case 'getTemporaryDirectory':
+            case 'getApplicationSupportDirectory':
+              return '/tmp/wavnote_test';
+          }
+          return null;
+        });
   }
 
   /// Create a test app widget with proper BLoC providers
@@ -219,7 +236,7 @@ class TestHelpers {
 
 /// Mock classes for testing
 class MockAudioServiceRepository extends Mock
-    implements IAudioServiceRepository {}
+    implements IAudioRecordingRepository {}
 
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
 

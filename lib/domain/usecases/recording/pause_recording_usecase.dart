@@ -9,7 +9,7 @@ import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/errors/exceptions.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
+import '../../../domain/repositories/i_audio_recording_repository.dart';
 
 /// Use case for pausing and resuming active audio recording
 ///
@@ -19,10 +19,10 @@ import '../../../domain/repositories/i_audio_service_repository.dart';
 /// - Error handling and state management
 /// - Duration preservation across pause/resume cycles
 class PauseRecordingUseCase {
-  final IAudioServiceRepository _audioService;
+  final IAudioRecordingRepository _audioService;
 
   PauseRecordingUseCase({
-    required IAudioServiceRepository audioService,
+    required IAudioRecordingRepository audioService,
   }) : _audioService = audioService;
 
   /// Pause the active recording.

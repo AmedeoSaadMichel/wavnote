@@ -9,7 +9,7 @@ import 'package:path/path.dart' as path;
 // Domain imports
 import '../../../core/utils/app_file_utils.dart';
 import '../../../domain/entities/recording_entity.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
+import '../../../domain/repositories/i_audio_recording_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../core/enums/audio_format.dart';
 
@@ -29,11 +29,12 @@ import '../folder/folder_bloc.dart';
 part 'recording_event.dart';
 part 'recording_state.dart';
 part 'recording_bloc_lifecycle.dart';
+part 'recording_bloc_overdub.dart';
 part 'recording_bloc_management.dart';
 
 /// BLoC responsible for managing audio recording state and operations.
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
-  final IAudioServiceRepository _audioService;
+  final IAudioRecordingRepository _audioService;
   final IRecordingRepository _recordingRepository;
   final ILocationRepository _locationRepository;
   final StartRecordingUseCase _startRecordingUseCase;
@@ -47,7 +48,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   StreamSubscription<Duration>? _durationSubscription;
 
   RecordingBloc({
-    required IAudioServiceRepository audioService,
+    required IAudioRecordingRepository audioService,
     required IRecordingRepository recordingRepository,
     required ILocationRepository locationRepository,
     FolderBloc? folderBloc,

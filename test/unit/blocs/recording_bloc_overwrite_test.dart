@@ -9,8 +9,7 @@ import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart'
     hide RecordingState;
-import 'package:wavnote/domain/repositories/i_audio_service_repository.dart'
-    hide RecordingState;
+import 'package:wavnote/domain/repositories/i_audio_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/services/audio/audio_trimmer_service.dart';
@@ -18,7 +17,7 @@ import 'package:wavnote/core/enums/audio_format.dart';
 
 import '../../helpers/test_helpers.dart';
 
-class MockAudioService extends Mock implements IAudioServiceRepository {}
+class MockAudioService extends Mock implements IAudioRecordingRepository {}
 
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
 

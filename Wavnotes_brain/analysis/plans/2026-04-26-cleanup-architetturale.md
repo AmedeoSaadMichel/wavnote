@@ -1,6 +1,6 @@
 # Piano Cleanup Architetturale — WavNote
 
-**Goal:** Risolvere i 7 problemi architetturali identificati mantenendo esattamente le stesse funzionalità dell'app.
+**Goal:** Risolvere i problemi architetturali identificati mantenendo esattamente le stesse funzionalità dell'app.
 
 **Principio:** ogni task è indipendente e può essere eseguito in sessioni separate. Nessun task introduce nuove funzionalità — solo pulizia e ristrutturazione.
 
@@ -8,36 +8,19 @@
 
 ---
 
-## Task 1 — Rimuovere `SwiftLogChannelService` 🔴
-
-**File da modificare:**
-- `lib/main.dart`
-- `lib/services/logging/swift_log_channel_service.dart` (eliminare)
-- `lib/config/dependency_injection.dart`
-
-**Cosa fare:**
-- [ ] In `main.dart` rimuovere la riga `SwiftLogChannelService.instance.initialize()` e il relativo import
-- [ ] In `dependency_injection.dart` rimuovere la registrazione GetIt di `SwiftLogChannelService` (se presente)
-- [ ] Eliminare il file `lib/services/logging/swift_log_channel_service.dart`
-- [ ] Verificare con `dart analyze` che non ci siano riferimenti rimasti
-- [ ] Sul lato Swift (`ios/Runner/`, `macos/Runner/`): rimuovere il canale `EventChannel("com.wavnote/swift_logs")` da `AppDelegate` o dal plugin corrispondente se esiste codice dedicato
-- [ ] `dart analyze` → 0 errori nuovi
-
-**Rischio:** nessuno — è solo un canale di debug logging.
-
----
-
 ## Task 2 — Rimuovere `AudioPlayerService` deprecated e `AudioCacheManager` inutilizzato
 
+**File da eliminare:**
+- `lib/services/audio/audio_player_service.dart`
+- `lib/services/audio/audio_cache_manager.dart`
+
 **File da modificare:**
-- `lib/services/audio/audio_player_service.dart` (eliminare)
-- `lib/services/audio/audio_cache_manager.dart` (eliminare)
 - `lib/config/dependency_injection.dart`
 - Qualsiasi import residuo nei file che li importano
 
 **Cosa fare:**
 - [ ] `grep -r "AudioPlayerService\|AudioCacheManager" lib/` — elenca tutti i file che li referenziano
-- [ ] Per ogni file trovato: rimuovere import e utilizzo (aspettati solo import orfani, dato che sono già deprecated/non usati)
+- [ ] Per ogni file trovato: rimuovere import e utilizzo
 - [ ] Rimuovere registrazioni GetIt in `dependency_injection.dart`
 - [ ] Eliminare `audio_player_service.dart` e `audio_cache_manager.dart`
 - [ ] `dart analyze` → 0 errori nuovi
@@ -66,21 +49,20 @@ owResult1.fold(
   },
   (_) {},
 );
-// se il blocco successivo dipende dal successo, wrappa in if/return
 ```
 
 **Cosa fare:**
-- [ ] Trovare le 4 righe `isLeft()` (righe ~139, ~507, ~628, ~789 dopo rimozione LEGACY)
+- [ ] Trovare le 4 righe `isLeft()` nel file
 - [ ] Per ognuna: trasformare in `.fold()` con emit diretto nel branch left + `return` per uscire dall'handler
-- [ ] Rimuovere i `try/catch` che avvolgono solo il pattern isLeft (non rimuovere catch che gestiscono altre eccezioni)
+- [ ] Rimuovere i `try/catch` che avvolgono solo il pattern isLeft (non rimuovere catch che gestiscono altre eccezioni reali)
 - [ ] `dart analyze` → 0 errori nuovi
-- [ ] Verificare che la logica di `return` sia corretta in ogni caso (il handler deve uscire se il fold emette errore)
+- [ ] Verificare che la logica di `return` sia corretta in ogni caso
 
 **Rischio:** basso — logica invariata, solo forma diversa.
 
 ---
 
-## Task 4 — Split `recording_bloc_lifecycle.dart` (829 righe → sotto 800)
+## Task 4 — Split `recording_bloc_lifecycle.dart` (801 righe → sotto 800)
 
 **File da creare:**
 - `lib/presentation/bloc/recording/recording_bloc_overdub.dart` — nuova extension con la logica overdub
@@ -113,7 +95,7 @@ owResult1.fold(
 - [ ] `dart analyze` → 0 errori nuovi
 - [ ] Verificare: `recording_bloc_lifecycle.dart` sotto 800 righe, `recording_bloc_overdub.dart` sotto 500
 
-**Rischio:** basso — il pattern `part of` usato dal progetto garantisce accesso completo ai campi privati.
+**Rischio:** basso — il pattern `part of` garantisce accesso completo ai campi privati.
 
 ---
 
@@ -121,80 +103,51 @@ owResult1.fold(
 
 **File da creare:**
 - `lib/domain/repositories/i_audio_recording_repository.dart` — solo recording ops
-- `lib/domain/repositories/i_audio_playback_repository.dart` — solo playback ops (legacy, da tenere per retrocompatibilità temporanea)
 
 **File da modificare:**
-- `lib/domain/repositories/i_audio_service_repository.dart` — diventa alias/deprecato
+- `lib/domain/repositories/i_audio_service_repository.dart` — marca `@deprecated`
 - `lib/services/audio/recording_service_repository.dart` — implementa `IAudioRecordingRepository`
-- `lib/services/audio/audio_playback_engine_impl.dart` — già implementa `IAudioPlaybackEngine`, non toccare
 - `lib/config/dependency_injection.dart` — aggiorna registrazione
-- `lib/presentation/bloc/recording/recording_bloc.dart` — dipende da `IAudioServiceRepository`, aggiornare il costruttore
-- `lib/presentation/bloc/recording/recording_bloc_lifecycle.dart` — accede a `_audioService`, verificare che usi solo recording ops
-
-**Strategia:** introdurre la nuova interfaccia senza rompere nulla, poi migrare gradualmente.
+- `lib/presentation/bloc/recording/recording_bloc.dart` — aggiorna costruttore
 
 **Cosa fare:**
-- [ ] Creare `i_audio_recording_repository.dart` con le sole ops di recording (startRecording, stopRecording, pauseRecording, amplitude stream, duration stream, convertAudioFile, getAudioDuration)
-- [ ] `RecordingServiceRepository` implementa `IAudioRecordingRepository` (già fa queste cose)
-- [ ] Nel DI registrare `IAudioRecordingRepository → RecordingServiceRepository`
-- [ ] Nel `RecordingBloc` sostituire `IAudioServiceRepository _audioService` con `IAudioRecordingRepository _audioService`
-- [ ] Aggiornare costruttore BLoC e `dependency_injection.dart`
-- [ ] `IAudioServiceRepository` originale: mantenerla ma marcarla `@deprecated`
+- [ ] `grep "_audioService\." lib/presentation/bloc/recording/recording_bloc_lifecycle.dart` — elenca tutti i metodi chiamati
+- [ ] Creare `i_audio_recording_repository.dart` con esattamente i metodi usati dal BLoC
+- [ ] `RecordingServiceRepository implements IAudioRecordingRepository`
+- [ ] Nel DI: `sl.registerSingleton<IAudioRecordingRepository>(sl<RecordingServiceRepository>())`
+- [ ] Nel `RecordingBloc`: sostituire `IAudioServiceRepository _audioService` con `IAudioRecordingRepository _audioService`
 - [ ] `dart analyze` → 0 errori nuovi
 
-**Rischio:** medio — il BLoC usa `_audioService` in molti punti. La nuova interfaccia deve coprire tutti i metodi chiamati. Verificare con `grep "_audioService\." recording_bloc_lifecycle.dart` prima di iniziare.
+**Rischio:** medio — tocca DI + BLoC. Fare per ultimo.
 
 ---
 
 ## Task 6 — Estrarre init logic da `main.dart`
 
 **File da creare:**
-- `lib/config/app_initializer.dart` — logica di bootstrap sequenziale
+- `lib/config/app_initializer.dart`
 
 **File da modificare:**
-- `lib/main.dart` — rimane solo con `runApp` e provider setup
+- `lib/main.dart`
 
 **Cosa fare:**
-- [ ] Creare `AppInitializer` con metodo statico `Future<void> initialize()` che esegue in ordine:
-  1. `DatabaseHelper.database` — apre SQLite
-  2. `setupDependencies()` — registra GetIt
-  3. Qualsiasi altro init sequenziale
+- [ ] Creare `AppInitializer` con metodo statico `Future<void> initialize()` che esegue in ordine: DatabaseHelper → setupDependencies → altri init
 - [ ] `main()` diventa: `await AppInitializer.initialize(); runApp(WavNoteApp());`
-- [ ] Estrarre `WavNoteApp` (root widget) in un file separato se `main.dart` rimane sopra 200 righe
+- [ ] Se `main.dart` rimane sopra 200 righe: estrarre `WavNoteApp` in `lib/app.dart`
 - [ ] `dart analyze` → 0 errori nuovi
 
 **Rischio:** basso — pura estrazione senza modifica logica.
 
 ---
 
-## Task 7 — Audit e rimozione `print`/`debugPrint`
-
-**File da modificare:** ~528 occorrenze sparse nel progetto
-
-**Strategia:** non rimuovere tutti ciecamente. Classificare prima:
-- `print()` di debug temporaneo → rimuovere
-- `debugPrint()` con informazione utile per troubleshooting → convertire in logging condizionale (`if (kDebugMode)`)
-- Log nei servizi audio (amplitude, seek, etc.) → rimuovere o condizionare a flag
-
-**Cosa fare:**
-- [ ] `grep -rn "print\|debugPrint" lib/ --include="*.dart" | wc -l` — conta occorrenze attuali
-- [ ] Rimuovere tutti i `print()` nei file audio (audio_engine_service, audio_playback_engine_impl, audio_service_coordinator) — sono i più rumorosi
-- [ ] Rimuovere print nel BLoC (recording_bloc_lifecycle, recording_bloc_management)
-- [ ] Nei widget: rimuovere print, mantenere al massimo `if (kDebugMode) debugPrint(...)` dove utile
-- [ ] `dart analyze` → 0 errori nuovi
-
-**Rischio:** nullo — i print non influenzano la logica.
-
----
-
-## Ordine di esecuzione consigliato
+## Ordine di esecuzione
 
 ```
-Task 1  → Task 2  → Task 7   (rimozioni pure, indipendenti, nessun rischio)
-Task 3                        (fix stile, logica invariata)
-Task 6                        (estrazione init, basso rischio)
-Task 4                        (split file, medio)
-Task 5                        (split interfaccia, medio — fare per ultimo perché tocca DI + BLoC)
+Task 2  (rimozione dead code, nessun rischio)
+Task 3  (fix stile Either, logica invariata)
+Task 6  (estrazione init, basso rischio)
+Task 4  (split file, medio)
+Task 5  (split interfaccia, medio — fare per ultimo)
 ```
 
 ---
@@ -203,13 +156,11 @@ Task 5                        (split interfaccia, medio — fare per ultimo perc
 
 | Task | Tempo | Rischio |
 |------|-------|---------|
-| 1 — SwiftLogChannelService | 15 min | 🟢 |
 | 2 — AudioPlayerService + CacheManager | 20 min | 🟢 |
 | 3 — Either→Exception | 30 min | 🟢 |
 | 4 — Split lifecycle/overdub | 45 min | 🟡 |
 | 5 — Split IAudioServiceRepository | 60 min | 🟡 |
 | 6 — main.dart init | 20 min | 🟢 |
-| 7 — print audit | 30 min | 🟢 |
-| **Totale** | **~3.5 ore** | |
+| **Totale** | **~3 ore** | |
 
 _Aggiornato: 2026-04-26_

@@ -47,7 +47,10 @@
       "Bash(grep -v \"^Analyzing\\\\|^$\")",
       "WebFetch(domain:gist.github.com)",
       "Bash(mkdir extracted *)",
-      "Bash(tar xf *)"
+      "Bash(tar xf *)",
+      "Bash(sort -t: -k3 -u)",
+      "Skill(schedule)",
+      "Skill(schedule:*)"
     ],
     "deny": [],
     "ask": []

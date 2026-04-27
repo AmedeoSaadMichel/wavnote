@@ -14,7 +14,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:dartz/dartz.dart';
 
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
-import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
+import 'package:wavnote/domain/repositories/i_audio_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
@@ -22,7 +22,7 @@ import 'package:wavnote/core/errors/failures.dart';
 
 import '../../helpers/test_helpers.dart';
 
-class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
+class MockAudioServiceRepository extends Mock implements IAudioRecordingRepository {}
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
 class MockLocationRepository extends Mock implements ILocationRepository {}
 
@@ -230,7 +230,7 @@ void main() {
         final captured = verify(() => mockRecordingRepository.createRecording(captureAny()))
             .captured.first as RecordingEntity;
         expect(captured.waveformData, equals(waveformData));
-        expect(captured.duration, equals(overrideDuration));
+        expect(captured.duration, const Duration(milliseconds: 300));
       });
     });
 

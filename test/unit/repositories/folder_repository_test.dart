@@ -36,8 +36,13 @@ void main() {
           TestHelpers.createTestFolder(
             id: 'all_recordings',
             name: 'All Recordings',
+            type: FolderType.defaultFolder,
           ),
-          TestHelpers.createTestFolder(id: 'favorites', name: 'Favorites'),
+          TestHelpers.createTestFolder(
+            id: 'favorites',
+            name: 'Favorites',
+            type: FolderType.defaultFolder,
+          ),
           TestHelpers.createTestFolder(id: 'custom_1', name: 'Work'),
           TestHelpers.createTestFolder(id: 'custom_2', name: 'Personal'),
         ];

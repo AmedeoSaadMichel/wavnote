@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import '../../domain/entities/recording_entity.dart';
-import '../../domain/repositories/i_audio_service_repository.dart';
+import '../../domain/entities/audio_types.dart';
 import '../../core/enums/audio_format.dart';
 import '../permission/permission_service.dart';
 
@@ -15,7 +15,7 @@ import '../permission/permission_service.dart';
 /// Handles recording lifecycle, permission management, real-time
 /// amplitude monitoring, and pause/resume tracking.
 /// Playback is delegated to [AudioPlayerService] via [AudioServiceCoordinator].
-class AudioRecorderService implements IAudioServiceRepository {
+class AudioRecorderService {
   static const String _tag = 'AudioRecorderService';
 
   // Record package instance
@@ -51,10 +51,9 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== INITIALIZATION ====
 
-  @override
   bool get needsDisposal => true;
 
-  @override
+
   Future<bool> initialize() async {
     if (_isInitialized) return true;
 
@@ -77,7 +76,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<void> dispose() async {
     try {
       if (_isRecording) await cancelRecording();
@@ -118,7 +117,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== PERMISSION METHODS ====
 
-  @override
+
   Future<bool> hasMicrophonePermission() async {
     try {
       return await PermissionService.hasMicrophonePermission();
@@ -128,7 +127,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> requestMicrophonePermission() async {
     try {
       final result = await PermissionService.requestMicrophonePermission();
@@ -143,7 +142,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> hasMicrophone() async {
     try {
       return await PermissionService.hasMicrophoneHardware();
@@ -156,7 +155,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== RECORDING OPERATIONS ====
 
-  @override
+
   Future<bool> startRecording({
     required String filePath,
     required AudioFormat format,
@@ -222,7 +221,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<RecordingEntity?> stopRecording({bool raw = false}) async {
     if (!_isRecording || _currentRecordingPath == null || _recorder == null) {
       _lastError = 'No active recording to stop';
@@ -276,7 +275,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> pauseRecording() async {
     if (!_isRecording || _isRecordingPaused || _recorder == null) return false;
     try {
@@ -292,7 +291,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> resumeRecording() async {
     if (!_isRecording || !_isRecordingPaused || _recorder == null) return false;
     try {
@@ -312,7 +311,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> cancelRecording() async {
     if (!_isRecording || _recorder == null) return false;
     try {
@@ -337,64 +336,31 @@ class AudioRecorderService implements IAudioServiceRepository {
     }
   }
 
-  @override
+
   Future<bool> isRecording() async => _isRecording && !_isRecordingPaused;
 
-  @override
+
   Future<bool> isRecordingPaused() async => _isRecordingPaused;
 
-  @override
+
   Future<Duration> getCurrentRecordingDuration() async =>
       _calculateTotalRecordingDuration();
 
-  @override
+
   Stream<double> getRecordingAmplitudeStream() =>
       _amplitudeController?.stream ?? const Stream.empty();
 
-  @override
+
   Stream<double>? get amplitudeStream => _amplitudeController?.stream;
 
-  @override
+
   Stream<Duration>? get durationStream => _positionController?.stream;
 
-  @override
+
   Future<double> getCurrentAmplitude() async => 0.0;
-
-  // ==== PLAYBACK — delegated to AudioPlayerService via coordinator ====
-
-  @override
-  Future<bool> startPlaying(
-    String filePath, {
-    Duration? initialPosition,
-  }) async => false;
-  @override
-  Future<bool> stopPlaying() async => false;
-  @override
-  Future<bool> pausePlaying() async => false;
-  @override
-  Future<bool> resumePlaying() async => false;
-  @override
-  Future<bool> seekTo(Duration position) async => false;
-  @override
-  Future<bool> setPlaybackSpeed(double speed) async => false;
-  @override
-  Future<bool> setVolume(double volume) async => false;
-  @override
-  Future<bool> isPlaying() async => false;
-  @override
-  Future<bool> isPlaybackPaused() async => false;
-  @override
-  Future<Duration> getCurrentPlaybackPosition() async => Duration.zero;
-  @override
-  Future<Duration> getCurrentPlaybackDuration() async => Duration.zero;
-  @override
-  Stream<Duration> getPlaybackPositionStream() => const Stream.empty();
-  @override
-  Stream<void> getPlaybackCompletionStream() => const Stream.empty();
 
   // ==== DEVICE & FORMAT ====
 
-  @override
   Future<List<AudioInputDevice>> getAudioInputDevices() async => [
     const AudioInputDevice(
       id: 'default',
@@ -404,22 +370,22 @@ class AudioRecorderService implements IAudioServiceRepository {
     ),
   ];
 
-  @override
+
   Future<bool> setAudioInputDevice(String deviceId) async => true;
 
-  @override
+
   Future<List<AudioFormat>> getSupportedFormats() async {
     if (Platform.isIOS) return [AudioFormat.m4a, AudioFormat.wav];
     return [AudioFormat.wav, AudioFormat.m4a];
   }
 
-  @override
+
   Future<List<int>> getSupportedSampleRates(AudioFormat format) async =>
       format.supportedSampleRates;
 
   // ==== AUDIO FILE INFO ====
 
-  @override
+
   Future<AudioFileInfo?> getAudioFileInfo(String filePath) async {
     try {
       final file = File(await _getFullPath(filePath));
@@ -444,7 +410,7 @@ class AudioRecorderService implements IAudioServiceRepository {
 
   // ==== ADVANCED (stubs) ====
 
-  @override
+
   Future<String?> convertAudioFile({
     required String inputPath,
     required String outputPath,
@@ -453,7 +419,7 @@ class AudioRecorderService implements IAudioServiceRepository {
     int? targetBitRate,
   }) async => null;
 
-  @override
+
   Future<String?> trimAudioFile({
     required String inputPath,
     required String outputPath,
@@ -461,14 +427,14 @@ class AudioRecorderService implements IAudioServiceRepository {
     required Duration endTime,
   }) async => null;
 
-  @override
+
   Future<String?> mergeAudioFiles({
     required List<String> inputPaths,
     required String outputPath,
     required AudioFormat outputFormat,
   }) async => null;
 
-  @override
+
   Future<List<double>> getWaveformData(
     String filePath, {
     int sampleCount = 100,
@@ -477,15 +443,15 @@ class AudioRecorderService implements IAudioServiceRepository {
     return List.generate(sampleCount, (_) => random.nextDouble());
   }
 
-  @override
+
   Future<Duration> getAudioDuration(String filePath) async => Duration.zero;
 
-  @override
+
   Future<bool> setAudioSessionCategory(AudioSessionCategory category) async =>
       true;
-  @override
+
   Future<bool> enableBackgroundRecording() async => true;
-  @override
+
   Future<bool> disableBackgroundRecording() async => true;
 
   // ==== PRIVATE HELPERS ====

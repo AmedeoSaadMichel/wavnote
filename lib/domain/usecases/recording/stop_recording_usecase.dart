@@ -7,19 +7,19 @@ import 'package:path/path.dart' as path;
 import '../../../core/errors/failures.dart';
 
 import '../../../domain/entities/recording_entity.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
+import '../../../domain/repositories/i_audio_recording_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../domain/repositories/i_location_repository.dart';
 import '../../../core/utils/app_file_utils.dart'; // IMPORT AGGIUNTO
 
 /// Use case for stopping an active audio recording
 class StopRecordingUseCase {
-  final IAudioServiceRepository _audioService;
+  final IAudioRecordingRepository _audioService;
   final IRecordingRepository _recordingRepository;
   final ILocationRepository _locationRepository;
 
   StopRecordingUseCase({
-    required IAudioServiceRepository audioService,
+    required IAudioRecordingRepository audioService,
     required IRecordingRepository recordingRepository,
     required ILocationRepository locationRepository,
   }) : _audioService = audioService,

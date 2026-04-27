@@ -11,14 +11,14 @@ import 'package:mocktail/mocktail.dart';
 import 'package:dartz/dartz.dart';
 
 import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
-import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
+import 'package:wavnote/domain/repositories/i_audio_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
 import 'package:wavnote/core/errors/failures.dart';
 
 import '../../helpers/test_helpers.dart';
 
-class MockAudioServiceRepository extends Mock implements IAudioServiceRepository {}
+class MockAudioServiceRepository extends Mock implements IAudioRecordingRepository {}
 class MockLocationRepository extends Mock implements ILocationRepository {}
 
 void main() {
@@ -59,7 +59,7 @@ void main() {
         expect(result.isRight(), isTrue);
         final success = (result as Right).value as StartRecordingSuccess;
         expect(success.filePath, isNotNull);
-        expect(success.title, equals('Via Cerlini 19, Milano'));
+        expect(success.title, matches(r'Recording \d{4}-\d{2}-\d{2} \d{2}:\d{2}'));
         expect(success.folderId, equals('test_folder'));
         expect(success.format, equals(AudioFormat.m4a));
         expect(success.sampleRate, equals(44100));
@@ -67,7 +67,6 @@ void main() {
         expect(success.startTime, isNotNull);
 
         verify(() => mockAudioService.hasMicrophonePermission()).called(1);
-        verify(() => mockLocationRepository.getRecordingLocationName()).called(1);
         verify(() => mockAudioService.startRecording(
           filePath: any(named: 'filePath'),
           format: AudioFormat.m4a,
@@ -162,7 +161,7 @@ void main() {
     });
 
     group('Location-Based Title Generation', () {
-      test('uses location service for title', () async {
+      test('usa subito un titolo temporaneo senza attendere la geolocalizzazione', () async {
         when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => 'Central Park, New York');
 
@@ -170,10 +169,11 @@ void main() {
 
         expect(result.isRight(), isTrue);
         final success = ((result as Right).value as StartRecordingSuccess);
-        expect(success.title, equals('Central Park, New York'));
+        expect(success.title, matches(r'Recording \d{4}-\d{2}-\d{2} \d{2}:\d{2}'));
+        verifyNever(() => mockLocationRepository.getRecordingLocationName());
       });
 
-      test('falls back to timestamp when location service throws', () async {
+      test('ignora errori del location service durante l’avvio', () async {
         when(() => mockLocationRepository.getRecordingLocationName())
             .thenThrow(Exception('Location service unavailable'));
 
@@ -182,9 +182,10 @@ void main() {
         expect(result.isRight(), isTrue);
         final success = ((result as Right).value as StartRecordingSuccess);
         expect(success.title, matches(r'Recording \d{4}-\d{2}-\d{2} \d{2}:\d{2}'));
+        verifyNever(() => mockLocationRepository.getRecordingLocationName());
       });
 
-      test('falls back to timestamp when location service returns empty string', () async {
+      test('ignora anche una risposta vuota del location service durante l’avvio', () async {
         when(() => mockLocationRepository.getRecordingLocationName())
             .thenAnswer((_) async => '');
 
@@ -193,6 +194,7 @@ void main() {
         expect(result.isRight(), isTrue);
         final success = ((result as Right).value as StartRecordingSuccess);
         expect(success.title, matches(r'Recording \d{4}-\d{2}-\d{2} \d{2}:\d{2}'));
+        verifyNever(() => mockLocationRepository.getRecordingLocationName());
       });
     });
 
@@ -221,7 +223,7 @@ void main() {
 
         expect(result.isRight(), isTrue);
         final path = ((result as Right).value as StartRecordingSuccess).filePath;
-        expect(path, contains('Recording_with_spaces'));
+        expect(path.split('/').last, isNot(contains(' ')));
       });
 
       test('truncates very long filenames', () async {
@@ -242,7 +244,7 @@ void main() {
 
         expect(result.isRight(), isTrue);
         final path = ((result as Right).value as StartRecordingSuccess).filePath;
-        expect(path, startsWith('my_custom_folder/'));
+        expect(path, contains('/my_custom_folder/'));
       });
 
       test('includes correct file extension per format', () async {

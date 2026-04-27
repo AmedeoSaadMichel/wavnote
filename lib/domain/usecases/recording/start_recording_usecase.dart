@@ -18,7 +18,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/errors/exceptions.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart';
+import '../../../domain/repositories/i_audio_recording_repository.dart';
 import '../../../domain/repositories/i_location_repository.dart';
 
 /// Use case for starting a new audio recording.
@@ -29,13 +29,13 @@ import '../../../domain/repositories/i_location_repository.dart';
 ///             Il BLoC risolve il titolo geolocalizzato in background e
 ///             aggiorna lo stato via [UpdateRecordingTitle].
 class StartRecordingUseCase {
-  final IAudioServiceRepository _audioService;
+  final IAudioRecordingRepository _audioService;
   // Mantenuto per retrocompatibilità; non più usato nell'avvio.
   // ignore: unused_field
   final ILocationRepository _locationRepository;
 
   StartRecordingUseCase({
-    required IAudioServiceRepository audioService,
+    required IAudioRecordingRepository audioService,
     required ILocationRepository locationRepository,
   }) : _audioService = audioService,
        _locationRepository = locationRepository;

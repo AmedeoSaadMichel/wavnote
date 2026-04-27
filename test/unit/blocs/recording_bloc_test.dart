@@ -6,10 +6,11 @@ import 'package:dartz/dartz.dart';
 
 import 'package:wavnote/presentation/bloc/recording/recording_bloc.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
+import 'package:wavnote/domain/repositories/i_audio_recording_repository.dart';
 import 'package:wavnote/domain/repositories/i_recording_repository.dart';
-import 'package:wavnote/domain/repositories/i_audio_service_repository.dart';
 import 'package:wavnote/domain/repositories/i_location_repository.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
+import 'package:wavnote/core/errors/failures.dart';
 import 'package:wavnote/domain/usecases/recording/start_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/stop_recording_usecase.dart';
 import 'package:wavnote/domain/usecases/recording/pause_recording_usecase.dart';
@@ -24,7 +25,7 @@ import '../../helpers/test_helpers.dart';
 
 // Mock classes
 class MockAudioServiceRepository extends Mock
-    implements IAudioServiceRepository {}
+    implements IAudioRecordingRepository {}
 
 class MockRecordingRepository extends Mock implements IRecordingRepository {}
 
@@ -238,7 +239,10 @@ void main() {
         },
         act: (testBloc) =>
             testBloc.add(const LoadRecordings(folderId: 'test_folder')),
-        expect: () => [isA<recording_bloc.RecordingLoaded>()],
+        expect: () => [
+          isA<recording_bloc.RecordingLoading>(),
+          isA<recording_bloc.RecordingLoaded>(),
+        ],
       );
 
       test('handles toggle favorite recording success', () async {
@@ -279,7 +283,11 @@ void main() {
               sampleRate: any(named: 'sampleRate'),
               bitRate: any(named: 'bitRate'),
             ),
-          ).thenThrow(Exception('Recording failed'));
+          ).thenAnswer(
+            (_) async => const Left(
+              UnexpectedFailure(message: 'Recording failed'),
+            ),
+          );
           return recordingBloc;
         },
         act: (testBloc) => testBloc.add(

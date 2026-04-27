@@ -22,7 +22,7 @@ import 'package:get_it/get_it.dart';
 import '../data/repositories/recording_repository.dart';
 import '../data/repositories/folder_repository.dart';
 import '../data/repositories/settings_repository_impl.dart';
-import '../domain/repositories/i_audio_service_repository.dart';
+import '../domain/repositories/i_audio_recording_repository.dart';
 import '../domain/repositories/i_audio_trimmer_repository.dart';
 import '../domain/repositories/i_folder_repository.dart';
 import '../domain/repositories/i_location_repository.dart';
@@ -41,7 +41,6 @@ import '../services/audio/audio_playback_engine_impl.dart';
 import '../services/audio/audio_engine_playback_adapter.dart';
 import '../services/audio/i_audio_preparation_service.dart';
 import '../services/audio/audio_preparation_service.dart'; // Implementazione concreta
-import '../services/audio/audio_cache_manager.dart'; // Cache Manager
 import '../presentation/screens/recording/controllers/recording_playback_coordinator.dart';
 
 /// Global service locator — use `sl<T>()` to resolve dependencies
@@ -73,10 +72,6 @@ Future<void> setupDependencies() async {
     );
   }
 
-  if (!sl.isRegistered<AudioCacheManager>()) {
-    sl.registerLazySingleton<AudioCacheManager>(() => AudioCacheManager());
-  }
-
   if (!sl.isRegistered<AudioServiceCoordinator>()) {
     sl.registerLazySingleton<AudioServiceCoordinator>(
       () => AudioServiceCoordinator(
@@ -85,8 +80,8 @@ Future<void> setupDependencies() async {
     );
   }
 
-  if (!sl.isRegistered<IAudioServiceRepository>()) {
-    sl.registerLazySingleton<IAudioServiceRepository>(
+  if (!sl.isRegistered<IAudioRecordingRepository>()) {
+    sl.registerLazySingleton<IAudioRecordingRepository>(
       () => RecordingServiceRepository(
         coordinator: sl<AudioServiceCoordinator>(),
       ),
@@ -95,10 +90,7 @@ Future<void> setupDependencies() async {
 
   if (!sl.isRegistered<IAudioPreparationService>()) {
     sl.registerLazySingleton<IAudioPreparationService>(
-      () => AudioPreparationService(
-        engine: sl<IAudioPlaybackEngine>(),
-        cacheManager: sl<AudioCacheManager>(),
-      ),
+      () => AudioPreparationService(engine: sl<IAudioPlaybackEngine>()),
     );
   }
 
@@ -135,7 +127,7 @@ Future<void> setupDependencies() async {
   }
 
   // ── Audio initialization ───────────────────────────────────
-  final audioInitialized = await sl<IAudioServiceRepository>().initialize();
+  final audioInitialized = await sl<IAudioRecordingRepository>().initialize();
   if (!audioInitialized) {
     assert(false, 'AudioServiceCoordinator failed to initialize');
   }
