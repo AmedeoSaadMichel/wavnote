@@ -9,8 +9,8 @@ import '../../../domain/entities/folder_entity.dart';
 import '../../../core/enums/audio_format.dart';
 import '../../../core/utils/app_file_utils.dart';
 import '../../../domain/entities/recording_entity.dart';
-import '../../../domain/repositories/i_audio_service_repository.dart'
-    show IAudioServiceRepository;
+import '../../../domain/repositories/i_audio_recording_repository.dart'
+    show IAudioRecordingRepository;
 import '../../bloc/recording/recording_bloc.dart';
 import '../../bloc/settings/settings_bloc.dart';
 import '../../widgets/recording/recording_bottom_sheet.dart';
@@ -195,7 +195,7 @@ class _RecordingListScreenState extends State<RecordingListScreen>
 
     if (state.seekBasePath != null) {
       try {
-        final baseDuration = await sl<IAudioServiceRepository>()
+        final baseDuration = await sl<IAudioRecordingRepository>()
             .getAudioDuration(await AppFileUtils.resolve(state.seekBasePath!));
         final baseDurationMs = baseDuration.inMilliseconds;
         final overwriteMs = state.overwriteStartTime?.inMilliseconds ?? 0;
@@ -320,9 +320,9 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     if (isPreparedPreviewReusable) {
       _didDispatchPreviewCompletion = false;
       _lastSyncedPreviewSeekBarIndex = recordingState.seekBarIndex;
-      bloc.add(const PlayRecordingPreview());
       await _playbackCoordinator.seekToPosition(initialPosition);
       await _playbackCoordinator.togglePlayback();
+      bloc.add(const PlayRecordingPreview());
       return;
     }
 
@@ -345,22 +345,15 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     _didDispatchPreviewCompletion = false;
     _lastSyncedPreviewSeekBarIndex = recordingState.seekBarIndex;
 
-    // Allinea subito la UI al tentativo di preview: in questo modo il primo
-    // tick del player non viene perso mentre il BLoC crede ancora che il
-    // preview sia fermo.
-    bloc.add(const PlayRecordingPreview());
-
     await _playbackCoordinator.expandRecording(previewRecording);
     if (_playbackCoordinator.state.value.status ==
         RecordingPlaybackStatus.error) {
       _activePreviewPlaybackId = null;
-      if (mounted) {
-        bloc.add(const StopRecordingPreview());
-      }
       return;
     }
     await _playbackCoordinator.seekToPosition(initialPosition);
     await _playbackCoordinator.togglePlayback();
+    bloc.add(const PlayRecordingPreview());
   }
 
   @override
