@@ -27,7 +27,7 @@ class RecordingListHeader extends StatelessWidget {
     final selectedCount = recordingState.selectedRecordings.length;
     final shouldExitEditMode = selectedCount == recordingState.recordings.length;
     final isRecentlyDeleted = folderName == 'Recently Deleted';
-    
+
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -39,7 +39,7 @@ class RecordingListHeader extends StatelessWidget {
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
-            isRecentlyDeleted 
+            isRecentlyDeleted
                 ? 'Are you sure you want to permanently delete $selectedCount recording${selectedCount == 1 ? '' : 's'}? This action cannot be undone.'
                 : 'Are you sure you want to delete $selectedCount recording${selectedCount == 1 ? '' : 's'}? ${selectedCount == 1 ? 'It' : 'They'} will be moved to Recently Deleted.',
             style: const TextStyle(color: Colors.white70),
@@ -82,7 +82,12 @@ class RecordingListHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
       builder: (context, recordingState) {
-        final isEditMode = recordingState is RecordingLoaded ? recordingState.isEditMode : false;
+        final loadedState = recordingState is RecordingLoaded
+            ? recordingState
+            : null;
+        final rawIsEditMode = loadedState?.isEditMode ?? false;
+        final hasRecordings = loadedState?.recordings.isNotEmpty ?? false;
+        final isEditMode = rawIsEditMode && hasRecordings;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -119,7 +124,9 @@ class RecordingListHeader extends StatelessWidget {
                         ),
                         // Format button right next to title (like main screen)
                         // Don't show format button in Recently Deleted folder
-                        if (!isEditMode && onShowFormatDialog != null && folderName != 'Recently Deleted') ...[
+                        if (!isEditMode &&
+                            onShowFormatDialog != null &&
+                            folderName != 'Recently Deleted') ...[
                           const SizedBox(width: 8),
                           Flexible(
                             flex: 0,
@@ -127,18 +134,26 @@ class RecordingListHeader extends StatelessWidget {
                               builder: (context, settingsState) {
                                 AudioFormat currentFormat = AudioFormat.m4a;
                                 if (settingsState is SettingsLoaded) {
-                                  currentFormat = settingsState.settings.audioFormat;
+                                  currentFormat =
+                                      settingsState.settings.audioFormat;
                                 }
 
                                 return GestureDetector(
                                   onTap: onShowFormatDialog,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                                      color: const Color(
+                                        0xFF5A2B8C,
+                                      ).withValues(alpha: 0.7),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: Colors.white.withValues(alpha: 0.1),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         width: 1,
                                       ),
                                     ),
@@ -174,13 +189,19 @@ class RecordingListHeader extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (isEditMode && recordingState is RecordingLoaded && recordingState.selectedRecordings.isNotEmpty) ...[
+                      if (isEditMode &&
+                          loadedState != null &&
+                          loadedState.selectedRecordings.isNotEmpty) ...[
                         // Move to folder button
-                        if (folderName != 'Recently Deleted' && onMoveSelected != null) ...[
+                        if (folderName != 'Recently Deleted' &&
+                            onMoveSelected != null) ...[
                           GestureDetector(
                             onTap: onMoveSelected,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.blue.withValues(alpha: 0.7),
                                 borderRadius: BorderRadius.circular(16),
@@ -191,7 +212,11 @@ class RecordingListHeader extends StatelessWidget {
                               ),
                               child: const Row(
                                 children: [
-                                  Icon(Icons.folder_open, color: Colors.white, size: 14),
+                                  Icon(
+                                    Icons.folder_open,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
                                   SizedBox(width: 4),
                                   Text(
                                     'Move',
@@ -210,10 +235,13 @@ class RecordingListHeader extends StatelessWidget {
                         // Delete selected recordings button with skull icon
                         GestureDetector(
                           onTap: () {
-                            _showDeleteConfirmation(context, recordingState);
+                            _showDeleteConfirmation(context, loadedState);
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red.withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(16),
@@ -224,7 +252,11 @@ class RecordingListHeader extends StatelessWidget {
                             ),
                             child: const Row(
                               children: [
-                                FaIcon(FontAwesomeIcons.skull, color: Colors.white, size: 14),
+                                FaIcon(
+                                  FontAwesomeIcons.skull,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
                                 SizedBox(width: 4),
                                 Text(
                                   'Delete',
@@ -243,12 +275,27 @@ class RecordingListHeader extends StatelessWidget {
                       // Edit/Done toggle button
                       GestureDetector(
                         onTap: () {
-                          context.read<RecordingBloc>().add(const ToggleEditMode());
+                          if (!hasRecordings) {
+                            if (rawIsEditMode) {
+                              context.read<RecordingBloc>().add(
+                                const ToggleEditMode(),
+                              );
+                            }
+                            return;
+                          }
+                          context.read<RecordingBloc>().add(
+                            const ToggleEditMode(),
+                          );
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF5A2B8C).withValues(alpha: 0.7),
+                            color: const Color(
+                              0xFF5A2B8C,
+                            ).withValues(alpha: 0.7),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -265,20 +312,23 @@ class RecordingListHeader extends StatelessWidget {
                           ),
                         ),
                       ),
-                      ],
-                    ),
+                    ],
+                  ),
                 ],
               ),
 
               // Selection status indicator and Select All button in edit mode
-              if (isEditMode && recordingState is RecordingLoaded) ...[
+              if (isEditMode && loadedState != null) ...[
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Selection count indicator
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.blue.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -288,7 +338,7 @@ class RecordingListHeader extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        '${recordingState.selectedRecordings.length} recording${recordingState.selectedRecordings.length == 1 ? '' : 's'} selected',
+                        '${loadedState.selectedRecordings.length} recording${loadedState.selectedRecordings.length == 1 ? '' : 's'} selected',
                         style: const TextStyle(
                           color: Colors.blue,
                           fontSize: 12,
@@ -300,15 +350,24 @@ class RecordingListHeader extends StatelessWidget {
                     // Select All / Deselect All button (same style as counter)
                     GestureDetector(
                       onTap: () {
-                        final areAllSelected = recordingState.recordings.length == recordingState.selectedRecordings.length;
+                        final areAllSelected =
+                            loadedState.recordings.length ==
+                            loadedState.selectedRecordings.length;
                         if (areAllSelected) {
-                          context.read<RecordingBloc>().add(const DeselectAllRecordings());
+                          context.read<RecordingBloc>().add(
+                            const DeselectAllRecordings(),
+                          );
                         } else {
-                          context.read<RecordingBloc>().add(const SelectAllRecordings());
+                          context.read<RecordingBloc>().add(
+                            const SelectAllRecordings(),
+                          );
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.blue.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
@@ -321,7 +380,8 @@ class RecordingListHeader extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              recordingState.recordings.length == recordingState.selectedRecordings.length
+                              loadedState.recordings.length ==
+                                      loadedState.selectedRecordings.length
                                   ? Icons.check_box
                                   : Icons.check_box_outline_blank,
                               color: Colors.blue,
@@ -329,7 +389,8 @@ class RecordingListHeader extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              recordingState.recordings.length == recordingState.selectedRecordings.length
+                              loadedState.recordings.length ==
+                                      loadedState.selectedRecordings.length
                                   ? 'Deselect All'
                                   : 'Select All',
                               style: const TextStyle(
