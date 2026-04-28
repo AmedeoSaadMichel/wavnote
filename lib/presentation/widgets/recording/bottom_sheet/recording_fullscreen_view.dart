@@ -253,7 +253,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                 waveColor: Colors.cyan,
                 spacing: 2.0,
                 waveThickness: 2.5,
-                scaleFactor: 80.0,
+                scaleFactor: constraints.maxHeight * 0.50,
                 currentDuration: widget.elapsed,
                 isPaused: widget.isPaused,
                 showPlayhead: true,

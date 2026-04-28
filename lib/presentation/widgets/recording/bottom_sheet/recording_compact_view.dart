@@ -141,7 +141,7 @@ class RecordingCompactView extends StatelessWidget {
                   waveColor: Colors.cyan,
                   spacing: 1.5,
                   waveThickness: 2.5,
-                  scaleFactor: constraints.maxHeight * 0.40,
+                  scaleFactor: constraints.maxHeight * 0.50,
                   currentDuration: elapsed,
                   centerBars: true,
                 );

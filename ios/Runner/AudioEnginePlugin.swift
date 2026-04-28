@@ -306,8 +306,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             // Riconfigura la sessione audio prima di ogni registrazione
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(sessionCategory, mode: .default, options: sessionOptions)
+            try session.setPreferredSampleRate(Double(cappedSampleRate))
             try session.setActive(true)
-            self.logger.debug("🎙️ [NATIVE] startRecording: AVAudioSession riconfigurata")
+            self.logger.debug("🎙️ [NATIVE] startRecording: AVAudioSession riconfigurata (preferredSampleRate=\(cappedSampleRate))")
             let fileURL = URL(fileURLWithPath: path)
             try FileManager.default.createDirectory(
                 at: fileURL.deletingLastPathComponent(),
@@ -556,6 +557,15 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             audioFile = nil
             recordingSegments.append(path)
             self.logger.debug("⏹️ [NATIVE] stopRecording: segmento finale → \(path)")
+            // 🔍 DEBUG TEMPORANEO — verifica durata reale file su disco
+            if let readFile = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) {
+                let sr = readFile.processingFormat.sampleRate
+                let frames = readFile.length
+                self.logger.debug("⏹️ [NATIVE] stopRecording: DEBUG file su disco — frames=\(frames) durata=\(Int(Double(frames)/sr*1000))ms ≈ \(Int(Double(frames)/sr*10)) bars@100ms")
+            }
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: path) {
+                self.logger.debug("⏹️ [NATIVE] stopRecording: DEBUG file su disco — size=\(attrs[.size] ?? 0) bytes")
+            }
         } else {
             audioFile = nil
             self.logger.debug("⏹️ [NATIVE] stopRecording: audioFile già nil (era in pausa)")

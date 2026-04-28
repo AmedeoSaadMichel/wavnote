@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/recording_list_header.dart
+// File: lib/presentation/widgets/recording/recording_list_header.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -25,6 +25,7 @@ class RecordingListHeader extends StatelessWidget {
   /// Show confirmation dialog for deleting selected recordings
   void _showDeleteConfirmation(BuildContext context, RecordingLoaded recordingState) {
     final selectedCount = recordingState.selectedRecordings.length;
+    final shouldExitEditMode = selectedCount == recordingState.recordings.length;
     final isRecentlyDeleted = folderName == 'Recently Deleted';
     
     showDialog(
@@ -54,9 +55,13 @@ class RecordingListHeader extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
-                context.read<RecordingBloc>().add(DeleteSelectedRecordings(
+                final recordingBloc = context.read<RecordingBloc>();
+                recordingBloc.add(DeleteSelectedRecordings(
                   folderId: isRecentlyDeleted ? 'recently_deleted' : 'all_recordings',
                 ));
+                if (shouldExitEditMode) {
+                  recordingBloc.add(const ToggleEditMode());
+                }
               },
               style: TextButton.styleFrom(
                 backgroundColor: Colors.red.withValues(alpha: 0.2),

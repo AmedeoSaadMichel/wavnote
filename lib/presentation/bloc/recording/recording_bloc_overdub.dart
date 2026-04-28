@@ -1,4 +1,4 @@
-// File: presentation/bloc/recording/recording_bloc_overdub.dart
+// File: lib/presentation/bloc/recording/recording_bloc_overdub.dart
 part of 'recording_bloc.dart';
 
 extension _RecordingBlocOverdub on RecordingBloc {
@@ -90,7 +90,12 @@ extension _RecordingBlocOverdub on RecordingBloc {
     Emitter<RecordingState> emit,
     RecordingPaused s,
   ) async {
-    emit(RecordingStarting(recordings: s.recordings, truncatedWaveData: s.truncatedWaveData));
+    emit(
+      RecordingStarting(
+        recordings: s.recordings,
+        truncatedWaveData: s.truncatedWaveData,
+      ),
+    );
     final overdubEntity = await _audioService.stopRecording(raw: true);
     final String consolidatedPath;
     final Duration consolidatedDuration;
@@ -108,7 +113,14 @@ extension _RecordingBlocOverdub on RecordingBloc {
           format: 'wav',
         );
         if (owResult2.isLeft()) {
-          emit(RecordingError(owResult2.fold((f) => f.message, (_) => 'Consolidamento overdub fallito')));
+          emit(
+            RecordingError(
+              owResult2.fold(
+                (f) => f.message,
+                (_) => 'Consolidamento overdub fallito',
+              ),
+            ),
+          );
           return;
         }
         try {
@@ -180,7 +192,12 @@ extension _RecordingBlocOverdub on RecordingBloc {
   ) async {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
-    emit(RecordingStarting(recordings: s.recordings, truncatedWaveData: s.truncatedWaveData));
+    emit(
+      RecordingStarting(
+        recordings: s.recordings,
+        truncatedWaveData: s.truncatedWaveData,
+      ),
+    );
 
     if (s.previewFilePath != null) {
       try {
@@ -198,8 +215,11 @@ extension _RecordingBlocOverdub on RecordingBloc {
     String pathToOverwrite;
     if (s.seekBasePath != null) {
       pathToOverwrite = s.seekBasePath!;
-    } else if (baseRecordingEntity != null && baseRecordingEntity.filePath.isNotEmpty) {
-      pathToOverwrite = await AppFileUtils.toRelative(baseRecordingEntity.filePath);
+    } else if (baseRecordingEntity != null &&
+        baseRecordingEntity.filePath.isNotEmpty) {
+      pathToOverwrite = await AppFileUtils.toRelative(
+        baseRecordingEntity.filePath,
+      );
     } else {
       pathToOverwrite = s.filePath;
     }
@@ -223,7 +243,11 @@ extension _RecordingBlocOverdub on RecordingBloc {
           format: 'wav',
         );
         if (owResult3.isLeft()) {
-          emit(RecordingError(owResult3.fold((f) => f.message, (_) => 'Overwrite seek fallito')));
+          emit(
+            RecordingError(
+              owResult3.fold((f) => f.message, (_) => 'Overwrite seek fallito'),
+            ),
+          );
           return;
         }
         pathToOverwrite = tempConcatPath;
@@ -294,30 +318,27 @@ extension _RecordingBlocOverdub on RecordingBloc {
     if (state is! RecordingPaused) return;
     final s = state as RecordingPaused;
 
-    // Legge la durata del preview file senza eliminarlo.
-    // Il file viene eliminato nei punti corretti: _onResumeRecording,
-    // _onStartOverwrite, _onResumeWithAutoStop. Eliminarlo qui causerebbe
-    // l'errore ExtAudioFileOpenURL alla seconda pressione di Play.
-    Duration? finalDuration;
-    try {
-      final dir = File(await s.resolvedFilePath).parent;
-      final files = dir.listSync();
-      for (var f in files) {
-        if (f.path.contains('_preview_') && f.path.endsWith('.wav')) {
-          finalDuration = await _audioService.getAudioDuration(f.path);
-        }
-      }
-    } catch (_) {}
+    final finalDuration = await _currentPreviewDuration(s);
 
     emit(
       s.copyWith(
         isPlayingPreview: false,
         duration: finalDuration ?? s.duration,
-        seekBarIndex: event.isNaturalCompletion
-            ? s.seekBarIndex
-            : (event.stoppedSeekBarIndex ?? s.seekBarIndex),
+        seekBarIndex: event.stoppedSeekBarIndex ?? s.seekBarIndex,
       ),
     );
+  }
+
+  Future<Duration?> _currentPreviewDuration(RecordingPaused state) async {
+    if (state.previewFilePath == null) return null;
+
+    try {
+      final previewPath = await state.resolvedPreviewFilePath;
+      if (previewPath == null) return null;
+      return _audioService.getAudioDuration(previewPath);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String?> _assemblePreviewFile(RecordingPaused state) async {
@@ -354,7 +375,9 @@ extension _RecordingBlocOverdub on RecordingBloc {
           format: 'wav',
         );
         if (owResult4.isLeft()) {
-          debugPrint('❌ Errore assembly preview: ${owResult4.fold((f) => f.message, (_) => '')}');
+          debugPrint(
+            '❌ Errore assembly preview: ${owResult4.fold((f) => f.message, (_) => '')}',
+          );
           return null;
         }
       }

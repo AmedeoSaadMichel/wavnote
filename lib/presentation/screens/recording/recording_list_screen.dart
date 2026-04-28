@@ -15,20 +15,14 @@ import '../../bloc/recording/recording_bloc.dart';
 import '../../bloc/settings/settings_bloc.dart';
 import '../../widgets/recording/recording_bottom_sheet.dart';
 import '../../widgets/dialogs/audio_format_dialog.dart';
-import '../../widgets/recording/recording_card/recording_card.dart';
 import '../../widgets/recording/recording_list_header.dart';
-import '../../widgets/recording/pull_to_search_list.dart';
 import '../../widgets/common/skeleton_screen.dart';
 import '../../../config/dependency_injection.dart';
-// import '../../../services/audio/audio_player_service.dart'; // Rimosso o commentato
 import 'recording_list_logic.dart';
+import 'recording_list_content.dart';
 import '../../../core/routing/app_router.dart';
-// import '../../../core/utils/performance_logger.dart'; // Rimosso: import non utilizzato
-
-// Nuovi import per il playback
 import 'controllers/recording_playback_coordinator.dart';
 import 'controllers/recording_playback_view_state.dart';
-import '../playback/playback_screen.dart';
 
 /// Recording List Screen con singolo motore di playback condiviso
 ///
@@ -124,7 +118,28 @@ class _RecordingListScreenState extends State<RecordingListScreen>
       return;
     }
 
-    final previewIndex = playbackState.position.inMilliseconds ~/ 100;
+    final hasCompletedNaturally =
+        !_isStoppingPreviewPlayback &&
+        !_didDispatchPreviewCompletion &&
+        _wasPreviewPlaying &&
+        isPreviewSelected &&
+        !isPreviewPlaying &&
+        playbackState.position == Duration.zero &&
+        playbackState.status == RecordingPlaybackStatus.ready;
+
+    if (hasCompletedNaturally) {
+      _didDispatchPreviewCompletion = true;
+      context.read<RecordingBloc>().add(
+        StopRecordingPreview(
+          isNaturalCompletion: true,
+          stoppedSeekBarIndex: _lastPreviewIndex(playbackState.duration),
+        ),
+      );
+      _wasPreviewPlaying = isPreviewPlaying;
+      return;
+    }
+
+    final previewIndex = _previewSeekIndex(playbackState);
     if (isPreviewSelected &&
         previewIndex != recordingState.seekBarIndex &&
         previewIndex != _lastSyncedPreviewSeekBarIndex) {
@@ -138,23 +153,25 @@ class _RecordingListScreenState extends State<RecordingListScreen>
       );
     }
 
-    final hasCompletedNaturally =
-        !_isStoppingPreviewPlayback &&
-        !_didDispatchPreviewCompletion &&
-        _wasPreviewPlaying &&
-        isPreviewSelected &&
-        !isPreviewPlaying &&
-        playbackState.position == Duration.zero &&
-        playbackState.status == RecordingPlaybackStatus.ready;
+    _wasPreviewPlaying = isPreviewPlaying;
+  }
 
-    if (hasCompletedNaturally) {
-      _didDispatchPreviewCompletion = true;
-      context.read<RecordingBloc>().add(
-        const StopRecordingPreview(isNaturalCompletion: true),
-      );
+  int _previewSeekIndex(RecordingPlaybackViewState playbackState) {
+    const tickMs = 100;
+    final positionMs = playbackState.position.inMilliseconds;
+    final durationMs = playbackState.duration.inMilliseconds;
+
+    if (durationMs > 0 && durationMs - positionMs <= tickMs) {
+      return _lastPreviewIndex(playbackState.duration);
     }
 
-    _wasPreviewPlaying = isPreviewPlaying;
+    return positionMs ~/ tickMs;
+  }
+
+  int _lastPreviewIndex(Duration duration) {
+    const tickMs = 100;
+    final lastIndex = (duration.inMilliseconds ~/ tickMs) - 1;
+    return lastIndex < 0 ? 0 : lastIndex;
   }
 
   Future<void> _syncPreviewPlaybackWithRecordingState(
@@ -308,9 +325,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     final playbackPath =
         await recordingState.resolvedPreviewFilePath ??
         await recordingState.resolvedFilePath;
-    final initialPosition = Duration(
-      milliseconds: recordingState.seekBarIndex * 100,
-    );
 
     final isPreparedPreviewReusable =
         _activePreviewPlaybackId != null &&
@@ -318,6 +332,11 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         _playbackCoordinator.expandedRecordingId == _activePreviewPlaybackId;
 
     if (isPreparedPreviewReusable) {
+      final preparedDuration = _playbackCoordinator.state.value.duration;
+      final initialPosition = _previewStartPosition(
+        recordingState,
+        preparedDuration,
+      );
       _didDispatchPreviewCompletion = false;
       _lastSyncedPreviewSeekBarIndex = recordingState.seekBarIndex;
       await _playbackCoordinator.seekToPosition(initialPosition);
@@ -329,6 +348,10 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     await _stopPreviewPlaybackEngineOnly(preservePreparedPreview: false);
 
     final previewDuration = await _resolvePreviewDuration(recordingState);
+    final initialPosition = _previewStartPosition(
+      recordingState,
+      previewDuration,
+    );
     final previewRecording = RecordingEntity(
       id: 'preview:${DateTime.now().microsecondsSinceEpoch}',
       name: 'Preview',
@@ -356,6 +379,19 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     bloc.add(const PlayRecordingPreview());
   }
 
+  Duration _previewStartPosition(
+    RecordingPaused recordingState,
+    Duration previewDuration,
+  ) {
+    const tickMs = 100;
+    final lastIndex = _lastPreviewIndex(previewDuration);
+    if (recordingState.seekBarIndex >= lastIndex) {
+      return Duration.zero;
+    }
+
+    return Duration(milliseconds: recordingState.seekBarIndex * tickMs);
+  }
+
   @override
   void stopRecordingPreview() {
     unawaited(_stopRecordingPreview());
@@ -378,7 +414,9 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         bloc.add(
           StopRecordingPreview(
             isNaturalCompletion: isNaturalCompletion,
-            stoppedSeekBarIndex: isNaturalCompletion ? null : stoppedSeekBarIndex,
+            stoppedSeekBarIndex: isNaturalCompletion
+                ? null
+                : stoppedSeekBarIndex,
           ),
         );
       }
@@ -400,10 +438,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
   ) async {
     final bloc = context.read<RecordingBloc>();
 
-    debugPrint(
-      '🎯 UI -> BLoC UpdateSeekBarIndex currentStateIndex=${recordingState.seekBarIndex} requested=$index isPlayingPreview=${recordingState.isPlayingPreview}',
-    );
-
     if (recordingState.isPlayingPreview) {
       await _stopRecordingPreview();
     }
@@ -414,10 +448,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
 
   @override
   Widget build(BuildContext context) {
-    print(
-      '🏗️ VERBOSE: RecordingListScreen build() called for folder: ${widget.folder.name}',
-    );
-    // PerformanceLogger.logRebuild('RecordingListScreen'); // Commentato o rimosso se PerformanceLogger non serve più
     return MultiBlocListener(
       listeners: [
         BlocListener<RecordingBloc, RecordingState>(
@@ -450,16 +480,10 @@ class _RecordingListScreenState extends State<RecordingListScreen>
                     _RecordingListHeaderWrapper(
                       folder: widget.folder,
                       onBack: () {
-                        print(
-                          '📁 RecordingListScreen: User tapped back button - saving main folder state with pool',
-                        );
                         context.read<SettingsBloc>().add(
                           const UpdateLastOpenedFolder('main'),
                         );
                         context.goToMain();
-                        print(
-                          '📁 RecordingListScreen: Navigation to main completed',
-                        );
                       },
                       onShowFormatDialog: _showAudioFormatDialog,
                       onMoveSelected: moveSelectedRecordings,
@@ -481,259 +505,37 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     );
   }
 
+  List<RecordingEntity> _extractRecordings(RecordingState state) {
+    if (state is RecordingLoaded) return state.recordings;
+    if (state is RecordingStopping) return state.recordings;
+    if (state is RecordingInProgress) return state.recordings;
+    if (state is RecordingPaused) return state.recordings;
+    if (state is RecordingStarting) return state.recordings;
+    return [];
+  }
+
   /// Build recordings list
   Widget _buildRecordingsList(BuildContext context) {
     return BlocBuilder<RecordingBloc, RecordingState>(
       buildWhen: (previous, current) {
-        // Non ricostruire durante gli stati di registrazione: la lista rimane
-        // visibile sotto il bottom sheet con le registrazioni precedenti.
+        // Non ricostruire durante gli stati di registrazione attiva
         if (current is RecordingInProgress ||
             current is RecordingStarting ||
             current is RecordingPaused) {
-          print(
-            '🔍 BUILD_WHEN: Recording state (${current.runtimeType}) - skipping rebuild, keeping previous list',
-          );
           return false;
         }
-
-        // Always rebuild when state type changes
-        if (previous.runtimeType != current.runtimeType) {
-          print(
-            '🔍 BUILD_WHEN: State type changed: ${previous.runtimeType} → ${current.runtimeType}',
-          );
-          return true;
-        }
-
-        // Always rebuild for RecordingLoaded states to ensure UI reflects all changes
-        // This prevents issues with list equality comparison not detecting entity changes
-        if (current is RecordingLoaded) {
-          print(
-            '🔍 BUILD_WHEN: RecordingLoaded state - forcing rebuild to ensure UI sync',
-          );
-
-          // Debug favorite status changes
-          if (previous is RecordingLoaded) {
-            print('🔍 DEBUG: Comparing RecordingLoaded states...');
-            print(
-              '🔍 DEBUG: Previous recordings count: ${previous.recordings.length}',
-            );
-            print(
-              '🔍 DEBUG: Current recordings count: ${current.recordings.length}',
-            );
-
-            // Check for favorite status changes
-            for (
-              int i = 0;
-              i < current.recordings.length && i < previous.recordings.length;
-              i++
-            ) {
-              final prev = previous.recordings[i];
-              final curr = current.recordings[i];
-              if (prev.id == curr.id && prev.isFavorite != curr.isFavorite) {
-                print(
-                  '🔍 DEBUG: Favorite status changed for ${curr.name}: ${prev.isFavorite} → ${curr.isFavorite}',
-                );
-              }
-            }
-          }
-
-          return true;
-        }
-
-        print('🔍 BUILD_WHEN: No rebuild needed for ${current.runtimeType}');
+        if (previous.runtimeType != current.runtimeType) return true;
+        if (current is RecordingLoaded) return true;
         return false;
       },
       builder: (context, state) {
-        print(
-          '🔍 BUILDER: RecordingListScreen builder called with state: ${state.runtimeType}',
-        );
-
-        if (state is RecordingLoaded) {
-          print(
-            '🔍 BUILDER: RecordingLoaded with ${state.recordings.length} recordings',
-          );
-          // Debug favorite statuses in current build
-          for (final recording in state.recordings) {
-            print(
-              '🔍 BUILDER: Recording ${recording.name} - favorite: ${recording.isFavorite}',
-            );
-          }
-        }
-
-        // PerformanceLogger.logRebuild('_buildRecordingsList'); // Commentato o rimosso se PerformanceLogger non serve più
-
-        if ((state is RecordingLoaded && state.recordings.isNotEmpty) ||
-            (state is RecordingStopping && state.recordings.isNotEmpty) ||
-            (state is RecordingInProgress && state.recordings.isNotEmpty) ||
-            (state is RecordingPaused && state.recordings.isNotEmpty) ||
-            (state is RecordingStarting && state.recordings.isNotEmpty)) {
-          print(
-              '🚀 FAST PATH: Showing content immediately for ${state.runtimeType}');
-          final List<RecordingEntity> recordings;
-          if (state is RecordingLoaded) {
-            recordings = state.recordings;
-          } else if (state is RecordingStopping) {
-            recordings = state.recordings;
-          } else if (state is RecordingInProgress) {
-            recordings = state.recordings;
-          } else if (state is RecordingPaused) {
-            recordings = state.recordings;
-          } else if (state is RecordingStarting) {
-            recordings = state.recordings;
-          } else {
-            recordings = [];
-          }
-
-          final filteredRecordings = filterRecordings(recordings);
-          return _buildRecordingContent(filteredRecordings, state);
-        }
-
         if (state is RecordingLoading) {
-          print('🟡 MINIMAL: Brief loading state, showing minimal skeleton');
           return RecordingListSkeleton(folderName: widget.folder.name);
         }
-
-        if (state is RecordingInitial) {
-          print(
-            '⚠️ UNEXPECTED: RecordingInitial state reached - should be bypassed by immediate loading',
-          );
+        if (state is RecordingInitial) return const SizedBox.shrink();
+        if (state is RecordingStopping && state.recordings.isEmpty) {
           return const SizedBox.shrink();
         }
-
-        if (state is RecordingLoaded) {
-          print(
-            '🟢 VERBOSE: Returning RecordingLoaded content with ${state.recordings.length} recordings',
-          );
-          final filteredRecordings = filterRecordings(state.recordings);
-
-          if (state.recordings.isEmpty) {
-            final recordingBloc = context.read<RecordingBloc>();
-            final currentState = recordingBloc.state;
-            if (currentState.isRecording) {
-              return const SizedBox.shrink(); // Hide the message when recording
-            }
-
-            return const Center(
-              child: Text(
-                'No recordings yet',
-                style: TextStyle(color: Colors.white70, fontSize: 18),
-              ),
-            );
-          }
-
-          return PullToSearchList(
-            itemCount: filteredRecordings.length,
-            searchQuery: searchQuery,
-            onSearchChanged: updateSearchQuery,
-            emptyState: searchQuery.isNotEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No recordings found for "$searchQuery"',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 16,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
-                : null,
-            itemBuilder: (context, index) {
-              final recording = filteredRecordings[index];
-              return ValueListenableBuilder<(String?, String?)>(
-                valueListenable: _cardIdsNotifier,
-                builder: (context, ids, _) {
-                  final isExpanded = ids.$1 == recording.id;
-                  final isActiveRecording = ids.$2 == recording.id;
-                  if (!isExpanded && !isActiveRecording) {
-                    return RecordingCard(
-                      recording: recording,
-                      isExpanded: false,
-                      onTap: () => expandRecording(recording),
-                      onShowWaveform: () {
-                        final nav = Navigator.of(this.context);
-                        nav.push(
-                          MaterialPageRoute(
-                            builder: (_) => PlaybackScreen(recording: recording),
-                          ),
-                        );
-                      },
-                      onDelete: () => deleteRecording(recording),
-                      onMoveToFolder: () => moveRecordingToFolder(recording),
-                      onMoreActions: () => showMoreActions(recording),
-                      onRestore: () => restoreRecording(recording),
-                      onToggleFavorite: () => toggleFavoriteRecording(recording),
-                      isPlaying: false,
-                      isLoading: false,
-                      currentPosition: Duration.zero,
-                      actualDuration: null,
-                      onPlayPause: togglePlayback,
-                      onSeek: seekToPosition,
-                      onSkipBackward: skipBackward,
-                      onSkipForward: skipForward,
-                      currentFolderId: widget.folder.id,
-                      folderNames: folderNames,
-                      isEditMode: state.isEditMode,
-                      isSelected: state.selectedRecordings.contains(recording.id),
-                      onSelectionToggle: () => context.read<RecordingBloc>().add(
-                        ToggleRecordingSelection(recordingId: recording.id),
-                      ),
-                    );
-                  }
-                  return ValueListenableBuilder<RecordingPlaybackViewState>(
-                    valueListenable: _playbackCoordinator.state,
-                    builder: (context, playbackState, _) {
-                      return RecordingCard(
-                        recording: recording,
-                        isExpanded: isExpanded,
-                        onTap: () => expandRecording(recording),
-                        onShowWaveform: () {
-                          final nav = Navigator.of(this.context);
-                          nav.push(
-                            MaterialPageRoute(
-                              builder: (_) => PlaybackScreen(recording: recording),
-                            ),
-                          );
-                        },
-                        onDelete: () => deleteRecording(recording),
-                        onMoveToFolder: () => moveRecordingToFolder(recording),
-                        onMoreActions: () => showMoreActions(recording),
-                        onRestore: () => restoreRecording(recording),
-                        onToggleFavorite: () => toggleFavoriteRecording(recording),
-                        isPlaying: isActiveRecording ? playbackState.isPlaying : false,
-                        isLoading: isActiveRecording ? playbackState.isLoading : false,
-                        currentPosition: isActiveRecording ? playbackState.position : Duration.zero,
-                        actualDuration: isActiveRecording ? playbackState.duration : null,
-                        onPlayPause: togglePlayback,
-                        onSeek: seekToPosition,
-                        onSkipBackward: skipBackward,
-                        onSkipForward: skipForward,
-                        currentFolderId: widget.folder.id,
-                        folderNames: folderNames,
-                        isEditMode: state.isEditMode,
-                        isSelected: state.selectedRecordings.contains(recording.id),
-                        onSelectionToggle: () => context.read<RecordingBloc>().add(
-                          ToggleRecordingSelection(recordingId: recording.id),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        }
-
         if (state is RecordingError) {
           return Center(
             child: Text(
@@ -744,18 +546,38 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           );
         }
 
-        // Gestisce lo stato intermedio di arresto della registrazione.
-        // Invece di mostrare uno scheletro (fallback), che causa un flicker visivo,
-        // si mostra un contenitore vuoto. La UI si aggiornerà correttamente
-        // allo stato successivo (RecordingLoaded) senza un caricamento invasivo.
-        if (state is RecordingStopping) {
-          return const SizedBox.shrink();
-        }
+        final recordings = _extractRecordings(state);
+        final isEditMode = state is RecordingLoaded && state.isEditMode;
+        final selectedRecordings = state is RecordingLoaded
+            ? state.selectedRecordings
+            : const <String>[];
+        final filteredRecordings = filterRecordings(recordings);
 
-        print('🔴 VERBOSE: FALLBACK - Unhandled state: ${state.runtimeType}');
-        print('🔴 VERBOSE: State details: $state');
-        print('🔴 VERBOSE: Returning fallback RecordingListSkeleton');
-        return RecordingListSkeleton(folderName: widget.folder.name);
+        return RecordingListCardList(
+          recordings: filteredRecordings,
+          hasAnyRecordings: recordings.isNotEmpty,
+          searchQuery: searchQuery,
+          onSearchChanged: updateSearchQuery,
+          cardIdsNotifier: _cardIdsNotifier,
+          playbackStateNotifier: _playbackCoordinator.state,
+          currentFolderId: widget.folder.id,
+          folderNames: folderNames,
+          isEditMode: isEditMode,
+          selectedRecordings: selectedRecordings,
+          onTap: expandRecording,
+          onDelete: deleteRecording,
+          onMoveToFolder: moveRecordingToFolder,
+          onMoreActions: showMoreActions,
+          onRestore: restoreRecording,
+          onToggleFavorite: toggleFavoriteRecording,
+          onTogglePlayback: togglePlayback,
+          onSeek: seekToPosition,
+          onSkipBackward: skipBackward,
+          onSkipForward: skipForward,
+          onSelectionToggle: (id) => context.read<RecordingBloc>().add(
+            ToggleRecordingSelection(recordingId: id),
+          ),
+        );
       },
     );
   }
@@ -794,20 +616,16 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         final truncatedWaveData = recordingState is RecordingInProgress
             ? recordingState.truncatedWaveData
             : recordingState is RecordingPaused
-                ? recordingState.truncatedWaveData
-                : recordingState is RecordingStopping
-                    ? recordingState.truncatedWaveData
-                    : recordingState is RecordingStarting
-                        ? recordingState.truncatedWaveData
-                        : null;
+            ? recordingState.truncatedWaveData
+            : recordingState is RecordingStopping
+            ? recordingState.truncatedWaveData
+            : recordingState is RecordingStarting
+            ? recordingState.truncatedWaveData
+            : null;
         // Rimosso cast non necessario: final blocSeekBarIndex = recordingState is RecordingPaused ? recordingState.seekBarIndex : null;
         final blocSeekBarIndex = recordingState is RecordingPaused
             ? recordingState.seekBarIndex
             : null;
-
-        debugPrint(
-          '🎨 BottomSheet Builder - isPlayingPreview: $isPlayingPreview, blocSeekBarIndex: $blocSeekBarIndex, isPaused: $isPaused',
-        );
 
         final isOverwrite =
             recordingState is RecordingInProgress &&
@@ -864,161 +682,6 @@ class _RecordingListScreenState extends State<RecordingListScreen>
       },
     );
   }
-
-  /// Extract recording content builder to reuse in fast path
-  Widget _buildRecordingContent(
-    List<RecordingEntity> filteredRecordings,
-    RecordingState state,
-  ) {
-    final List<RecordingEntity> allRecordings;
-    final bool isEditMode;
-    final List<String> selectedRecordings;
-
-    if (state is RecordingLoaded) {
-      allRecordings = state.recordings;
-      isEditMode = state.isEditMode;
-      selectedRecordings = state.selectedRecordings.toList();
-    } else if (state is RecordingStopping) {
-      allRecordings = state.recordings;
-      isEditMode = false;
-      selectedRecordings = [];
-    } else if (state is RecordingInProgress) {
-      allRecordings = state.recordings;
-      isEditMode = false;
-      selectedRecordings = [];
-    } else if (state is RecordingPaused) {
-      allRecordings = state.recordings;
-      isEditMode = false;
-      selectedRecordings = [];
-    } else if (state is RecordingStarting) {
-      allRecordings = state.recordings;
-      isEditMode = false;
-      selectedRecordings = [];
-    } else {
-      // This case should not be reached given the builder logic
-      return const SizedBox.shrink();
-    }
-
-    if (allRecordings.isEmpty) {
-      final recordingBloc = context.read<RecordingBloc>();
-      final currentState = recordingBloc.state;
-      if (currentState.isRecording) {
-        return const SizedBox.shrink(); // Hide the message when recording
-      }
-
-      return const Center(
-        child: Text(
-          'No recordings yet',
-          style: TextStyle(color: Colors.white70, fontSize: 18),
-        ),
-      );
-    }
-
-    return PullToSearchList(
-      itemCount: filteredRecordings.length,
-      searchQuery: searchQuery,
-      onSearchChanged: updateSearchQuery,
-      emptyState: searchQuery.isNotEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.search_off, size: 64, color: Colors.grey[600]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No recordings found for "$searchQuery"',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )
-          : null,
-      itemBuilder: (context, index) {
-        final recording = filteredRecordings[index];
-        return ValueListenableBuilder<(String?, String?)>(
-          valueListenable: _cardIdsNotifier,
-          builder: (context, ids, _) {
-            final isExpanded = ids.$1 == recording.id;
-            final isActiveRecording = ids.$2 == recording.id;
-            if (!isExpanded && !isActiveRecording) {
-              return RecordingCard(
-                recording: recording,
-                isExpanded: false,
-                onTap: () => expandRecording(recording),
-                onShowWaveform: () {
-                  final nav = Navigator.of(this.context);
-                  nav.push(
-                    MaterialPageRoute(
-                      builder: (_) => PlaybackScreen(recording: recording),
-                    ),
-                  );
-                },
-                onDelete: () => deleteRecording(recording),
-                onMoveToFolder: () => moveRecordingToFolder(recording),
-                onMoreActions: () => showMoreActions(recording),
-                onRestore: () => restoreRecording(recording),
-                onToggleFavorite: () => toggleFavoriteRecording(recording),
-                isPlaying: false,
-                isLoading: false,
-                currentPosition: Duration.zero,
-                actualDuration: null,
-                onPlayPause: togglePlayback,
-                onSeek: seekToPosition,
-                onSkipBackward: skipBackward,
-                onSkipForward: skipForward,
-                currentFolderId: widget.folder.id,
-                folderNames: folderNames,
-                isEditMode: isEditMode,
-                isSelected: selectedRecordings.contains(recording.id),
-                onSelectionToggle: () => context.read<RecordingBloc>().add(
-                  ToggleRecordingSelection(recordingId: recording.id),
-                ),
-              );
-            }
-            return ValueListenableBuilder<RecordingPlaybackViewState>(
-              valueListenable: _playbackCoordinator.state,
-              builder: (context, playbackState, _) {
-                return RecordingCard(
-                  recording: recording,
-                  isExpanded: isExpanded,
-                  onTap: () => expandRecording(recording),
-                  onShowWaveform: () {
-                    final nav = Navigator.of(this.context);
-                    nav.push(
-                      MaterialPageRoute(
-                        builder: (_) => PlaybackScreen(recording: recording),
-                      ),
-                    );
-                  },
-                  onDelete: () => deleteRecording(recording),
-                  onMoveToFolder: () => moveRecordingToFolder(recording),
-                  onMoreActions: () => showMoreActions(recording),
-                  onRestore: () => restoreRecording(recording),
-                  onToggleFavorite: () => toggleFavoriteRecording(recording),
-                  isPlaying: isActiveRecording ? playbackState.isPlaying : false,
-                  isLoading: isActiveRecording ? playbackState.isLoading : false,
-                  currentPosition: isActiveRecording ? playbackState.position : Duration.zero,
-                  actualDuration: isActiveRecording ? playbackState.duration : null,
-                  onPlayPause: togglePlayback,
-                  onSeek: seekToPosition,
-                  onSkipBackward: skipBackward,
-                  onSkipForward: skipForward,
-                  currentFolderId: widget.folder.id,
-                  folderNames: folderNames,
-                  isEditMode: isEditMode,
-                  isSelected: selectedRecordings.contains(recording.id),
-                  onSelectionToggle: () => context.read<RecordingBloc>().add(
-                    ToggleRecordingSelection(recordingId: recording.id),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
 }
 
 /// Separate header widget to prevent unnecessary rebuilds
@@ -1037,7 +700,6 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // PerformanceLogger.logRebuild('_RecordingListHeaderWrapper'); // Commentato o rimosso se PerformanceLogger non serve più
     return RecordingListHeader(
       folderName: folder.name,
       onBack: onBack,

@@ -297,7 +297,7 @@ class _FolderItemState extends State<FolderItem>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: widget.folder.hasRecordings
-            ? Colors.green.withValues(alpha: 0.2)
+            ? Colors.greenAccent.withValues(alpha: 0.2)
             : Colors.grey.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -305,7 +305,7 @@ class _FolderItemState extends State<FolderItem>
         widget.folder.shortCountText,
         style: TextStyle(
           color: widget.folder.hasRecordings
-              ? Colors.green[300]
+              ? Colors.greenAccent[400]
               : Colors.white.withValues(alpha: 0.7),
           fontSize: 14,
           fontWeight: FontWeight.w600,
