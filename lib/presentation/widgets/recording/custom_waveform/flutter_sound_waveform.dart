@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/custom_waveform/flutter_sound_waveform.dart
+// File: lib/presentation/widgets/recording/custom_waveform/flutter_sound_waveform.dart
 import 'package:flutter/material.dart';
 import 'recorder_wave_painter.dart';
 
@@ -78,6 +78,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   Offset _totalBackDistance = Offset.zero;
   final Offset _dragOffset = Offset.zero;
   double _initialPosition = 0.0;
+  int _lastBuildLogMs = 0;
+  int _lastBuildLogLength = -1;
+  int _lastBuildLogFutureBars = -1;
 
   @override
   void initState() {
@@ -98,6 +101,18 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   @override
   void didUpdateWidget(RecordingWaveform oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final shouldTraceUpdate =
+        widget.isPaused != oldWidget.isPaused ||
+        widget.futureBarsCount != oldWidget.futureBarsCount ||
+        widget.seekVersion != oldWidget.seekVersion ||
+        widget.externalSeekBarIndex != oldWidget.externalSeekBarIndex ||
+        widget.waveData.length % 50 == 0;
+
+    if (shouldTraceUpdate) {
+      debugPrint(
+        '🌊 WAVEFORM-UPDATE len=${widget.waveData.length} oldLen=${oldWidget.waveData.length} sameList=${identical(widget.waveData, oldWidget.waveData)} paused=${oldWidget.isPaused}->${widget.isPaused} future=${oldWidget.futureBarsCount}->${widget.futureBarsCount} seekVersion=${oldWidget.seekVersion}->${widget.seekVersion} externalSeek=${oldWidget.externalSeekBarIndex}->${widget.externalSeekBarIndex} currentIndex=$_currentSeekBarIndex dx=${_totalBackDistance.dx.toStringAsFixed(2)}',
+      );
+    }
 
     // Reset scroll position when waveData is cleared (new recording)
     if (widget.waveData.isEmpty && oldWidget.waveData.isNotEmpty) {
@@ -121,6 +136,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
         );
         _initialPosition = 0.0;
       });
+      debugPrint(
+        '🌊 WAVEFORM seekVersion align lastIndex=$lastIndex waveDataLength=${widget.waveData.length} targetDx=${_totalBackDistance.dx.toStringAsFixed(2)}',
+      );
       return;
     }
 
@@ -144,16 +162,23 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
       return;
     }
 
-    // Erosione progressiva: futureBarsCount cala → una barra futura è stata registrata.
-    // Il painter non vede nuove barre (lunghezza fissa) → non chiama pushBack.
-    // Avanziamo manualmente lo scroll di un spacing per far scorrere la waveform.
+    // Erosione progressiva: futureBarsCount cala → barre future registrate.
+    // Dopo foreground il delta può essere > 1, quindi lo scroll deve avanzare
+    // dello stesso numero di barre recuperate.
     if (!widget.isPaused &&
         widget.futureBarsCount < oldWidget.futureBarsCount &&
         widget.waveData.isNotEmpty) {
+      final consumedFutureBars =
+          oldWidget.futureBarsCount - widget.futureBarsCount;
       setState(() {
         _initialPosition = 0.0;
-        _totalBackDistance = _totalBackDistance + Offset(widget.spacing, 0.0);
+        _totalBackDistance =
+            _totalBackDistance +
+            Offset(widget.spacing * consumedFutureBars, 0.0);
       });
+      debugPrint(
+        '🌊 WAVEFORM future erosion oldFuture=${oldWidget.futureBarsCount} newFuture=${widget.futureBarsCount} consumed=$consumedFutureBars len=${widget.waveData.length} dx=${_totalBackDistance.dx.toStringAsFixed(2)} currentIndex=$_currentSeekBarIndex',
+      );
     }
 
     // Playback preview: riposiziona la waveform quando l'indice cambia dall'esterno
@@ -189,6 +214,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
           );
           _initialPosition = 0.0;
         });
+        debugPrint(
+          '🌊 WAVEFORM auto-follow len=${widget.waveData.length} oldLen=${oldWidget.waveData.length} lastIndex=$lastIndex targetDx=${_totalBackDistance.dx.toStringAsFixed(2)} currentWidth=${currentWaveformWidth.toStringAsFixed(1)} halfWidth=${halfWidth.toStringAsFixed(1)}',
+        );
       }
     }
   }
@@ -259,9 +287,20 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   @override
   Widget build(BuildContext context) {
     final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
-    print(
-      '⏱️ [$buildTimestamp] RecordingWaveform.build START: waveData.length = ${widget.waveData.length}, amplitude = ${widget.amplitude.toStringAsFixed(3)}',
-    );
+    final shouldLogBuild =
+        buildTimestamp - _lastBuildLogMs > 500 ||
+        widget.waveData.length != _lastBuildLogLength ||
+        widget.futureBarsCount != _lastBuildLogFutureBars ||
+        widget.isPaused;
+
+    if (shouldLogBuild) {
+      _lastBuildLogMs = buildTimestamp;
+      _lastBuildLogLength = widget.waveData.length;
+      _lastBuildLogFutureBars = widget.futureBarsCount;
+      debugPrint(
+        '🌊 WAVEFORM-BUILD t=$buildTimestamp len=${widget.waveData.length} amp=${widget.amplitude.toStringAsFixed(3)} paused=${widget.isPaused} future=${widget.futureBarsCount} currentIndex=$_currentSeekBarIndex dx=${_totalBackDistance.dx.toStringAsFixed(2)} size=${widget.size.width.toStringAsFixed(1)}x${widget.size.height.toStringAsFixed(1)} scale=${widget.scaleFactor.toStringAsFixed(1)} centerBars=${widget.centerBars}',
+      );
+    }
 
     const double playheadExtension = 0.0;
     // centerBars=true → barre al centro verticale del canvas (compact view).

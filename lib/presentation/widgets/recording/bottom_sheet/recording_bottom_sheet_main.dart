@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart
+// File: lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart
 import 'package:flutter/material.dart';
 
 import 'recording_compact_view.dart';
@@ -65,6 +65,11 @@ class RecordingBottomSheet extends StatefulWidget {
   /// Waveform completa, usata per inizializzare o ripristinare lo stato.
   final List<double>? fullWaveData;
 
+  /// Campioni ampiezza accumulati dal BLoC per recuperare il pattern quando
+  /// Flutter non ridisegna durante il background.
+  final List<double> waveformAmplitudeSamples;
+  final int waveformAmplitudeSampleCount;
+
   /// Identificatore univoco della sessione incrementato alla chiusura
   final int sessionCounter;
 
@@ -93,6 +98,8 @@ class RecordingBottomSheet extends StatefulWidget {
     this.truncatedWaveData,
     this.blocSeekBarIndex,
     this.fullWaveData,
+    this.waveformAmplitudeSamples = const [],
+    this.waveformAmplitudeSampleCount = 0,
     this.sessionCounter = 0,
   });
 
@@ -148,7 +155,11 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   int _seekTimeOffsetMs = 0;
 
   double _currentAmplitude = 0.0;
+  final List<double> _pendingAmplitudeSamples = [];
+  int _lastConsumedBlocAmplitudeSampleCount = 0;
   static const double _amplitudeFloor = 0.08;
+  static const int _catchUpBatchThreshold = 3;
+  static const int _maxPendingAmplitudeSamples = 3000;
 
   @override
   void initState() {
@@ -195,8 +206,12 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _seekBarIndex = 0;
         _seekTimeOffsetMs = 0;
         _currentAmplitude = 0.0;
+        _pendingAmplitudeSamples.clear();
+        _lastConsumedBlocAmplitudeSampleCount = 0;
       });
     }
+
+    _queueBlocAmplitudeSamples();
 
     // Sincronizza _seekBarIndex locale con il BLoC durante il playback preview
     // o quando la seekbar è stata spostata manualmente in pausa
@@ -289,16 +304,21 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
       setState(() {
         if (barsToAdd > 0) {
+          final amplitudeSamples = _consumeAmplitudeSamples(
+            barsToAdd,
+            fallback: _currentAmplitude,
+          );
           for (int i = 0; i < barsToAdd; i++) {
+            final barAmplitude = amplitudeSamples[i];
             if (_futureBarsCount > 0) {
               final insertAt = _waveData.length - _futureBarsCount;
-              _waveData[insertAt] = _amplitudeFloor;
+              _waveData[insertAt] = barAmplitude;
               if (insertAt < _waveSegments.length) {
                 _waveSegments[insertAt] = _currentSegment;
               }
               _futureBarsCount--;
             } else {
-              _waveData.add(_amplitudeFloor);
+              _waveData.add(barAmplitude);
               _waveSegments.add(_currentSegment);
             }
           }
@@ -331,6 +351,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _sheetOffset = 1.0;
       });
       _seekTimeOffsetMs = 0;
+      _pendingAmplitudeSamples.clear();
+      _lastConsumedBlocAmplitudeSampleCount =
+          widget.waveformAmplitudeSampleCount;
       _sheetAnimationController.animateTo(1.0);
     }
 
@@ -380,22 +403,44 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     final amplitude = _currentAmplitude > _amplitudeFloor
         ? _currentAmplitude
         : _amplitudeFloor;
+    final waveLengthBefore = _waveData.length;
+    final futureBarsBefore = _futureBarsCount;
+    final recordedBarsBefore = waveLengthBefore - futureBarsBefore;
+    final barsToAddBefore = expectedBars - recordedBarsBefore;
+    final isCatchUpBatch = barsToAddBefore >= _catchUpBatchThreshold;
+    final pendingSamplesBefore = _pendingAmplitudeSamples.length;
+    final shouldTraceWaveData =
+        barsToAddBefore.abs() > 2 ||
+        futureBarsBefore > 0 ||
+        waveLengthBefore % 50 == 0;
+
+    if (shouldTraceWaveData) {
+      debugPrint(
+        '🌊 WAVEFORM-DATA before elapsedMs=$elapsedMs expectedBars=$expectedBars recordedBars=$recordedBarsBefore barsToAdd=$barsToAddBefore catchUp=$isCatchUpBatch pendingAmp=$pendingSamplesBefore amp=${amplitude.toStringAsFixed(3)} len=$waveLengthBefore future=$futureBarsBefore seekOffset=$_seekTimeOffsetMs segment=$_currentSegment seekBar=$_seekBarIndex paused=${widget.isPaused}',
+      );
+    }
 
     setState(() {
       final currentBars = _waveData.length - _futureBarsCount;
       final barsToAdd = expectedBars - currentBars;
 
       if (barsToAdd > 0) {
+        final amplitudeSamples = _consumeAmplitudeSamples(
+          barsToAdd,
+          fallback: amplitude,
+        );
         for (int i = 0; i < barsToAdd; i++) {
+          final barAmplitude = amplitudeSamples[i];
+
           if (_futureBarsCount > 0) {
             final insertAt = _waveData.length - _futureBarsCount;
-            _waveData[insertAt] = amplitude;
+            _waveData[insertAt] = barAmplitude;
             if (insertAt < _waveSegments.length) {
               _waveSegments[insertAt] = _currentSegment;
             }
             _futureBarsCount--;
           } else {
-            _waveData.add(amplitude);
+            _waveData.add(barAmplitude);
             _waveSegments.add(_currentSegment);
             if (_waveData.length > _maxWavePoints) {
               _waveData.removeAt(0);
@@ -419,6 +464,80 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         _seekBarIndex = recordedCount > 0 ? recordedCount - 1 : 0;
       }
     });
+
+    if (shouldTraceWaveData) {
+      debugPrint(
+        '🌊 WAVEFORM-DATA after len=${_waveData.length} future=$_futureBarsCount recorded=${_waveData.length - _futureBarsCount} catchUp=$isCatchUpBatch pendingAmp=${_pendingAmplitudeSamples.length} seekBar=$_seekBarIndex lastAmp=${_waveData.isNotEmpty ? _waveData.last.toStringAsFixed(3) : 'n/a'} lastSegment=${_waveSegments.isNotEmpty ? _waveSegments.last : 'n/a'}',
+      );
+    }
+  }
+
+  double _normalizedAmplitude(double rawAmplitude) {
+    return rawAmplitude > _amplitudeFloor ? rawAmplitude : _amplitudeFloor;
+  }
+
+  void _queuePendingAmplitudeSample(double rawAmplitude) {
+    _pendingAmplitudeSamples.add(_normalizedAmplitude(rawAmplitude));
+    if (_pendingAmplitudeSamples.length > _maxPendingAmplitudeSamples) {
+      final overflow =
+          _pendingAmplitudeSamples.length - _maxPendingAmplitudeSamples;
+      _pendingAmplitudeSamples.removeRange(0, overflow);
+    }
+  }
+
+  void _queueBlocAmplitudeSamples() {
+    final newSampleCount = widget.waveformAmplitudeSampleCount;
+    if (newSampleCount <= _lastConsumedBlocAmplitudeSampleCount) return;
+
+    final samples = widget.waveformAmplitudeSamples;
+    if (samples.isEmpty) {
+      _lastConsumedBlocAmplitudeSampleCount = newSampleCount;
+      return;
+    }
+
+    final firstAvailableSampleCount = newSampleCount - samples.length;
+    final firstNewIndex =
+        (_lastConsumedBlocAmplitudeSampleCount - firstAvailableSampleCount)
+            .clamp(0, samples.length);
+    final queuedSamples = samples.length - firstNewIndex;
+    final pendingSamplesBefore = _pendingAmplitudeSamples.length;
+
+    for (int i = firstNewIndex; i < samples.length; i++) {
+      _queuePendingAmplitudeSample(samples[i]);
+    }
+    if (queuedSamples > 2 || newSampleCount % 25 == 0) {
+      debugPrint(
+        '🌊 BOTTOM SHEET bloc amp sync '
+        'old=$_lastConsumedBlocAmplitudeSampleCount new=$newSampleCount '
+        'stored=${samples.length} queued=$queuedSamples '
+        'pendingBefore=$pendingSamplesBefore '
+        'pendingAfter=${_pendingAmplitudeSamples.length}',
+      );
+    }
+    _lastConsumedBlocAmplitudeSampleCount = newSampleCount;
+  }
+
+  List<double> _consumeAmplitudeSamples(int count, {required double fallback}) {
+    if (count <= 0) return const [];
+
+    final normalizedFallback = _normalizedAmplitude(fallback);
+    if (_pendingAmplitudeSamples.isEmpty) {
+      return List<double>.filled(count, normalizedFallback);
+    }
+
+    final available = List<double>.of(_pendingAmplitudeSamples);
+    _pendingAmplitudeSamples.clear();
+
+    if (available.length == count) {
+      return available;
+    }
+
+    final samples = <double>[];
+    for (int i = 0; i < count; i++) {
+      final sourceIndex = (((i + 1) * available.length) / count).ceil() - 1;
+      samples.add(available[sourceIndex.clamp(0, available.length - 1)]);
+    }
+    return samples;
   }
 
   @override
@@ -497,6 +616,12 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   /// Build container with clean design
   Widget _buildContainer() {
+    final displayElapsed = widget.isRecording && _seekTimeOffsetMs > 0
+        ? Duration(
+            milliseconds: widget.elapsed.inMilliseconds + _seekTimeOffsetMs,
+          )
+        : widget.elapsed;
+
     // ClipRRect invece di Container con gradient: il bottom sheet condivide
     // lo stesso gradient dello schermo (recording_list_screen). Un gradient
     // separato creava un seam visibile (origini diverse → colori diversi
@@ -524,7 +649,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
               ? RecordingFullscreenView(
                   key: const ValueKey('fullscreen'),
                   title: widget.title,
-                  elapsed: widget.elapsed,
+                  elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   isPaused: widget.isPaused,
                   amplitude: widget.amplitude,
@@ -588,7 +713,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
               : RecordingCompactView(
                   key: ValueKey(widget.sessionCounter),
                   title: widget.title,
-                  elapsed: widget.elapsed,
+                  elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   amplitude: widget.amplitude,
                   waveData: _waveData,

@@ -24,6 +24,8 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 
 | Area | Workaround | Motivazione / Note |
 |------|-----------|-------------------|
+| Waveform background/foreground | Buffer ampiezze BLoC + UI `_pendingAmplitudeSamples` | iOS può sospendere il rendering Flutter in background; la UI non può disegnare live, quindi recupera al foreground usando le ampiezze ricevute nel BLoC. Il buffer viene preservato anche attraverso pausa/resume per evitare `pendingAmp=0` nei catch-up successivi. Da validare su device: nei log `catchUp=true pendingAmp` dovrebbe essere alto quando `barsToAdd` è alto. |
+| Waveform debug temporaneo | Log `🌊 BLoC waveform buffer count=...` e `🌊 BOTTOM SHEET bloc amp sync ...` | Aggiunti per verificare che il fix BLoC sia effettivamente in esecuzione e che il bottom sheet accodi i campioni arrivati in background. Rimuovere dopo validazione. |
 | `PlaybackClockTick.totalDuration` su just_audio | Emesso come `Duration.zero` da `_setupPlaybackStreams()` nel coordinator | just_audio non fornisce durata nel position stream; il BLoC attualmente non usa `totalDuration` da `activeClockStream`, ma se UI futura la consuma deve fare workaround. Da risolvere espando l'interfaccia playback. 🟡 Media |
 | Posizione cumulativa al resume semplice | `_seekTimeOffsetMs = 0` in bottom sheet: assume che il clock nativo emetta posizioni cumulative dopo pausa/resume | Coerente con l'implementazione Swift (`framesInPreviousSegments` accumulati). Da verificare su dispositivo prima di ritenere chiuso. 🟡 Media — da Step 7 |
 | Audio iOS/macOS | `AudioRecorderService` (package `record`) mantenuto commentato come fallback | AVAudioEngine nativo preferito; il codice record è documentato con `// mantenuto come fallback` |

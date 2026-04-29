@@ -613,6 +613,17 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         final amplitude = recordingState is RecordingInProgress
             ? recordingState.amplitude
             : 0.0;
+        final waveformAmplitudeSamples = recordingState is RecordingInProgress
+            ? recordingState.waveformAmplitudeSamples
+            : recordingState is RecordingPaused
+            ? recordingState.waveformAmplitudeSamples
+            : const <double>[];
+        final waveformAmplitudeSampleCount =
+            recordingState is RecordingInProgress
+            ? recordingState.waveformAmplitudeSampleCount
+            : recordingState is RecordingPaused
+            ? recordingState.waveformAmplitudeSampleCount
+            : 0;
         final truncatedWaveData = recordingState is RecordingInProgress
             ? recordingState.truncatedWaveData
             : recordingState is RecordingPaused
@@ -651,6 +662,8 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           },
           elapsed: elapsed,
           amplitude: amplitude,
+          waveformAmplitudeSamples: waveformAmplitudeSamples,
+          waveformAmplitudeSampleCount: waveformAmplitudeSampleCount,
           width: MediaQuery.of(context).size.width,
           truncatedWaveData: truncatedWaveData,
           onTitleChanged: (newTitle) {

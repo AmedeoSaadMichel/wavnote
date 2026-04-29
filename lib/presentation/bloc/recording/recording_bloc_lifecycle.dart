@@ -1,4 +1,4 @@
-// File: presentation/bloc/recording/recording_bloc_lifecycle.dart
+// File: lib/presentation/bloc/recording/recording_bloc_lifecycle.dart
 part of 'recording_bloc.dart';
 
 extension _RecordingBlocLifecycle on RecordingBloc {
@@ -99,7 +99,12 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       // Fallback, though this state should not be reached if canStopRecording is enforced.
       recordings = [];
     }
-    emit(RecordingStopping(recordings: recordings, truncatedWaveData: truncatedWaveData));
+    emit(
+      RecordingStopping(
+        recordings: recordings,
+        truncatedWaveData: truncatedWaveData,
+      ),
+    );
     _stopAmplitudeUpdates();
     _stopDurationUpdates();
 
@@ -128,7 +133,11 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           format: 'wav',
         );
         if (owResult1.isLeft()) {
-          emit(RecordingError(owResult1.fold((f) => f.message, (_) => 'Overwrite failed')));
+          emit(
+            RecordingError(
+              owResult1.fold((f) => f.message, (_) => 'Overwrite failed'),
+            ),
+          );
           return;
         }
 
@@ -330,6 +339,8 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       originalFilePathForOverwrite: s.originalFilePathForOverwrite,
       overwriteStartTime: s.overwriteStartTime,
       truncatedWaveData: s.truncatedWaveData,
+      waveformAmplitudeSamples: s.waveformAmplitudeSamples,
+      waveformAmplitudeSampleCount: s.waveformAmplitudeSampleCount,
       previewFilePath: null,
       seekBarIndex: pausedSeekBarIndex, // <-- Passa l'indice calcolato
     );
@@ -377,6 +388,8 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           originalFilePathForOverwrite: s.originalFilePathForOverwrite,
           overwriteStartTime: s.overwriteStartTime,
           truncatedWaveData: s.truncatedWaveData,
+          waveformAmplitudeSamples: s.waveformAmplitudeSamples,
+          waveformAmplitudeSampleCount: s.waveformAmplitudeSampleCount,
         ),
       );
       _startAmplitudeUpdates();

@@ -1,4 +1,4 @@
-// File: presentation/bloc/recording/recording_bloc.dart
+// File: lib/presentation/bloc/recording/recording_bloc.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart'; // IMPORT FONDAMENTALE
@@ -9,6 +9,7 @@ import 'package:path/path.dart' as path;
 // Domain imports
 import '../../../core/utils/app_file_utils.dart';
 import '../../../domain/entities/recording_entity.dart';
+import '../../../domain/entities/recording_external_control_action.dart';
 import '../../../domain/repositories/i_audio_recording_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../core/enums/audio_format.dart';
@@ -34,6 +35,8 @@ part 'recording_bloc_management.dart';
 
 /// BLoC responsible for managing audio recording state and operations.
 class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
+  static const int _maxWaveformAmplitudeSamples = 3000;
+
   final IAudioRecordingRepository _audioService;
   final IRecordingRepository _recordingRepository;
   final ILocationRepository _locationRepository;
@@ -46,6 +49,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<RecordingExternalControlAction>?
+  _externalControlSubscription;
 
   RecordingBloc({
     required IAudioRecordingRepository audioService,
@@ -120,6 +125,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<DebugLoadAllRecordings>(_onDebugLoadAllRecordings);
     on<DebugCreateTestRecording>(_onDebugCreateTestRecording);
 
+    _externalControlSubscription = _audioService.externalControlStream.listen(
+      _onExternalControlAction,
+    );
     _initializeAudioService();
   }
 
@@ -127,6 +135,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   Future<void> close() async {
     await _amplitudeSubscription?.cancel();
     await _durationSubscription?.cancel();
+    await _externalControlSubscription?.cancel();
 
     if (_audioService.needsDisposal) {
       try {
@@ -148,6 +157,22 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     }
   }
 
+  void _onExternalControlAction(RecordingExternalControlAction action) {
+    if (isClosed) return;
+    switch (action) {
+      case RecordingExternalControlAction.pause:
+        if (state.canPauseRecording) add(const PauseRecording());
+      case RecordingExternalControlAction.resume:
+        if (state.canResumeRecording) add(const ResumeRecording());
+      case RecordingExternalControlAction.stop:
+        if (state.canStopRecording) add(const StopRecording());
+      case RecordingExternalControlAction.cancel:
+        if (state is RecordingInProgress || state is RecordingPaused) {
+          add(const CancelRecording());
+        }
+    }
+  }
+
   // ==== HANDLERS (implementati nei part file) ====
   void _onUpdateRecordingAmplitude(
     UpdateRecordingAmplitude event,
@@ -155,7 +180,28 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   ) {
     if (state is RecordingInProgress) {
       debugPrint('🔍 BLoC received amplitude: ${event.amplitude}');
-      emit((state as RecordingInProgress).copyWith(amplitude: event.amplitude));
+      final s = state as RecordingInProgress;
+      final waveformSamples = List<double>.of(s.waveformAmplitudeSamples)
+        ..add(event.amplitude);
+      if (waveformSamples.length > _maxWaveformAmplitudeSamples) {
+        final overflow = waveformSamples.length - _maxWaveformAmplitudeSamples;
+        waveformSamples.removeRange(0, overflow);
+      }
+      final nextSampleCount = s.waveformAmplitudeSampleCount + 1;
+      if (nextSampleCount % 25 == 0) {
+        debugPrint(
+          '🌊 BLoC waveform buffer count=$nextSampleCount '
+          'stored=${waveformSamples.length} '
+          'amp=${event.amplitude.toStringAsFixed(3)}',
+        );
+      }
+      emit(
+        s.copyWith(
+          amplitude: event.amplitude,
+          waveformAmplitudeSamples: waveformSamples,
+          waveformAmplitudeSampleCount: nextSampleCount,
+        ),
+      );
     }
   }
 
