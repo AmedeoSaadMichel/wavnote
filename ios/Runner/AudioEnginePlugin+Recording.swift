@@ -59,6 +59,11 @@ extension AudioEnginePlugin {
             framesWrittenThisSegment = 0
             lastClockEmitTime = 0
             lastLiveActivityUpdateTime = 0
+            liveActivityAmplitudeSamples = []
+            lastLiveActivitySampleTime = 0
+            liveActivitySampleAppendCount = 0
+            liveActivityUpdateRequestCount = 0
+            lastLiveActivityDebugLogTime = 0
             liveActivityElapsedOffsetMs = max(0, initialElapsedMs)
 
             // Cambia estensione a .wav per il file interno
@@ -163,6 +168,10 @@ extension AudioEnginePlugin {
 
                 // Clock tick — throttle a 100ms, chiamato su main thread per Flutter EventChannel
                 let now = CACurrentMediaTime()
+                self.appendLiveActivityAmplitudeSample(
+                    Double(self.currentAmplitude),
+                    timestamp: now
+                )
                 if now - self.lastClockEmitTime >= 0.1 {
                     self.lastClockEmitTime = now
                     let totalFrames = self.framesInPreviousSegments + self.framesWrittenThisSegment
@@ -175,7 +184,7 @@ extension AudioEnginePlugin {
                         )
                     }
                 }
-                if now - self.lastLiveActivityUpdateTime >= 1.0 {
+                if now - self.lastLiveActivityUpdateTime >= AudioEnginePlugin.liveActivityUpdateInterval {
                     self.lastLiveActivityUpdateTime = now
                     self.updateLiveActivity(isPaused: false)
                 }
@@ -296,6 +305,11 @@ extension AudioEnginePlugin {
         currentAmplitude = 0.0
         framesInPreviousSegments = 0
         framesWrittenThisSegment = 0
+        liveActivityAmplitudeSamples = []
+        lastLiveActivitySampleTime = 0
+        liveActivitySampleAppendCount = 0
+        liveActivityUpdateRequestCount = 0
+        lastLiveActivityDebugLogTime = 0
         liveActivityElapsedOffsetMs = 0
         if #available(iOS 16.1, *) {
             Task {
@@ -419,6 +433,11 @@ extension AudioEnginePlugin {
         recordingFilePath = nil
         framesInPreviousSegments = 0
         framesWrittenThisSegment = 0
+        liveActivityAmplitudeSamples = []
+        lastLiveActivitySampleTime = 0
+        liveActivitySampleAppendCount = 0
+        liveActivityUpdateRequestCount = 0
+        lastLiveActivityDebugLogTime = 0
         liveActivityElapsedOffsetMs = 0
         if #available(iOS 16.1, *) {
             Task {
@@ -449,10 +468,46 @@ extension AudioEnginePlugin {
                 0,
                 (segmentElapsedMs + liveActivityElapsedOffsetMs) / 1000
             )
-            WavNoteLiveActivityController.shared.update(
-                elapsedSeconds: elapsedSeconds,
-                isPaused: isPaused,
-                amplitude: Double(currentAmplitude)
+            liveActivityUpdateRequestCount += 1
+            let now = CACurrentMediaTime()
+            if now - lastLiveActivityDebugLogTime >= 1.0 || isPaused {
+                lastLiveActivityDebugLogTime = now
+                let lastSample = liveActivityAmplitudeSamples.last ?? -1
+                let nonZeroSamples = liveActivityAmplitudeSamples.filter { $0 > 0 }.count
+                logger.debug(
+                    "🌊 [LIVE_ACTIVITY] update request #\(self.liveActivityUpdateRequestCount) elapsed=\(elapsedSeconds)s paused=\(isPaused) amp=\(Double(self.currentAmplitude)) samples=\(self.liveActivityAmplitudeSamples.count) nonZero=\(nonZeroSamples) last=\(lastSample)"
+                )
+            }
+            let amplitude = Double(currentAmplitude)
+            let samples = liveActivityAmplitudeSamples
+            DispatchQueue.main.async {
+                WavNoteLiveActivityController.shared.update(
+                    elapsedSeconds: elapsedSeconds,
+                    isPaused: isPaused,
+                    amplitude: amplitude,
+                    amplitudeSamples: samples
+                )
+            }
+        }
+    }
+
+    func appendLiveActivityAmplitudeSample(
+        _ amplitude: Double,
+        timestamp: CFTimeInterval
+    ) {
+        guard timestamp - lastLiveActivitySampleTime >= AudioEnginePlugin.liveActivitySampleInterval else { return }
+        lastLiveActivitySampleTime = timestamp
+        let normalized = min(max(amplitude, 0.0), 1.0)
+        liveActivityAmplitudeSamples.append(normalized)
+        liveActivitySampleAppendCount += 1
+        if liveActivityAmplitudeSamples.count > AudioEnginePlugin.maxLiveActivityAmplitudeSamples {
+            let overflow = liveActivityAmplitudeSamples.count -
+                AudioEnginePlugin.maxLiveActivityAmplitudeSamples
+            liveActivityAmplitudeSamples.removeFirst(overflow)
+        }
+        if liveActivitySampleAppendCount % 30 == 1 {
+            logger.debug(
+                "🌊 [LIVE_ACTIVITY] sample append #\(self.liveActivitySampleAppendCount) raw=\(amplitude) normalized=\(normalized) buffer=\(self.liveActivityAmplitudeSamples.count)"
             )
         }
     }
