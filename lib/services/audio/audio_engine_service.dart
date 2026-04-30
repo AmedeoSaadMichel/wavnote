@@ -1,4 +1,4 @@
-// File: services/audio/audio_engine_service.dart
+// File: lib/services/audio/audio_engine_service.dart
 //
 // Audio Engine Service - Service Layer
 // =====================================
@@ -15,9 +15,49 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 
+import '../../domain/entities/recording_external_control_action.dart';
+
 // Record types per i tick del clock
 typedef RecordingTick = ({Duration position, double amplitude});
 typedef PlaybackTick = ({Duration position, Duration totalDuration});
+
+class AudioEngineRecordingStatus {
+  const AudioEngineRecordingStatus({
+    required this.isRecording,
+    required this.isPaused,
+    required this.path,
+    required this.duration,
+    required this.amplitude,
+  });
+
+  const AudioEngineRecordingStatus.idle()
+    : isRecording = false,
+      isPaused = false,
+      path = null,
+      duration = Duration.zero,
+      amplitude = 0.0;
+
+  factory AudioEngineRecordingStatus.fromMap(Map<dynamic, dynamic>? map) {
+    if (map == null) return const AudioEngineRecordingStatus.idle();
+    return AudioEngineRecordingStatus(
+      isRecording: map['isRecording'] as bool? ?? false,
+      isPaused: map['isPaused'] as bool? ?? false,
+      path: map['path'] as String?,
+      duration: Duration(
+        milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0,
+      ),
+      amplitude: ((map['amplitude'] as num?)?.toDouble() ?? 0.0)
+          .clamp(0.0, 1.0)
+          .toDouble(),
+    );
+  }
+
+  final bool isRecording;
+  final bool isPaused;
+  final String? path;
+  final Duration duration;
+  final double amplitude;
+}
 
 class AudioEngineService {
   static const _channel = MethodChannel('com.wavnote/audio_engine');
@@ -44,6 +84,7 @@ class AudioEngineService {
   // Clock streams (clock_events EventChannel — ADR-001)
   StreamController<RecordingTick>? _recordingTickController;
   StreamController<PlaybackTick>? _playbackTickController;
+  StreamController<RecordingExternalControlAction>? _externalControlController;
   StreamSubscription<dynamic>? _clockEventSubscription;
 
   double _lastAmplitude = 0.0;
@@ -64,6 +105,9 @@ class AudioEngineService {
   // Playback tick stream: position + totalDuration (da lastRenderTime nativo)
   Stream<PlaybackTick> get playbackTickStream =>
       _playbackTickController?.stream ?? const Stream.empty();
+
+  Stream<RecordingExternalControlAction> get externalControlStream =>
+      _externalControlController?.stream ?? const Stream.empty();
 
   // Derived streams — mantenuti per compatibilità con AudioServiceCoordinator
   // (verranno sostituiti in Step 3 con activeClockStream)
@@ -92,6 +136,22 @@ class AudioEngineService {
     }
   }
 
+  Future<AudioEngineRecordingStatus> getRecordingStatus() async {
+    try {
+      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'getRecordingStatus',
+      );
+      final status = AudioEngineRecordingStatus.fromMap(raw);
+      _isRecording = status.isRecording;
+      _isRecordingPaused = status.isPaused;
+      _currentRecordingPath = status.path ?? _currentRecordingPath;
+      _lastAmplitude = status.amplitude;
+      return status;
+    } catch (_) {
+      return const AudioEngineRecordingStatus.idle();
+    }
+  }
+
   Future<bool> initialize() async {
     if (_isInitialized) return true;
 
@@ -99,6 +159,8 @@ class AudioEngineService {
       _completionController = StreamController<void>.broadcast();
       _recordingTickController = StreamController<RecordingTick>.broadcast();
       _playbackTickController = StreamController<PlaybackTick>.broadcast();
+      _externalControlController =
+          StreamController<RecordingExternalControlAction>.broadcast();
 
       // Completion events (già presenti, invariati)
       _playbackEventSubscription = _playbackEventChannel
@@ -132,6 +194,13 @@ class AudioEngineService {
                   position: Duration(milliseconds: posMs),
                   totalDuration: Duration(milliseconds: durMs),
                 ));
+              case 'liveActivityControl':
+                final action = RecordingExternalControlAction.fromNative(
+                  event['action'] as String?,
+                );
+                if (action != null) {
+                  _externalControlController?.add(action);
+                }
             }
           });
 
@@ -154,10 +223,12 @@ class AudioEngineService {
     await _completionController?.close();
     await _recordingTickController?.close();
     await _playbackTickController?.close();
+    await _externalControlController?.close();
 
     _completionController = null;
     _recordingTickController = null;
     _playbackTickController = null;
+    _externalControlController = null;
     _playbackEventSubscription = null;
     _clockEventSubscription = null;
 
@@ -169,6 +240,7 @@ class AudioEngineService {
     int sampleRate = 44100,
     int bitRate = 128000,
     String format = 'm4a',
+    Duration initialElapsedOffset = Duration.zero,
   }) async {
     if (!_isInitialized) {
       final ok = await initialize();
@@ -183,11 +255,13 @@ class AudioEngineService {
         'sampleRate': sampleRate,
         'bitRate': bitRate,
         'format': format,
+        'initialElapsedMs': initialElapsedOffset.inMilliseconds,
       });
 
       if (result == true) {
         _isRecording = true;
         _isRecordingPaused = false;
+        _currentRecordingPath = path;
         // Nessun timer Dart — i tick arrivano via clock_events EventChannel
       }
 
@@ -242,6 +316,7 @@ class AudioEngineService {
       );
       _isRecording = false;
       _isRecordingPaused = false;
+      _currentRecordingPath = null;
 
       if (result != null) {
         return Map<String, dynamic>.from(result);
@@ -250,6 +325,7 @@ class AudioEngineService {
     } catch (e) {
       print('AudioEngineService: Failed to stop recording: $e');
       _isRecording = false;
+      _currentRecordingPath = null;
       return null;
     }
   }

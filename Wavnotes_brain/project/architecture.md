@@ -340,20 +340,33 @@ Gestisce tutte le preferenze utente: formato audio, sample rate, bitrate, animaz
 
 ## `lib/presentation/screens/`
 
-### `main/main_screen.dart` (899 righe)
-Root screen dopo splash. Contiene:
-- `NavigationBar` con tab Recordings e Settings
-- Drawer per navigazione tra cartelle
-- `FolderBloc` listener per aggiornare la lista cartelle nel drawer
-- Passa il `folderId` selezionato a `RecordingListScreen`
+### `main/main_screen.dart` (~357 righe)
+Root screen dopo splash. Ora resta un orchestratore leggero:
+- coordina tab Recordings/Settings e navigazione cartelle
+- ascolta `FolderBloc`
+- passa callback e stato ai widget estratti
+- delega header e contenuto cartelle a file dedicati
 
-### `recording/recording_list_screen.dart` (1055 righe)
-Schermata principale dell'app. Responsabilità:
-- Lista `RecordingCard` per la cartella selezionata
-- `RecordingBottomSheet` sovrapposto quando una registrazione è attiva
-- `RecordingPlaybackCoordinator` per coordinare playback UI
+### `main/main_screen_header.dart`
+Header della main screen. Contiene titolo, azioni e stati UI legati alla parte superiore della schermata.
+
+### `main/main_screen_folders.dart`
+Contenuto cartelle della main screen. Renderizza default/custom folder, stati vuoti e azioni legate alla lista folder.
+
+### `recording/recording_list_screen.dart` (~705 righe)
+Schermata principale della cartella selezionata. Responsabilità:
+- orchestrazione tra `RecordingBloc`, `RecordingBottomSheet` e `RecordingPlaybackCoordinator`
+- gestione preview playback durante pausa/overdub
+- conversione posizione audio → `seekBarIndex`
 - `_cardIdsNotifier` — `ValueNotifier<(String?, String?)>` che si aggiorna solo quando cambiano `expandedRecordingId` o `activeRecordingId`, evitando rebuild a cascata ogni 100ms
-- Pull-to-search tramite `PullToSearchList`
+- delega rendering lista a `RecordingListCardList`
+
+### `recording/recording_list_content.dart`
+Widget puro per la lista registrazioni:
+- `RecordingCard` per ogni registrazione
+- empty state e search-empty state
+- `PullToSearchList`
+- callback espliciti ricevuti dalla screen
 
 ### `recording/recording_list_logic.dart` (772 righe)
 `mixin RecordingListLogic` usato da `RecordingListScreen`. Separa la logica dalla UI:

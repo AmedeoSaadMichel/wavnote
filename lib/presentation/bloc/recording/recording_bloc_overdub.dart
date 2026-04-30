@@ -147,6 +147,7 @@ extension _RecordingBlocOverdub on RecordingBloc {
       format: s.format,
       sampleRate: s.sampleRate,
       bitRate: s.bitRate,
+      initialElapsedOffset: consolidatedDuration,
     );
 
     if (!started) {
@@ -268,6 +269,7 @@ extension _RecordingBlocOverdub on RecordingBloc {
       format: s.format,
       sampleRate: s.sampleRate,
       bitRate: s.bitRate,
+      initialElapsedOffset: Duration(milliseconds: durationMs),
     );
 
     if (started) {

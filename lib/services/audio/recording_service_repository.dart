@@ -1,6 +1,7 @@
 // File: lib/services/audio/recording_service_repository.dart
 import '../../core/enums/audio_format.dart';
 import '../../domain/entities/recording_entity.dart';
+import '../../domain/entities/recording_external_control_action.dart';
 import '../../domain/repositories/i_audio_recording_repository.dart';
 import 'audio_service_coordinator.dart';
 
@@ -31,11 +32,13 @@ class RecordingServiceRepository implements IAudioRecordingRepository {
     required AudioFormat format,
     required int sampleRate,
     required int bitRate,
+    Duration initialElapsedOffset = Duration.zero,
   }) => _coordinator.startRecording(
     filePath: filePath,
     format: format,
     sampleRate: sampleRate,
     bitRate: bitRate,
+    initialElapsedOffset: initialElapsedOffset,
   );
 
   @override
@@ -67,6 +70,10 @@ class RecordingServiceRepository implements IAudioRecordingRepository {
 
   @override
   Stream<Duration>? get durationStream => _coordinator.durationStream;
+
+  @override
+  Stream<RecordingExternalControlAction> get externalControlStream =>
+      _coordinator.externalControlStream;
 
   @override
   Future<String?> convertAudioFile({

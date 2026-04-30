@@ -1,5 +1,6 @@
 // File: domain/repositories/i_audio_recording_repository.dart
 import '../entities/recording_entity.dart';
+import '../entities/recording_external_control_action.dart';
 import '../../core/enums/audio_format.dart';
 
 /// Contratto per le operazioni di registrazione audio.
@@ -16,6 +17,7 @@ abstract class IAudioRecordingRepository {
     required AudioFormat format,
     required int sampleRate,
     required int bitRate,
+    Duration initialElapsedOffset = Duration.zero,
   });
 
   Future<RecordingEntity?> stopRecording({bool raw = false});
@@ -28,6 +30,7 @@ abstract class IAudioRecordingRepository {
 
   Stream<double> getRecordingAmplitudeStream();
   Stream<Duration>? get durationStream;
+  Stream<RecordingExternalControlAction> get externalControlStream;
 
   Future<String?> convertAudioFile({
     required String inputPath,

@@ -6,6 +6,8 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | Feature | File chiave | Stato |
 |---------|------------|-------|
 | Registrazione audio (start/stop/pause/resume) | `services/audio/audio_service_coordinator.dart` + `domain/usecases/recording/` | ✅ Completato |
+| Registrazione audio in background | `AudioEnginePlugin.swift` + `AudioEngineService` + `RecordingLifecycleService` | 🚧 Prima tranche iOS implementata, test device richiesto |
+| Live Activity / Dynamic Island registrazione | `WavNoteLiveActivityExtension` + `WavNoteLiveActivityController.swift` | 🚧 Prima tranche visuale implementata, test device richiesto |
 | Motore nativo AVAudioEngine (iOS/macOS) | `services/audio/audio_engine_service.dart` | ✅ Completato (fix flusso dati ampiezza) |
 | Fallback package `record` (non iOS) | `services/audio/audio_recorder_service.dart` | ✅ Presente (non attivo su iOS) |
 | Overdubbing / seek-and-overwrite | `domain/usecases/recording/overwrite_recording_usecase.dart` | ✅ Completato |

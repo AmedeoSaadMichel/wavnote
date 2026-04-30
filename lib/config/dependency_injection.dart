@@ -31,6 +31,7 @@ import '../domain/repositories/i_settings_repository.dart';
 import '../services/audio/audio_recorder_service.dart';
 import '../services/audio/audio_engine_service.dart';
 import '../services/audio/audio_service_coordinator.dart';
+import '../services/audio/recording_lifecycle_service.dart';
 import '../services/audio/recording_service_repository.dart';
 import '../services/audio/audio_trimmer_service.dart';
 import '../services/location/geolocation_service.dart';
@@ -53,7 +54,9 @@ final GetIt sl = GetIt.instance;
 Future<void> setupDependencies() async {
   // ── Services ──────────────────────────────────────────────
   if (!sl.isRegistered<AudioRecorderService>()) {
-    sl.registerLazySingleton<AudioRecorderService>(() => AudioRecorderService());
+    sl.registerLazySingleton<AudioRecorderService>(
+      () => AudioRecorderService(),
+    );
   }
   if (!sl.isRegistered<AudioEngineService>()) {
     sl.registerLazySingleton<AudioEngineService>(() => AudioEngineService());
@@ -74,9 +77,14 @@ Future<void> setupDependencies() async {
 
   if (!sl.isRegistered<AudioServiceCoordinator>()) {
     sl.registerLazySingleton<AudioServiceCoordinator>(
-      () => AudioServiceCoordinator(
-        engineService: sl<AudioEngineService>(),
-      ),
+      () => AudioServiceCoordinator(engineService: sl<AudioEngineService>()),
+    );
+  }
+
+  if (!sl.isRegistered<RecordingLifecycleService>()) {
+    sl.registerLazySingleton<RecordingLifecycleService>(
+      () =>
+          RecordingLifecycleService(coordinator: sl<AudioServiceCoordinator>()),
     );
   }
 
@@ -131,4 +139,5 @@ Future<void> setupDependencies() async {
   if (!audioInitialized) {
     assert(false, 'AudioServiceCoordinator failed to initialize');
   }
+  await sl<RecordingLifecycleService>().initialize();
 }

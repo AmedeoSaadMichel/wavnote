@@ -32,6 +32,8 @@
 		<string>This app needs location access to name recordings with your current address</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 		<string>This app needs location access to name recordings with your current address</string>
+		<key>NSSupportsLiveActivities</key>
+		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>UIBackgroundModes</key>

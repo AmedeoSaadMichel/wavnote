@@ -34,6 +34,8 @@
 |------|-------|
 | [[analysis/2026-04-26-bug-sfarfallio-overdub]] | Root cause sfarfallio play/pause (B1) + overdub error (B2) — analisi completa |
 | [[analysis/plans/2026-04-26-fix-b2-overdub]] | Piano di fix B2 — tre task chirurgici (completato) |
+| [[analysis/plans/2026-04-28-background-audio-recording]] | Piano feature registrazione audio in background — iOS first + Android foreground service |
+| [[analysis/plans/2026-04-28-live-activity-dynamic-island]] | Piano Live Activity / Dynamic Island per registrazione in background |
 | [[analysis/2026-04-23-post-refactor-improvements]] | Migliorie codice post-refactor — audio playback/preparation layer, top 10 azioni |
 | [[analysis/2026-04-23-project-state]] | Stato generale progetto — architettura audio, waveform, fullscreen player |
 
@@ -49,7 +51,10 @@
 > **Regola:** Se la logica di uno strumento o funzionalità non è chiara, consulta prima il file `.md` corrispondente qui.
 
 ## Decision Records
-`project/adr/` — vuoto, pronto per le prossime ADR
+| File | Topic |
+|------|-------|
+| [[project/adr/2026-04-14-audio-clock-push-based]] | ADR-001 — AudioClock push-based nativo end-to-end |
+| [[project/adr/2026-04-28-presentation-file-splitting]] | ADR-002 — Split chirurgico dei file presentation troppo grandi |
 
 ## Log
 | Cartella | Scopo |

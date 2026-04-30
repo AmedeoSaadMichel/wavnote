@@ -21,6 +21,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/recording_entity.dart';
+import '../../domain/entities/recording_external_control_action.dart';
 import '../../domain/entities/audio_types.dart';
 import '../../core/enums/audio_format.dart';
 import 'audio_recorder_service.dart';
@@ -69,7 +70,7 @@ class AudioServiceCoordinator {
   StreamSubscription<Duration>? _recordingPositionSubscription;
 
   AudioServiceCoordinator({AudioEngineService? engineService})
-      : _injectedEngine = engineService {
+    : _injectedEngine = engineService {
     _recordingService = AudioRecorderService();
   }
 
@@ -139,6 +140,7 @@ class AudioServiceCoordinator {
     required AudioFormat format,
     required int sampleRate,
     required int bitRate,
+    Duration initialElapsedOffset = Duration.zero,
   }) async {
     if (!_isInitialized) return false;
 
@@ -151,6 +153,7 @@ class AudioServiceCoordinator {
         sampleRate: sampleRate,
         bitRate: bitRate,
         format: format.fileExtension.substring(1), // 'wav', 'm4a', 'flac'
+        initialElapsedOffset: initialElapsedOffset,
       );
 
       if (success) {
@@ -186,7 +189,7 @@ class AudioServiceCoordinator {
       _cleanupEngineAmplitudeStream();
 
       final nativePath = rawResult?['path'] as String?;
-      final path = raw ? (nativePath ?? _iosRecordingPath) : _iosRecordingPath;
+      final path = nativePath ?? _iosRecordingPath;
       if (path == null) return null;
 
       final nativeDurationMs = (rawResult?['duration'] as num?)?.toInt();
@@ -285,8 +288,49 @@ class AudioServiceCoordinator {
   }
 
   Future<Duration> getCurrentRecordingDuration() async {
-    if (_useNativeEngine && _iosNativeActive) return _calculateIosDuration();
+    if (_useNativeEngine && _iosNativeActive && _engineService != null) {
+      final status = await _engineService!.getRecordingStatus();
+      if (status.isRecording) return status.duration;
+      return _calculateIosDuration();
+    }
     return await _recordingService.getCurrentRecordingDuration();
+  }
+
+  Future<void> syncNativeRecordingStatus() async {
+    if (!_useNativeEngine || _engineService == null) return;
+
+    final status = await _engineService!.getRecordingStatus();
+    if (!status.isRecording && !_iosNativeActive) return;
+
+    _iosNativeActive = status.isRecording;
+    _iosRecordingPath ??= status.path;
+
+    if (!status.isRecording) {
+      _cleanupEngineAmplitudeStream();
+      return;
+    }
+
+    _iosRecordingStartTime ??= DateTime.now().subtract(status.duration);
+
+    _positionController?.add(status.duration);
+    _amplitudeController?.add(status.amplitude);
+    _clockController?.add(
+      RecordingClockTick(
+        position: status.duration,
+        amplitude: status.amplitude,
+      ),
+    );
+
+    if (status.isPaused) {
+      _iosPauseStartTime ??= DateTime.now();
+      _amplitudeController?.add(0.0);
+      return;
+    }
+
+    _iosPauseStartTime = null;
+    if (_engineAmplitudeSubscription == null) {
+      _setupEngineAmplitudeStream();
+    }
   }
 
   Stream<ClockTick> get activeClockStream =>
@@ -298,6 +342,9 @@ class AudioServiceCoordinator {
   Stream<double>? get amplitudeStream => _amplitudeController?.stream;
 
   Stream<Duration>? get durationStream => _positionController?.stream;
+
+  Stream<RecordingExternalControlAction> get externalControlStream =>
+      _engineService?.externalControlStream ?? const Stream.empty();
 
   Future<double> getCurrentAmplitude() async {
     if (_useNativeEngine && _iosNativeActive && _engineService != null) {

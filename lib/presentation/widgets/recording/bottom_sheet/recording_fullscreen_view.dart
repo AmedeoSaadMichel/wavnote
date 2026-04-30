@@ -109,9 +109,9 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
   /// che viene passata come widget.elapsed. In quel momento elapsed > waveData
   /// e viene mostrata la durata corretta dell'audio completo.
   String _seekLabel(int barIndex) {
-    final seekMs = barIndex * 100;
     final waveMs = widget.waveData.length * 100;
     final elapsedMs = widget.elapsed.inMilliseconds;
+    final seekMs = widget.isRecording ? elapsedMs : barIndex * 100;
     // Usa il massimo tra la durata calcolata dalla waveform e quella dal BLoC.
     // Dopo la fine naturale del playback, elapsed contiene la durata del file
     // di preview completo (es. 14.9s) che supera waveData.length*100 (es. 9s).

@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/custom_waveform/recorder_wave_painter.dart
+// File: lib/presentation/widgets/recording/custom_waveform/recorder_wave_painter.dart
 import 'package:flutter/material.dart';
 import 'label.dart';
 import 'waveform_utils.dart';
@@ -52,6 +52,7 @@ class CustomRecorderWavePainter extends CustomPainter {
   final double scaleFactor;
   final Duration currentlyRecordedDuration;
   final bool isPaused;
+
   /// Barre future da erosione progressiva: ancora a 0.3 opacity anche durante recording.
   final int futureBarsCount;
 
@@ -108,16 +109,16 @@ class CustomRecorderWavePainter extends CustomPainter {
     required this.currentlyRecordedDuration,
     this.isPaused = false,
     this.futureBarsCount = 0,
-  })  : _wavePaint = Paint()
-          ..color = waveColor
-          ..strokeWidth = waveThickness
-          ..strokeCap = waveCap,
-        _linePaint = Paint()
-          ..color = middleLineColor
-          ..strokeWidth = middleLineThickness,
-        _durationLinePaint = Paint()
-          ..strokeWidth = 3
-          ..color = durationLinesColor;
+  }) : _wavePaint = Paint()
+         ..color = waveColor
+         ..strokeWidth = waveThickness
+         ..strokeCap = waveCap,
+       _linePaint = Paint()
+         ..color = middleLineColor
+         ..strokeWidth = middleLineThickness,
+       _durationLinePaint = Paint()
+         ..strokeWidth = 3
+         ..color = durationLinesColor;
   var _labelPadding = 0.0;
 
   final List<WaveformLabel> _labels = [];
@@ -126,6 +127,7 @@ class CustomRecorderWavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paintStartTimestamp = DateTime.now().millisecondsSinceEpoch;
+    final paintDiagnostics = _calculatePaintDiagnostics(size);
 
     if (shouldClearLabels) {
       _labels.clear();
@@ -138,7 +140,8 @@ class CustomRecorderWavePainter extends CustomPainter {
 
       // Il pushback scatta solo per barre registrate (non future):
       // le barre future non devono causare lo scroll del waveform.
-      final isRecordedBar = futureBarsCount == 0 || i < waveData.length - futureBarsCount;
+      final isRecordedBar =
+          futureBarsCount == 0 || i < waveData.length - futureBarsCount;
       if (isRecordedBar &&
           ((spacing * i) + dragOffset.dx + spacing >
               size.width / (extendWaveform ? 1 : 2) + totalBackDistance.dx) &&
@@ -162,12 +165,68 @@ class CustomRecorderWavePainter extends CustomPainter {
     /// calculates scrolled position with respect to duration
     if (shouldCalculateScrolledPosition) _setScrolledDuration(size);
 
-    // Log paint duration every 5 points
-    if (waveData.length % 5 == 0) {
+    if (_shouldLogPaintDiagnostics(paintDiagnostics)) {
       final paintEndTimestamp = DateTime.now().millisecondsSinceEpoch;
       final paintDuration = paintEndTimestamp - paintStartTimestamp;
-      print('⏱️ [$paintEndTimestamp] CustomPaint.paint COMPLETE: ${waveData.length} points, paintDuration=${paintDuration}ms');
+      debugPrint(
+        '🌊 WAVEFORM-PAINT t=$paintEndTimestamp len=${waveData.length} visible=${paintDiagnostics.visibleCount} visibleRange=${paintDiagnostics.firstVisibleIndex}-${paintDiagnostics.lastVisibleIndex} ampRange=${paintDiagnostics.minVisibleAmplitude.toStringAsFixed(3)}..${paintDiagnostics.maxVisibleAmplitude.toStringAsFixed(3)} dxRange=${paintDiagnostics.minVisibleDx.toStringAsFixed(1)}..${paintDiagnostics.maxVisibleDx.toStringAsFixed(1)} totalDx=${totalBackDistance.dx.toStringAsFixed(2)} initial=${initialPosition.toStringAsFixed(2)} spacing=${spacing.toStringAsFixed(2)} scale=${scaleFactor.toStringAsFixed(1)} paused=$isPaused future=$futureBarsCount pushback=$callPushback paintMs=$paintDuration',
+      );
     }
+  }
+
+  _PaintDiagnostics _calculatePaintDiagnostics(Size size) {
+    final halfWidth = size.width * 0.5;
+    var firstVisibleIndex = -1;
+    var lastVisibleIndex = -1;
+    var visibleCount = 0;
+    var minVisibleAmplitude = 1.0;
+    var maxVisibleAmplitude = 0.0;
+    var minVisibleDx = double.infinity;
+    var maxVisibleDx = double.negativeInfinity;
+
+    for (var i = 0; i < waveData.length; i++) {
+      final dx =
+          -totalBackDistance.dx +
+          dragOffset.dx +
+          (spacing * i) -
+          initialPosition;
+      if (dx > -halfWidth && dx < halfWidth * 2) {
+        firstVisibleIndex = firstVisibleIndex == -1 ? i : firstVisibleIndex;
+        lastVisibleIndex = i;
+        visibleCount++;
+        minVisibleAmplitude = waveData[i] < minVisibleAmplitude
+            ? waveData[i]
+            : minVisibleAmplitude;
+        maxVisibleAmplitude = waveData[i] > maxVisibleAmplitude
+            ? waveData[i]
+            : maxVisibleAmplitude;
+        minVisibleDx = dx < minVisibleDx ? dx : minVisibleDx;
+        maxVisibleDx = dx > maxVisibleDx ? dx : maxVisibleDx;
+      }
+    }
+
+    if (visibleCount == 0) {
+      minVisibleAmplitude = 0.0;
+      minVisibleDx = 0.0;
+      maxVisibleDx = 0.0;
+    }
+
+    return _PaintDiagnostics(
+      firstVisibleIndex: firstVisibleIndex,
+      lastVisibleIndex: lastVisibleIndex,
+      visibleCount: visibleCount,
+      minVisibleAmplitude: minVisibleAmplitude,
+      maxVisibleAmplitude: maxVisibleAmplitude,
+      minVisibleDx: minVisibleDx,
+      maxVisibleDx: maxVisibleDx,
+    );
+  }
+
+  bool _shouldLogPaintDiagnostics(_PaintDiagnostics diagnostics) {
+    if (waveData.isEmpty || diagnostics.visibleCount == 0) return false;
+    if (isPaused) return true;
+    if (futureBarsCount > 0) return true;
+    return waveData.length % 25 == 0;
   }
 
   @override
@@ -193,10 +252,7 @@ class CustomRecorderWavePainter extends CustomPainter {
       final content = label.content;
       final offset = label.offset;
       final halfWidth = size.width * 0.5;
-      final textSpan = TextSpan(
-        text: content,
-        style: durationStyle,
-      );
+      final textSpan = TextSpan(text: content, style: durationStyle);
 
       // Text painting is performance intensive process so we will only render
       // labels whose position is greater then -halfWidth and triple of
@@ -218,8 +274,9 @@ class CustomRecorderWavePainter extends CustomPainter {
     final labelDuration = Duration(seconds: i);
     final durationLineDx = _labelPadding + dragOffset.dx - totalBackDistance.dx;
     final height = size.height;
-    final currentDuration =
-        Duration(seconds: currentlyRecordedDuration.inSeconds + durationBuffer);
+    final currentDuration = Duration(
+      seconds: currentlyRecordedDuration.inSeconds + durationBuffer,
+    );
     if (labelDuration < currentDuration) {
       canvas.drawLine(
         Offset(durationLineDx, height),
@@ -265,7 +322,8 @@ class CustomRecorderWavePainter extends CustomPainter {
     // 0 is negative direction have some buffer on left side.
     if (dx > -halfWidth && dx < halfWidth * 2) {
       // Barra futura = ancora da sovrascrivere durante erosione progressiva
-      final isFutureBar = futureBarsCount > 0 && i >= waveData.length - futureBarsCount;
+      final isFutureBar =
+          futureBarsCount > 0 && i >= waveData.length - futureBarsCount;
       final barColor = _getBarColor(i);
       if (isPaused) {
         final opacity = dx < halfWidth ? 1.0 : 0.3;
@@ -296,10 +354,31 @@ class CustomRecorderWavePainter extends CustomPainter {
 
   void _setScrolledDuration(Size size) {
     setCurrentPositionDuration(
-        (((-totalBackDistance.dx + dragOffset.dx - (size.width / 2)) /
-                    (spacing * updateFrequecy)) *
-                1000)
-            .abs()
-            .toInt());
+      (((-totalBackDistance.dx + dragOffset.dx - (size.width / 2)) /
+                  (spacing * updateFrequecy)) *
+              1000)
+          .abs()
+          .toInt(),
+    );
   }
+}
+
+class _PaintDiagnostics {
+  final int firstVisibleIndex;
+  final int lastVisibleIndex;
+  final int visibleCount;
+  final double minVisibleAmplitude;
+  final double maxVisibleAmplitude;
+  final double minVisibleDx;
+  final double maxVisibleDx;
+
+  const _PaintDiagnostics({
+    required this.firstVisibleIndex,
+    required this.lastVisibleIndex,
+    required this.visibleCount,
+    required this.minVisibleAmplitude,
+    required this.maxVisibleAmplitude,
+    required this.minVisibleDx,
+    required this.maxVisibleDx,
+  });
 }
