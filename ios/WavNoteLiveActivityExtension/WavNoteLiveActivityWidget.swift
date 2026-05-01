@@ -1,7 +1,14 @@
 // File: ios/WavNoteLiveActivityExtension/WavNoteLiveActivityWidget.swift
 import ActivityKit
+import os
 import SwiftUI
 import WidgetKit
+
+private let liveActivityWidgetLogger = Logger(
+    subsystem: "com.example.wavnote.liveactivity",
+    category: "Waveform"
+)
+private let showWaveformRevisionProbe = true
 
 struct WavNoteLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -20,12 +27,7 @@ struct WavNoteLiveActivityWidget: Widget {
                     TimerText(state: context.state, size: 13, color: WavNoteColors.pink)
                 }
             } compactTrailing: {
-                MiniWaveView(
-                    preferredBars: 14,
-                    height: 16,
-                    seed: context.state.amplitudeSeed,
-                    isPaused: context.state.isPaused
-                )
+                RecordingShortBadgeView(isPaused: context.state.isPaused)
                 .frame(width: 56)
             } minimal: {
                 RecDotView(size: 8)
@@ -59,14 +61,18 @@ private struct LockScreenActivityView: View {
                     preferredBars: 96,
                     height: 22,
                     seed: state.amplitudeSeed,
+                    samples: state.amplitudeSamples,
+                    revision: state.waveformRevision,
                     isPaused: state.isPaused
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .clipped()
+                VisualControlsView(isPaused: state.isPaused)
+                    .padding(.top, 14)
             }
             .padding(16)
         }
-        .frame(maxWidth: .infinity, minHeight: 158)
+        .frame(maxWidth: .infinity, minHeight: 202)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: Color.black.opacity(0.32), radius: 22, y: 14)
     }
@@ -159,16 +165,44 @@ private struct MiniWaveView: View {
     let preferredBars: Int
     let height: CGFloat
     let seed: Double
+    let samples: [Double]
+    let revision: Int
     let isPaused: Bool
+    private let silenceThreshold = 0.003
+
+    private var debugSignature: String {
+        let lastSample = samples.last ?? -1
+        return "\(revision)-\(samples.count)-\(String(format: "%.3f", lastSample))-\(String(format: "%.3f", seed))-\(isPaused)"
+    }
 
     var body: some View {
-        if isPaused {
-            barsView(tick: seed * 8.0)
-        } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
-                barsView(tick: timeline.date.timeIntervalSinceReferenceDate * 7.5 + seed * 2.0)
+        Group {
+            if isPaused {
+                barsView(tick: seed * 8.0)
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 18.0)) { timeline in
+                    barsView(tick: liveTick(at: timeline.date))
+                }
             }
         }
+        .onAppear {
+            logWidgetState(reason: "appear")
+        }
+        .onChange(of: debugSignature) { _ in
+            logWidgetState(reason: "change")
+        }
+    }
+
+    private func liveTick(at date: Date) -> Double {
+        date.timeIntervalSinceReferenceDate * 7.5 + Double(revision) * 0.37 + seed * 2.0
+    }
+
+    private func logWidgetState(reason: String) {
+        let lastSample = samples.last ?? -1
+        let nonZeroSamples = samples.filter { $0 > 0 }.count
+        liveActivityWidgetLogger.debug(
+            "🌊 [LIVE_ACTIVITY_WIDGET] \(reason, privacy: .public) preferredBars=\(preferredBars) paused=\(isPaused) seed=\(seed, privacy: .public) samples=\(samples.count) nonZero=\(nonZeroSamples) last=\(lastSample, privacy: .public)"
+        )
     }
 
     private func barsView(tick: Double) -> some View {
@@ -182,23 +216,99 @@ private struct MiniWaveView: View {
             HStack(alignment: .center, spacing: spacing) {
                 ForEach(0..<barCount, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(WavNoteColors.yellow)
-                        .frame(width: barWidth, height: barHeight(index: index, tick: tick))
-                        .shadow(color: WavNoteColors.yellow.opacity(0.55), radius: 4)
+                        .fill(WavNoteColors.cyan)
+                        .frame(
+                            width: barWidth,
+                            height: barHeight(
+                                index: index,
+                                barCount: barCount,
+                                tick: tick
+                            )
+                        )
+                        .shadow(color: WavNoteColors.cyan.opacity(0.55), radius: 4)
                         .opacity(isPaused ? 0.78 : 0.96)
                 }
             }
+            .animation(.easeOut(duration: 0.18), value: revision)
             .frame(maxWidth: .infinity, maxHeight: height, alignment: .leading)
+            .overlay(alignment: .topTrailing) {
+                if showWaveformRevisionProbe {
+                    Text("\(revision)")
+                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                        .foregroundStyle(WavNoteColors.yellow)
+                        .padding(.horizontal, 3)
+                        .background(Color.black.opacity(0.62), in: Capsule())
+                        .offset(y: -7)
+                }
+            }
         }
         .frame(height: height)
     }
 
-    private func barHeight(index: Int, tick: Double) -> CGFloat {
+    private func barHeight(index: Int, barCount: Int, tick: Double) -> CGFloat {
+        if !samples.isEmpty {
+            let value = displaySampleValue(index: index, barCount: barCount, tick: tick)
+            if value > 0 { return max(1, height * value) }
+            if isPaused { return height * 0.42 }
+            let primary = sin(tick + Double(index) * 0.45)
+            let secondary = cos(tick * 0.6 + Double(index) * 0.2)
+            return height * (0.10 + 0.15 * abs(primary * secondary))
+        }
         if isPaused { return height * 0.42 }
         let primary = sin(tick + Double(index) * 0.45)
         let secondary = cos(tick * 0.6 + Double(index) * 0.2)
         let value = abs(primary * secondary)
         return height * (0.35 + 0.65 * value)
+    }
+
+    private func realSampleValue(index: Int, barCount: Int, tick: Double) -> Double {
+        guard samples.count > 1, barCount > 1 else {
+            return samples.first ?? 0
+        }
+        let sampleCount = samples.count
+        let phase = isPaused
+            ? 0
+            : tick.truncatingRemainder(dividingBy: Double(sampleCount))
+        let rawPosition = Double(index) / Double(barCount - 1) * Double(sampleCount - 1)
+        let position = (rawPosition + phase)
+            .truncatingRemainder(dividingBy: Double(sampleCount))
+        let lower = Int(floor(position))
+        let upper = (lower + 1) % sampleCount
+        let fraction = position - Double(lower)
+        let start = samples[lower]
+        let end = samples[upper]
+        return start + (end - start) * fraction
+    }
+
+    private func displaySampleValue(index: Int, barCount: Int, tick: Double) -> Double {
+        let sampleValue = realSampleValue(index: index, barCount: barCount, tick: tick)
+        guard !isPaused else {
+            return shapedAmplitude(sampleValue, boost: 1.05)
+        }
+
+        let motion = syntheticMotion(index: index, tick: tick)
+        let audioBase = shapedAmplitude(sampleValue, boost: 0.92)
+        let animatedAudio = max(audioBase, 0.06) * (0.68 + 0.32 * motion)
+        let liveHeadStart = max(0, barCount - 6)
+        guard index >= liveHeadStart else { return min(animatedAudio, 1.0) }
+
+        let headProgress = Double(index - liveHeadStart + 1) /
+            Double(max(1, barCount - liveHeadStart))
+        let liveSeed = shapedAmplitude(seed, boost: 1.05)
+        let liveValue = liveSeed * (0.52 + 0.48 * motion) * (0.58 + 0.42 * headProgress)
+        return min(max(animatedAudio, liveValue), 1.0)
+    }
+
+    private func syntheticMotion(index: Int, tick: Double) -> Double {
+        let primary = sin(tick + Double(index) * 0.45)
+        let secondary = cos(tick * 0.6 + Double(index) * 0.2)
+        return abs(primary * secondary)
+    }
+
+    private func shapedAmplitude(_ value: Double, boost: Double) -> Double {
+        guard value > silenceThreshold else { return 0 }
+        let normalized = min(max((value - silenceThreshold) / (1.0 - silenceThreshold), 0), 1)
+        return min(pow(normalized, 0.68) * boost, 1.0)
     }
 }
 
@@ -316,10 +426,9 @@ private struct ExpandedBottomView: View {
             let width = max(geometry.size.width, 1)
             let compact = width < 330
             let timerSize: CGFloat = compact ? 29 : 32
-            let waveHeight: CGFloat = state.isPaused ? 15 : (compact ? 19 : 22)
             let horizontalInset: CGFloat = compact ? 2 : 6
 
-            VStack(alignment: .center, spacing: compact ? 7 : 8) {
+            VStack(alignment: .center, spacing: compact ? 10 : 12) {
                 HStack(alignment: .center, spacing: compact ? 10 : 14) {
                     EyeGlyphView()
                     TimerText(state: state, size: timerSize, color: WavNoteColors.yellow)
@@ -331,21 +440,12 @@ private struct ExpandedBottomView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
 
-                MiniWaveView(
-                    preferredBars: compact ? 64 : 74,
-                    height: waveHeight,
-                    seed: state.amplitudeSeed,
-                    isPaused: state.isPaused
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
-                .clipped()
-
                 VisualControlsView(isPaused: state.isPaused)
                     .padding(.bottom, compact ? 6 : 7)
             }
             .padding(.horizontal, horizontalInset)
         }
-        .frame(height: 112)
+        .frame(height: 86)
     }
 }
 
@@ -390,21 +490,21 @@ private struct WavNoteGradient: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.10, green: 0.02, blue: 0.20),
-                    Color(red: 0.18, green: 0.04, blue: 0.32),
-                    Color(red: 0.29, green: 0.08, blue: 0.44)
+                    WavNoteColors.primaryPurple,
+                    WavNoteColors.primaryPink,
+                    WavNoteColors.primaryOrange
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             RadialGradient(
-                colors: [WavNoteColors.purple.opacity(0.40), .clear],
+                colors: [WavNoteColors.cyan.opacity(0.18), .clear],
                 center: .topLeading,
                 startRadius: 4,
                 endRadius: 180
             )
             RadialGradient(
-                colors: [WavNoteColors.magenta.opacity(0.32), .clear],
+                colors: [WavNoteColors.yellow.opacity(0.14), .clear],
                 center: .bottomTrailing,
                 startRadius: 4,
                 endRadius: 180
@@ -417,9 +517,12 @@ private enum WavNoteColors {
     static let ink = Color(red: 0.04, green: 0.02, blue: 0.08)
     static let yellow = Color(red: 1.0, green: 0.78, blue: 0.25)
     static let teal = Color(red: 0.10, green: 0.82, blue: 0.74)
-    static let cyan = Color(red: 0.40, green: 0.88, blue: 0.95)
+    static let cyan = Color(red: 0.0, green: 0.74, blue: 0.83)
     static let magenta = Color(red: 0.96, green: 0.22, blue: 0.74)
     static let purple = Color(red: 0.54, green: 0.15, blue: 0.88)
     static let pink = Color(red: 1.0, green: 0.30, blue: 0.52)
     static let red = Color(red: 1.0, green: 0.15, blue: 0.25)
+    static let primaryPurple = Color(red: 0.56, green: 0.18, blue: 0.89)
+    static let primaryPink = Color(red: 0.85, green: 0.13, blue: 1.0)
+    static let primaryOrange = Color(red: 1.0, green: 0.31, blue: 0.31)
 }

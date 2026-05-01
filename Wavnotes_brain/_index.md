@@ -36,6 +36,9 @@
 | [[analysis/plans/2026-04-26-fix-b2-overdub]] | Piano di fix B2 — tre task chirurgici (completato) |
 | [[analysis/plans/2026-04-28-background-audio-recording]] | Piano feature registrazione audio in background — iOS first + Android foreground service |
 | [[analysis/plans/2026-04-28-live-activity-dynamic-island]] | Piano Live Activity / Dynamic Island per registrazione in background |
+| [[analysis/plans/2026-04-30-dynamic-island-audio-driven-waveform]] | Piano per waveform Dynamic Island/Live Activity guidate da ampiezze audio reali |
+| [[analysis/plans/2026-05-01-dynamic-island-control-latency]] | Piano per ridurre la latenza dei controlli Dynamic Island/Live Activity |
+| [[analysis/plans/2026-04-30-ai-context-token-efficiency]] | Piano per rendere Obsidian/CLAUDE/AGENTS più efficienti per agenti AI e token budget |
 | [[analysis/2026-04-23-post-refactor-improvements]] | Migliorie codice post-refactor — audio playback/preparation layer, top 10 azioni |
 | [[analysis/2026-04-23-project-state]] | Stato generale progetto — architettura audio, waveform, fullscreen player |
 
@@ -72,4 +75,4 @@
 3. Aggiorna `features.md` e `tech-debt.md` a fine sessione se li hai toccati
 4. Crea session note solo se la sessione dura >20 min o produce decisioni architetturali. **Regola fondamentale**: ogni file di sessione creato DEVE contenere alla fine della pagina dei link espliciti (es. `[[project/features]]`, `[[project/tech-debt]]` e `[[_index]]`) in modo da mantenere il Graph View di Obsidian sempre connesso.
 
-_Ultimo aggiornamento: 2026-04-26_
+_Ultimo aggiornamento: 2026-04-30_
