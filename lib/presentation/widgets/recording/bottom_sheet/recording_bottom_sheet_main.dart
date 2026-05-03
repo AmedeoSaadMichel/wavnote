@@ -135,7 +135,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   /// Contatore monotono di overwrite: non si azzera mai al resume semplice,
   /// così ogni overwrite ottiene un colore unico nel tempo.
   int _overwriteCount = 0;
-  static const int _maxWavePoints = 1000;
   int _seekBarIndex = 0;
 
   /// Incrementato ad ogni seek-and-resume per segnalare a RecordingWaveform
@@ -157,7 +156,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   double _currentAmplitude = 0.0;
   final List<double> _pendingAmplitudeSamples = [];
   int _lastConsumedBlocAmplitudeSampleCount = 0;
-  static const double _amplitudeFloor = 0.08;
+  static const double _silenceAmplitudeThreshold = 0.03;
   static const int _catchUpBatchThreshold = 3;
   static const int _maxPendingAmplitudeSamples = 3000;
 
@@ -197,17 +196,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     // Reset completo dello stato interno quando inizia una nuova sessione (es. dopo aver premuto Done)
     if (widget.sessionCounter != oldWidget.sessionCounter) {
       setState(() {
-        _waveData.clear();
-        _waveSegments.clear();
-        _currentSegment = 0;
-        _overwriteCount = 0;
-        _futureBarsCount = 0;
-        _seekVersion = 0;
-        _seekBarIndex = 0;
-        _seekTimeOffsetMs = 0;
-        _currentAmplitude = 0.0;
-        _pendingAmplitudeSamples.clear();
-        _lastConsumedBlocAmplitudeSampleCount = 0;
+        _resetWaveformState(
+          consumedSampleCount: widget.waveformAmplitudeSampleCount,
+        );
+      });
+    }
+
+    // Quando lo stop arriva dalla Live Activity, il bottom sheet può restare
+    // montato e conservare le barre della registrazione precedente.
+    final isFreshRecordingStart =
+        widget.isRecording &&
+        !oldWidget.isRecording &&
+        !oldWidget.isPaused &&
+        widget.elapsed.inMilliseconds <= 500 &&
+        _waveData.isNotEmpty;
+    if (isFreshRecordingStart) {
+      setState(() {
+        _resetWaveformState(
+          consumedSampleCount: widget.waveformAmplitudeSampleCount,
+        );
       });
     }
 
@@ -295,10 +302,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     // Reset seekBarIndex sull'ultima barra registrata + auto-espandi a fullscreen.
     if (widget.isPaused && !oldWidget.isPaused) {
       final finalElapsedMs = widget.elapsed.inMilliseconds + _seekTimeOffsetMs;
-      final finalExpectedBars = (finalElapsedMs / 100).floor().clamp(
-        0,
-        _maxWavePoints,
-      );
+      final finalExpectedBars = (finalElapsedMs / 100).floor();
       final recordedBars = _waveData.length - _futureBarsCount;
       final barsToAdd = finalExpectedBars - recordedBars;
 
@@ -399,10 +403,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     // Per registrazione normale e resume semplice _seekTimeOffsetMs == 0
     // (il clock nativo emette posizioni cumulative già corrette).
     final elapsedMs = widget.elapsed.inMilliseconds + _seekTimeOffsetMs;
-    final expectedBars = (elapsedMs / 100).floor().clamp(0, _maxWavePoints);
-    final amplitude = _currentAmplitude > _amplitudeFloor
-        ? _currentAmplitude
-        : _amplitudeFloor;
+    final expectedBars = (elapsedMs / 100).floor();
+    final amplitude = _normalizedAmplitude(_currentAmplitude);
     final waveLengthBefore = _waveData.length;
     final futureBarsBefore = _futureBarsCount;
     final recordedBarsBefore = waveLengthBefore - futureBarsBefore;
@@ -442,10 +444,6 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           } else {
             _waveData.add(barAmplitude);
             _waveSegments.add(_currentSegment);
-            if (_waveData.length > _maxWavePoints) {
-              _waveData.removeAt(0);
-              _waveSegments.removeAt(0);
-            }
           }
         }
       } else if (barsToAdd == 0 && _waveData.isNotEmpty) {
@@ -473,7 +471,21 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   }
 
   double _normalizedAmplitude(double rawAmplitude) {
-    return rawAmplitude > _amplitudeFloor ? rawAmplitude : _amplitudeFloor;
+    return rawAmplitude > _silenceAmplitudeThreshold ? rawAmplitude : 0.0;
+  }
+
+  void _resetWaveformState({required int consumedSampleCount}) {
+    _waveData.clear();
+    _waveSegments.clear();
+    _currentSegment = 0;
+    _overwriteCount = 0;
+    _futureBarsCount = 0;
+    _seekVersion = 0;
+    _seekBarIndex = 0;
+    _seekTimeOffsetMs = 0;
+    _currentAmplitude = 0.0;
+    _pendingAmplitudeSamples.clear();
+    _lastConsumedBlocAmplitudeSampleCount = consumedSampleCount;
   }
 
   void _queuePendingAmplitudeSample(double rawAmplitude) {

@@ -82,6 +82,30 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   int _lastBuildLogLength = -1;
   int _lastBuildLogFutureBars = -1;
 
+  bool get _shouldAnchorLiveWaveform =>
+      widget.centerBars && !widget.isPaused && widget.waveData.isNotEmpty;
+
+  int get _livePlayheadIndex {
+    if (widget.waveData.isEmpty) return 0;
+    final recordedBars = widget.waveData.length - widget.futureBarsCount;
+    return (recordedBars - 1).clamp(0, widget.waveData.length - 1);
+  }
+
+  Offset _targetBackDistanceForIndex(int index) {
+    final halfWidth = widget.size.width / 2;
+    return Offset(
+      (index * widget.spacing) - halfWidth + (widget.spacing / 2),
+      0,
+    );
+  }
+
+  Offset get _effectiveTotalBackDistance {
+    if (_shouldAnchorLiveWaveform) {
+      return _targetBackDistanceForIndex(_livePlayheadIndex);
+    }
+    return _totalBackDistance;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -89,12 +113,8 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     // seek-and-resume, o fullscreen aperta mentre era in pausa/registrazione),
     // posiziona subito l'ultima barra sul playhead invece di partire da sinistra.
     if (widget.waveData.isNotEmpty) {
-      final halfWidth = widget.size.width / 2;
       final lastIndex = widget.waveData.length - 1;
-      _totalBackDistance = Offset(
-        (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
-        0,
-      );
+      _totalBackDistance = _targetBackDistanceForIndex(lastIndex);
     }
   }
 
@@ -127,13 +147,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     // seekVersion cambia solo una volta per ogni seek → scatta esattamente una volta.
     if (widget.seekVersion != oldWidget.seekVersion &&
         widget.waveData.isNotEmpty) {
-      final halfWidth = widget.size.width / 2;
       final lastIndex = widget.waveData.length - 1;
       setState(() {
-        _totalBackDistance = Offset(
-          (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
-          0,
-        );
+        _totalBackDistance = _targetBackDistanceForIndex(lastIndex);
         _initialPosition = 0.0;
       });
       debugPrint(
@@ -147,14 +163,10 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     // che la barra appaia incollata "da sinistra" e non col suo esatto centro
     // sul playhead, così da eliminare l'effetto "spazio vuoto finale".
     if (widget.isPaused && !oldWidget.isPaused && widget.waveData.isNotEmpty) {
-      final halfWidth = widget.size.width / 2;
       final lastIndex =
           widget.externalSeekBarIndex ?? (widget.waveData.length - 1);
       setState(() {
-        _totalBackDistance = Offset(
-          (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
-          0,
-        );
+        _totalBackDistance = _targetBackDistanceForIndex(lastIndex);
       });
       debugPrint(
         '🌊 WAVEFORM pause align externalSeekBarIndex=${widget.externalSeekBarIndex} lastIndex=$lastIndex waveDataLength=${widget.waveData.length} spacing=${widget.spacing} totalBackDistance=${_totalBackDistance.dx}',
@@ -185,11 +197,9 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
     if (widget.externalSeekBarIndex != null &&
         widget.externalSeekBarIndex != oldWidget.externalSeekBarIndex &&
         widget.externalSeekBarIndex != _currentSeekBarIndex) {
-      final halfWidth = widget.size.width / 2;
-      final targetDx =
-          (widget.externalSeekBarIndex! * widget.spacing) -
-          halfWidth +
-          (widget.spacing / 2);
+      final targetDx = _targetBackDistanceForIndex(
+        widget.externalSeekBarIndex!,
+      ).dx;
       setState(() {
         _totalBackDistance = Offset(targetDx, 0);
       });
@@ -198,35 +208,19 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
       );
     }
 
-    // Auto-follow end: durante la registrazione (non in pausa), se la waveform
-    // cresce e supera il centro (halfWidth), forziamo _totalBackDistance per
-    // tenere l'ultima barra ancorata al playhead. Questo aggira il ritardo del pushBack.
-    if (!widget.isPaused &&
-        widget.waveData.length > oldWidget.waveData.length) {
-      final halfWidth = widget.size.width / 2;
-      final currentWaveformWidth = widget.waveData.length * widget.spacing;
-      if (currentWaveformWidth > halfWidth) {
-        final lastIndex = widget.waveData.length - 1;
-        setState(() {
-          _totalBackDistance = Offset(
-            (lastIndex * widget.spacing) - halfWidth + (widget.spacing / 2),
-            0,
-          );
-          _initialPosition = 0.0;
-        });
-        debugPrint(
-          '🌊 WAVEFORM auto-follow len=${widget.waveData.length} oldLen=${oldWidget.waveData.length} lastIndex=$lastIndex targetDx=${_totalBackDistance.dx.toStringAsFixed(2)} currentWidth=${currentWaveformWidth.toStringAsFixed(1)} halfWidth=${halfWidth.toStringAsFixed(1)}',
-        );
-      }
-    }
+    // Durante la registrazione il painter riceve un offset calcolato dal numero
+    // corrente di barre, perché waveData può essere mutata in-place dal parent.
   }
 
   int get _currentSeekBarIndex {
+    return _seekBarIndexForDistance(_effectiveTotalBackDistance);
+  }
+
+  int _seekBarIndexForDistance(Offset distance) {
     final halfWidth = widget.size.width / 2;
-    // Sottraiamo lo shift (spacing/2) dal calcolo inverso
+    // Sottraiamo lo shift (spacing/2) dal calcolo inverso.
     final index =
-        ((_totalBackDistance.dx + halfWidth - (widget.spacing / 2)) /
-                widget.spacing)
+        ((distance.dx + halfWidth - (widget.spacing / 2)) / widget.spacing)
             .round();
     return index.clamp(
       0,
@@ -287,6 +281,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
   @override
   Widget build(BuildContext context) {
     final buildTimestamp = DateTime.now().millisecondsSinceEpoch;
+    final effectiveTotalBackDistance = _effectiveTotalBackDistance;
     final shouldLogBuild =
         buildTimestamp - _lastBuildLogMs > 500 ||
         widget.waveData.length != _lastBuildLogLength ||
@@ -298,7 +293,7 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
       _lastBuildLogLength = widget.waveData.length;
       _lastBuildLogFutureBars = widget.futureBarsCount;
       debugPrint(
-        '🌊 WAVEFORM-BUILD t=$buildTimestamp len=${widget.waveData.length} amp=${widget.amplitude.toStringAsFixed(3)} paused=${widget.isPaused} future=${widget.futureBarsCount} currentIndex=$_currentSeekBarIndex dx=${_totalBackDistance.dx.toStringAsFixed(2)} size=${widget.size.width.toStringAsFixed(1)}x${widget.size.height.toStringAsFixed(1)} scale=${widget.scaleFactor.toStringAsFixed(1)} centerBars=${widget.centerBars}',
+        '🌊 WAVEFORM-BUILD t=$buildTimestamp len=${widget.waveData.length} amp=${widget.amplitude.toStringAsFixed(3)} paused=${widget.isPaused} future=${widget.futureBarsCount} currentIndex=${_seekBarIndexForDistance(effectiveTotalBackDistance)} dx=${effectiveTotalBackDistance.dx.toStringAsFixed(2)} size=${widget.size.width.toStringAsFixed(1)}x${widget.size.height.toStringAsFixed(1)} scale=${widget.scaleFactor.toStringAsFixed(1)} centerBars=${widget.centerBars}',
       );
     }
 
@@ -333,11 +328,11 @@ class _RecordingWaveformState extends State<RecordingWaveform> {
                   waveCap: StrokeCap.round,
                   middleLineColor: widget.middleLineColor,
                   middleLineThickness: widget.middleLineThickness,
-                  totalBackDistance: _totalBackDistance,
+                  totalBackDistance: effectiveTotalBackDistance,
                   dragOffset: _dragOffset,
                   waveThickness: widget.waveThickness,
                   pushBack: _onPushBack,
-                  callPushback: !widget.isPaused,
+                  callPushback: !widget.isPaused && !_shouldAnchorLiveWaveform,
                   extendWaveform: false,
                   updateFrequecy: 10.0,
                   showHourInDuration: false,

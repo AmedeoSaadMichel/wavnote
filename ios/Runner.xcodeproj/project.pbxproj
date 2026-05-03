@@ -20,6 +20,7 @@
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* AudioEnginePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A4 /* AudioEnginePlugin.swift */; };
 		C0DEF0012026042800000001 /* AudioEnginePlugin+Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0012026042800000002 /* AudioEnginePlugin+Recording.swift */; };
 		C0DEF0012026042800000003 /* AudioEnginePlugin+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0012026042800000004 /* AudioEnginePlugin+Playback.swift */; };
+		C0DEF0012026050300000005 /* AudioEnginePlugin+Streams.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0012026050300000006 /* AudioEnginePlugin+Streams.swift */; };
 		D1A100000000000000000001 /* WavNoteLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000002 /* WavNoteLiveActivityController.swift */; };
 		D1A100000000000000000003 /* WavNoteRecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */; };
 		D1A100000000000000000005 /* WavNoteRecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */; };
@@ -102,6 +103,7 @@
 		B2C3D4E5F6A7B8C9D0E1F2A4 /* AudioEnginePlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioEnginePlugin.swift; sourceTree = "<group>"; };
 		C0DEF0012026042800000002 /* AudioEnginePlugin+Recording.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Recording.swift"; sourceTree = "<group>"; };
 		C0DEF0012026042800000004 /* AudioEnginePlugin+Playback.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Playback.swift"; sourceTree = "<group>"; };
+		C0DEF0012026050300000006 /* AudioEnginePlugin+Streams.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Streams.swift"; sourceTree = "<group>"; };
 		D1A100000000000000000002 /* WavNoteLiveActivityController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteLiveActivityController.swift; sourceTree = "<group>"; };
 		D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingAttributes.swift; sourceTree = "<group>"; };
 		D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingControlIntents.swift; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 				B2C3D4E5F6A7B8C9D0E1F2A4 /* AudioEnginePlugin.swift */,
 				C0DEF0012026042800000002 /* AudioEnginePlugin+Recording.swift */,
 				C0DEF0012026042800000004 /* AudioEnginePlugin+Playback.swift */,
+				C0DEF0012026050300000006 /* AudioEnginePlugin+Streams.swift */,
 				D1A100000000000000000002 /* WavNoteLiveActivityController.swift */,
 				EB8F4EB62F8B967900F4ABE7 /* SwiftLogPlugin.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
@@ -520,6 +523,7 @@
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* AudioEnginePlugin.swift in Sources */,
 				C0DEF0012026042800000001 /* AudioEnginePlugin+Recording.swift in Sources */,
 				C0DEF0012026042800000003 /* AudioEnginePlugin+Playback.swift in Sources */,
+				C0DEF0012026050300000005 /* AudioEnginePlugin+Streams.swift in Sources */,
 				D1A100000000000000000001 /* WavNoteLiveActivityController.swift in Sources */,
 				D1A100000000000000000003 /* WavNoteRecordingAttributes.swift in Sources */,
 				D1A100000000000000000020 /* WavNoteRecordingControlIntents.swift in Sources */,

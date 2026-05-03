@@ -20,6 +20,20 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | 5 | `recording_compact_view.dart` / `recording_bottom_sheet_main.dart` | — | Nessun feedback visivo durante `RecordingStarting` (~3s di AVAudioSession init): l'utente ri-clicca pensando che il tap non sia stato registrato, genera registrazione 0ms e `RecordingError`. Fix: disabilitare il bottone record + mostrare spinner/pulse durante `isStarting`. | 🟡 Media |
 | 6 | `lib/presentation/screens/recording/recording_list_screen.dart` | builder fallback su `RecordingStopping` | Durante lo stop della registrazione la lista passa per `RecordingStopping`, ma il builder non gestisce questo stato e mostra temporaneamente `RecordingListSkeleton`. **✅ Risolto 2026-04-24**: Preservata la lista dei file negli stati di transizione (`Starting`, `InProgress`, `Paused`, `Stopping`). | ✅ Risolto |
 
+## Actionable usciti da `hot.md` (2026-04-30)
+
+| # | Area | Descrizione | Priorità |
+|---|------|-------------|----------|
+| H1 | Live Activity / Dynamic Island | Test device fisico iOS 16.1+: avvio recording → Dynamic Island/Lock Screen → background 60s → foreground → stop. Verificare durata file, timer, controlli e waveform audio-driven. | 🔴 Alta |
+| H2 | Dynamic Island audio-driven waveform | Validare che `amplitudeSamples` reagisca a silenzio/parlato e che la pausa congeli la forma senza movimento artificiale. | 🔴 Alta |
+| H3 | Recording background lifecycle | Dopo il fix che evita `configureAudioSession` durante recording attivo, verificare su device che `engineRunning=true` e `framesWrittenThisSegment` crescano dopo background/foreground. | 🔴 Alta |
+| H4 | Preview overdub | Raccogliere log con `DEBUG file su disco` per capire se il WAV è corto su disco o se è solo calcolo BLoC; poi applicare fix e rimuovere log temporaneo. | 🔴 Alta |
+| H5 | Waveform debug temporanei | Rimuovere log `🌊 BLoC waveform buffer count=...`, `🌊 BOTTOM SHEET bloc amp sync ...` e log correlati dopo validazione background/foreground. | 🟡 Media |
+| H6 | Obsidian AI context | Applicare `analysis/plans/2026-04-30-ai-context-token-efficiency.md`: `_index.md` router, `hot.md` sotto 900 parole, storico in `log/sessions/`, aperti in `tech-debt.md`. | 🟡 Media |
+| H7 | `settings_bloc.dart` | File a 803 righe: supera il limite assoluto del progetto. Richiede conferma esplicita prima di refactor. | 🟡 Media |
+| H8 | Test suite | Stabilizzazione completa `test/unit` seguendo `analysis/plans/2026-04-27-piano-risanamento-progetto.md`. | 🟡 Media |
+| H9 | `IAudioServiceRepository` | Cleanup finale seguendo `analysis/plans/2026-04-27-cleanup-iaudioservicerepository.md`. | 🟡 Media |
+
 ## Workaround architetturali noti (post ADR-001)
 
 | Area | Workaround | Motivazione / Note |

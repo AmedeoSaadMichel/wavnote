@@ -65,6 +65,7 @@ extension AudioEnginePlugin {
             liveActivityUpdateRequestCount = 0
             lastLiveActivityDebugLogTime = 0
             liveActivityElapsedOffsetMs = max(0, initialElapsedMs)
+            resetWaveformBuckets()
 
             // Cambia estensione a .wav per il file interno
             let wavURL = fileURL.deletingPathExtension().appendingPathExtension("wav")
@@ -165,6 +166,10 @@ extension AudioEnginePlugin {
                     self.currentAmplitude = amp
                     if shouldLog { self.logger.trace("🎙️ [NATIVE]   amplitude=\(amp)") }
                 }
+                self.appendWaveformBucketSample(
+                    Double(self.currentAmplitude),
+                    outputFrames: writtenOutputFrames
+                )
 
                 // Clock tick — throttle a 100ms, chiamato su main thread per Flutter EventChannel
                 let now = CACurrentMediaTime()
@@ -177,11 +182,20 @@ extension AudioEnginePlugin {
                     let totalFrames = self.framesInPreviousSegments + self.framesWrittenThisSegment
                     let positionMs = Int(Double(totalFrames) / self.outputSampleRate * 1000)
                     let amp = self.currentAmplitude
+                    let bucketBatch = self.consumePendingWaveformBuckets()
                     DispatchQueue.main.async { [weak self] in
-                        self?.clockStreamHandler.sendRecordingTick(
+                        guard let self = self else { return }
+                        self.clockStreamHandler.sendRecordingTick(
                             positionMs: positionMs,
                             amplitude: Double(amp)
                         )
+                        if !bucketBatch.samples.isEmpty {
+                            self.clockStreamHandler.sendWaveformBuckets(
+                                startIndex: bucketBatch.startIndex,
+                                samples: bucketBatch.samples,
+                                totalCount: bucketBatch.totalCount
+                            )
+                        }
                     }
                 }
                 if now - self.lastLiveActivityUpdateTime >= AudioEnginePlugin.liveActivityUpdateInterval {
@@ -215,17 +229,82 @@ extension AudioEnginePlugin {
     }
 
     func pauseRecording(result: @escaping FlutterResult) {
-        self.logger.debug("⏸️ [NATIVE] pauseRecording — isRecording=\(isRecording) isPaused=\(isPaused)")
-        guard isRecording, !isPaused else {
-            self.logger.error("⏸️ [NATIVE] pauseRecording ERROR: stato invalido")
-            result(FlutterError(code: "INVALID_STATE", message: "Not recording or already paused", details: nil))
+        let pauseResult = pauseRecordingCore()
+        if let error = pauseResult.error {
+            result(error)
             return
+        }
+        result(true)
+    }
+
+    private func resetWaveformBuckets() {
+        waveformBucketFrameCount = 0
+        waveformBucketPeak = 0
+        waveformBucketTotalCount = 0
+        pendingWaveformBucketSamples = []
+    }
+
+    private func appendWaveformBucketSample(_ amplitude: Double, outputFrames: Int64) {
+        guard outputFrames > 0, outputSampleRate > 0 else { return }
+        let framesPerBucket = max(1, Int64(outputSampleRate / 10))
+        waveformBucketFrameCount += outputFrames
+        waveformBucketPeak = max(waveformBucketPeak, min(max(amplitude, 0), 1))
+
+        while waveformBucketFrameCount >= framesPerBucket {
+            pendingWaveformBucketSamples.append(waveformBucketPeak)
+            waveformBucketTotalCount += 1
+            waveformBucketFrameCount -= framesPerBucket
+            waveformBucketPeak = min(max(amplitude, 0), 1)
+        }
+    }
+
+    private func flushWaveformBucket() {
+        guard waveformBucketFrameCount > 0 else { return }
+        pendingWaveformBucketSamples.append(waveformBucketPeak)
+        waveformBucketTotalCount += 1
+        waveformBucketFrameCount = 0
+        waveformBucketPeak = 0
+    }
+
+    private func consumePendingWaveformBuckets() -> (startIndex: Int, samples: [Double], totalCount: Int) {
+        let samples = pendingWaveformBucketSamples
+        pendingWaveformBucketSamples = []
+        return (
+            startIndex: waveformBucketTotalCount - samples.count,
+            samples: samples,
+            totalCount: waveformBucketTotalCount
+        )
+    }
+
+    func pauseRecordingFromLiveActivity() -> Bool {
+        let pauseResult = pauseRecordingCore()
+        let success = pauseResult.error == nil
+        sendLiveActivityControlCompleted(
+            action: "pause",
+            success: success,
+            durationMs: pauseResult.durationMs
+        )
+        return success
+    }
+
+    private func pauseRecordingCore() -> (durationMs: Int?, error: FlutterError?) {
+        logger.debug("⏸️ [NATIVE] pauseRecording — isRecording=\(isRecording) isPaused=\(isPaused)")
+        guard isRecording, !isPaused else {
+            logger.error("⏸️ [NATIVE] pauseRecording ERROR: stato invalido")
+            return (
+                nil,
+                FlutterError(
+                    code: "INVALID_STATE",
+                    message: "Not recording or already paused",
+                    details: nil
+                )
+            )
         }
         // Log frames scritti PRIMA di chiudere il file
         if let file = audioFile {
             let sr = file.processingFormat.sampleRate
             let frames = file.length
-            self.logger.debug("⏸️ [NATIVE] pauseRecording: PRIMA chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms)")
+            logger.debug("⏸️ [NATIVE] pauseRecording: PRIMA chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms)")
         }
         audioEngine?.pause()
         if let path = recordingFilePath {
@@ -237,36 +316,97 @@ extension AudioEnginePlugin {
             if let readFile = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) {
                 let sr = readFile.processingFormat.sampleRate
                 let frames = readFile.length
-                self.logger.debug("⏸️ [NATIVE] pauseRecording: DOPO chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms) segmenti=\(recordingSegments.count)")
+                logger.debug("⏸️ [NATIVE] pauseRecording: DOPO chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms) segmenti=\(recordingSegments.count)")
             }
             if let attrs = try? FileManager.default.attributesOfItem(atPath: path) {
-                self.logger.debug("⏸️ [NATIVE] pauseRecording: size=\(attrs[.size] ?? 0) bytes")
+                logger.debug("⏸️ [NATIVE] pauseRecording: size=\(attrs[.size] ?? 0) bytes")
             }
         }
         isPaused = true
+        flushWaveformBucket()
+        let bucketBatch = consumePendingWaveformBuckets()
+        if !bucketBatch.samples.isEmpty {
+            DispatchQueue.main.async { [weak self] in
+                self?.clockStreamHandler.sendWaveformBuckets(
+                    startIndex: bucketBatch.startIndex,
+                    samples: bucketBatch.samples,
+                    totalCount: bucketBatch.totalCount
+                )
+            }
+        }
         currentAmplitude = 0.0
         updateLiveActivity(isPaused: true)
-        result(true)
+        let durationMs = Int(
+            Double(framesInPreviousSegments + framesWrittenThisSegment) /
+                outputSampleRate * 1000
+        )
+        return (durationMs, nil)
     }
 
     func resumeRecording(result: @escaping FlutterResult) {
-        self.logger.debug("▶️ [NATIVE] resumeRecording — isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
-        guard isRecording, isPaused else {
-            self.logger.error("▶️ [NATIVE] resumeRecording ERROR: stato invalido")
-            result(FlutterError(code: "INVALID_STATE", message: "Not paused", details: nil))
+        let resumeResult = resumeRecordingCore()
+        if let error = resumeResult.error {
+            result(error)
             return
         }
+        result(true)
+    }
+
+    func resumeRecordingFromLiveActivity() async -> Bool {
+        var lastResult: (durationMs: Int?, error: FlutterError?) = (nil, nil)
+        for attempt in 1...3 {
+            let resumeResult = resumeRecordingCore()
+            lastResult = resumeResult
+            if resumeResult.error == nil {
+                sendLiveActivityControlCompleted(
+                    action: "resume",
+                    success: true,
+                    durationMs: resumeResult.durationMs
+                )
+                return true
+            }
+            if resumeResult.error?.code == "INVALID_STATE" || attempt == 3 {
+                break
+            }
+            logger.warning("▶️ [LIVE_ACTIVITY] resume retry \(attempt + 1)/3 dopo errore: \(resumeResult.error?.message ?? "unknown")")
+            try? await Task.sleep(nanoseconds: 350_000_000)
+        }
+        sendLiveActivityControlCompleted(
+            action: "resume",
+            success: false,
+            durationMs: lastResult.durationMs
+        )
+        return false
+    }
+
+    private func resumeRecordingCore() -> (durationMs: Int?, error: FlutterError?) {
+        logger.debug("▶️ [NATIVE] resumeRecording — isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
+        guard isRecording, isPaused else {
+            logger.error("▶️ [NATIVE] resumeRecording ERROR: stato invalido")
+            return (
+                nil,
+                FlutterError(code: "INVALID_STATE", message: "Not paused", details: nil)
+            )
+        }
+        var continuationPath: String?
         do {
             try configureAudioSession(preferredSampleRate: Int(outputSampleRate))
-            self.logger.debug("▶️ [NATIVE] resumeRecording: AVAudioSession riconfigurata")
+            logger.debug("▶️ [NATIVE] resumeRecording: AVAudioSession riconfigurata")
             guard let settings = recordingSettings, let first = recordingSegments.first else {
-                self.logger.error("▶️ [NATIVE] resumeRecording ERROR: nessun settings o segmento")
-                result(FlutterError(code: "RESUME_ERROR", message: "No recording settings available", details: nil))
-                return
+                logger.error("▶️ [NATIVE] resumeRecording ERROR: nessun settings o segmento")
+                return (
+                    nil,
+                    FlutterError(
+                        code: "RESUME_ERROR",
+                        message: "No recording settings available",
+                        details: nil
+                    )
+                )
             }
             let baseURL = URL(fileURLWithPath: first)
             let contPath = baseURL.deletingPathExtension().path + "_cnt\(recordingSegments.count)." + baseURL.pathExtension
-            self.logger.debug("▶️ [NATIVE] resumeRecording: nuovo file → \(contPath)")
+            continuationPath = contPath
+            logger.debug("▶️ [NATIVE] resumeRecording: nuovo file → \(contPath)")
             audioFile = try AVAudioFile(forWriting: URL(fileURLWithPath: contPath), settings: settings)
             recordingFilePath = contPath
             framesWrittenThisSegment = 0
@@ -274,11 +414,29 @@ extension AudioEnginePlugin {
             try audioEngine?.start()
             isPaused = false
             updateLiveActivity(isPaused: false)
-            self.logger.info("▶️ [NATIVE] resumeRecording: OK — engine riavviato")
-            result(true)
+            logger.info("▶️ [NATIVE] resumeRecording: OK — engine riavviato")
+            let durationMs = Int(
+                Double(framesInPreviousSegments + framesWrittenThisSegment) /
+                    outputSampleRate * 1000
+            )
+            return (durationMs, nil)
         } catch {
-            self.logger.error("▶️ [NATIVE] resumeRecording ERROR: \(error)")
-            result(FlutterError(code: "RESUME_ERROR", message: error.localizedDescription, details: nil))
+            if let continuationPath {
+                audioFile = nil
+                if recordingFilePath == continuationPath {
+                    recordingFilePath = nil
+                }
+                try? FileManager.default.removeItem(atPath: continuationPath)
+            }
+            logger.error("▶️ [NATIVE] resumeRecording ERROR: \(error)")
+            return (
+                nil,
+                FlutterError(
+                    code: "RESUME_ERROR",
+                    message: error.localizedDescription,
+                    details: nil
+                )
+            )
         }
     }
 
@@ -291,6 +449,7 @@ extension AudioEnginePlugin {
         }
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
+        flushWaveformBucket()
         if let path = recordingFilePath, audioFile != nil {
             audioFile = nil
             recordingSegments.append(path)
@@ -311,6 +470,7 @@ extension AudioEnginePlugin {
         liveActivityUpdateRequestCount = 0
         lastLiveActivityDebugLogTime = 0
         liveActivityElapsedOffsetMs = 0
+        resetWaveformBuckets()
         if #available(iOS 16.1, *) {
             Task {
                 await WavNoteLiveActivityController.shared.end()
@@ -390,6 +550,65 @@ extension AudioEnginePlugin {
         }
     }
 
+    func stopRecordingFromLiveActivity() async -> Bool {
+        guard isRecording else {
+            logger.error("⏹️ [LIVE_ACTIVITY] stop ignored: no active recording")
+            sendLiveActivityControlCompleted(
+                action: "stop",
+                success: false
+            )
+            return false
+        }
+
+        logger.debug("⏹️ [LIVE_ACTIVITY] direct native stop")
+        return await withCheckedContinuation { continuation in
+            stopRecording(raw: false) { [weak self] result in
+                guard let self = self else {
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                if let error = result as? FlutterError {
+                    self.logger.error("⏹️ [LIVE_ACTIVITY] stop failed: \(error.message ?? error.code)")
+                    self.sendLiveActivityControlCompleted(
+                        action: "stop",
+                        success: false
+                    )
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                guard let payload = result as? [String: Any] else {
+                    self.logger.error("⏹️ [LIVE_ACTIVITY] stop failed: invalid native result")
+                    self.sendLiveActivityControlCompleted(
+                        action: "stop",
+                        success: false
+                    )
+                    continuation.resume(returning: false)
+                    return
+                }
+
+                let path = payload["path"] as? String
+                let durationMs: Int?
+                if let number = payload["duration"] as? NSNumber {
+                    durationMs = number.intValue
+                } else if let value = payload["duration"] as? Double {
+                    durationMs = Int(value)
+                } else {
+                    durationMs = nil
+                }
+                let success = path != nil
+                self.sendLiveActivityControlCompleted(
+                    action: "stop",
+                    success: success,
+                    durationMs: durationMs,
+                    path: path
+                )
+                continuation.resume(returning: success)
+            }
+        }
+    }
+
     /// Helper per restituire il risultato finale di stopRecording.
     func finishWithFile(_ path: String, outputPath: String, segments: [String], result: @escaping FlutterResult) {
         // Se path != outputPath e dobbiamo spostare
@@ -439,12 +658,35 @@ extension AudioEnginePlugin {
         liveActivityUpdateRequestCount = 0
         lastLiveActivityDebugLogTime = 0
         liveActivityElapsedOffsetMs = 0
+        resetWaveformBuckets()
         if #available(iOS 16.1, *) {
             Task {
                 await WavNoteLiveActivityController.shared.end()
             }
         }
         result(true)
+    }
+
+    func cancelRecordingFromLiveActivity() -> Bool {
+        guard isRecording || recordingFilePath != nil || !recordingSegments.isEmpty else {
+            logger.error("❌ [LIVE_ACTIVITY] cancel ignored: no active recording")
+            sendLiveActivityControlCompleted(
+                action: "cancel",
+                success: false
+            )
+            return false
+        }
+
+        logger.debug("❌ [LIVE_ACTIVITY] direct native cancel")
+        cancelRecording { [weak self] result in
+            guard let self = self else { return }
+            let success = (result as? Bool) == true
+            self.sendLiveActivityControlCompleted(
+                action: "cancel",
+                success: success
+            )
+        }
+        return true
     }
 
     func getRecordingStatus(result: @escaping FlutterResult) {

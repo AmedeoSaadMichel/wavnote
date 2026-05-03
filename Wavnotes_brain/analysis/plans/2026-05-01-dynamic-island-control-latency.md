@@ -318,6 +318,42 @@ L'obiettivo realistico non è renderli identici a un bottone Flutter foreground,
 - esecuzione nativa più diretta possibile;
 - riallineamento Flutter affidabile.
 
+## Implementato il 2026-05-01
+
+Prima tranche applicata su `pause/resume`:
+
+- `LiveActivityIntent` ora chiama `AudioEnginePlugin.handleLiveActivityControl(action:)`.
+- `pause` e `resume` vengono eseguiti direttamente nel plugin Swift, senza fare prima il giro `EventChannel → Flutter → MethodChannel`.
+- `stop/cancel` restano sul percorso precedente, perché toccano salvataggio e lista.
+- Swift invia a Dart un evento `liveActivityControlCompleted` con `action`, `success` e `durationMs`.
+- Dart distingue `RecordingExternalControlEvent.requested` da `RecordingExternalControlEvent.completed`.
+- Il BLoC non richiama più il use case quando riceve `pause/resume` già completati dal nativo.
+- Lo stato `RecordingPaused` viene emesso prima della preview; `_assemblePreviewFile` aggiorna `previewFilePath` dopo.
+
+Verifiche:
+
+- `flutter build ios --debug --no-codesign` passa.
+- `dart analyze` non mostra errori bloccanti nuovi, ma resta fallito per 45 warning/info preesistenti nel progetto.
+
+Prossima verifica manuale:
+
+- tap `PAUSE` dalla Dynamic Island su device/simulatore;
+- confermare che il log salti il percorso `liveActivityControl requested → PauseRecordingUseCase`;
+- confermare che il badge `PAUSED` e la pausa audio arrivino più rapidamente.
+
+## Correzione review 2026-05-01
+
+Applicati i fix ai due finding P1:
+
+- `AudioEngineService` aggiorna i flag locali `_isRecording` / `_isRecordingPaused` quando riceve `liveActivityControlCompleted`.
+- `syncNativeRecordingStatus()` usa `getRecordingStatus()` per rilevare divergenze `paused/resumed` e riemettere un evento completed verso il BLoC se l'evento originale è stato perso mentre Flutter era sospeso.
+- Il reconcile passa dallo stream esistente di `AudioEngineService`, senza aggiungere un secondo controller nel coordinator.
+
+Verifiche:
+
+- `dart analyze`: nessun errore introdotto; restano 45 warning/info preesistenti.
+- `flutter build ios --debug --no-codesign`: passa.
+
 ## Link
 
 - [[analysis/plans/2026-04-28-live-activity-dynamic-island]]

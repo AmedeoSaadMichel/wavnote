@@ -55,6 +55,41 @@ class ResumeRecording extends RecordingEvent {
   const ResumeRecording();
 }
 
+class ExternalRecordingPaused extends RecordingEvent {
+  final Duration? nativeDuration;
+
+  const ExternalRecordingPaused({this.nativeDuration});
+
+  @override
+  List<Object?> get props => [nativeDuration];
+}
+
+class ExternalRecordingResumed extends RecordingEvent {
+  final Duration? nativeDuration;
+
+  const ExternalRecordingResumed({this.nativeDuration});
+
+  @override
+  List<Object?> get props => [nativeDuration];
+}
+
+class ExternalRecordingStopped extends RecordingEvent {
+  final String path;
+  final Duration nativeDuration;
+
+  const ExternalRecordingStopped({
+    required this.path,
+    required this.nativeDuration,
+  });
+
+  @override
+  List<Object?> get props => [path, nativeDuration];
+}
+
+class ExternalRecordingCancelled extends RecordingEvent {
+  const ExternalRecordingCancelled();
+}
+
 /// Event to resume recording with auto-stop of preview if playing.
 /// Used by RecordPupilButton when user taps resume during preview playback.
 class ResumeWithAutoStop extends RecordingEvent {
@@ -83,6 +118,16 @@ class UpdateRecordingAmplitude extends RecordingEvent {
 
   @override
   List<Object> get props => [amplitude];
+}
+
+/// Event to append native 100ms waveform buckets.
+class UpdateRecordingWaveformBuckets extends RecordingEvent {
+  final RecordingWaveformBucketBatch batch;
+
+  const UpdateRecordingWaveformBuckets(this.batch);
+
+  @override
+  List<Object> get props => [batch];
 }
 
 /// Event to update recording duration

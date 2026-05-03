@@ -7,7 +7,7 @@ _Aggiorna a fine sessione se hai toccato una feature._
 |---------|------------|-------|
 | Registrazione audio (start/stop/pause/resume) | `services/audio/audio_service_coordinator.dart` + `domain/usecases/recording/` | ✅ Completato |
 | Registrazione audio in background | `AudioEnginePlugin.swift` + `AudioEngineService` + `RecordingLifecycleService` | 🚧 Prima tranche iOS implementata, test device richiesto |
-| Live Activity / Dynamic Island registrazione | `WavNoteLiveActivityExtension` + `WavNoteLiveActivityController.swift` | 🚧 Prima tranche visuale implementata, test device richiesto |
+| Live Activity / Dynamic Island registrazione | `WavNoteLiveActivityExtension` + `WavNoteLiveActivityController.swift` | 🚧 UI responsive + waveform audio-driven implementate, test device richiesto |
 | Motore nativo AVAudioEngine (iOS/macOS) | `services/audio/audio_engine_service.dart` | ✅ Completato (fix flusso dati ampiezza) |
 | Fallback package `record` (non iOS) | `services/audio/audio_recorder_service.dart` | ✅ Presente (non attivo su iOS) |
 | Overdubbing / seek-and-overwrite | `domain/usecases/recording/overwrite_recording_usecase.dart` | ✅ Completato |
@@ -21,6 +21,7 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | Feature                                  | File chiave                                               | Stato                        |
 | ---------------------------------------- | --------------------------------------------------------- | ---------------------------- |
 | Waveform live durante registrazione      | `presentation/widgets/recording/custom_waveform/`         | ✅ Completato (fix flusso)   |
+| Waveform Live Activity / Dynamic Island  | `WavNoteLiveActivityWidget.swift` + `WavNoteRecordingAttributes.swift` | 🚧 Audio-driven implementata, test device richiesto |
 | Waveform playback (audio_waveforms)      | `presentation/widgets/recording/waveform_widget.dart`     | ✅ Completato                 |
 | Waveform a colori per segmenti overwrite | `recorder_wave_painter.dart` (_kSegmentPalette)           | ✅ Completato                 |
 | Waveform fullscreen                      | `presentation/widgets/recording/fullscreen_waveform.dart' | ✅ Completato                 |

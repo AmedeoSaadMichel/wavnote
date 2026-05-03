@@ -10,6 +10,7 @@ import 'package:path/path.dart' as path;
 import '../../../core/utils/app_file_utils.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/entities/recording_external_control_action.dart';
+import '../../../domain/entities/recording_waveform_bucket_batch.dart';
 import '../../../domain/repositories/i_audio_recording_repository.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../core/enums/audio_format.dart';
@@ -48,8 +49,9 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final FolderBloc? _folderBloc;
 
   StreamSubscription<double>? _amplitudeSubscription;
+  StreamSubscription<RecordingWaveformBucketBatch>? _waveformBucketSubscription;
   StreamSubscription<Duration>? _durationSubscription;
-  StreamSubscription<RecordingExternalControlAction>?
+  StreamSubscription<RecordingExternalControlEvent>?
   _externalControlSubscription;
 
   RecordingBloc({
@@ -93,6 +95,10 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<StopRecording>(_onStopRecording);
     on<PauseRecording>(_onPauseRecording);
     on<ResumeRecording>(_onResumeRecording);
+    on<ExternalRecordingPaused>(_onExternalRecordingPaused);
+    on<ExternalRecordingResumed>(_onExternalRecordingResumed);
+    on<ExternalRecordingStopped>(_onExternalRecordingStopped);
+    on<ExternalRecordingCancelled>(_onExternalRecordingCancelled);
     on<ResumeWithAutoStop>(_onResumeWithAutoStop);
     on<CancelRecording>(_onCancelRecording);
     on<StartOverwrite>(_onStartOverwrite);
@@ -101,6 +107,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<StopRecordingPreview>(_onStopRecordingPreview);
 
     on<UpdateRecordingAmplitude>(_onUpdateRecordingAmplitude);
+    on<UpdateRecordingWaveformBuckets>(_onUpdateRecordingWaveformBuckets);
     on<UpdateRecordingDuration>(_onUpdateRecordingDuration);
 
     on<CheckRecordingPermissions>(_onCheckRecordingPermissions);
@@ -134,6 +141,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   @override
   Future<void> close() async {
     await _amplitudeSubscription?.cancel();
+    await _waveformBucketSubscription?.cancel();
     await _durationSubscription?.cancel();
     await _externalControlSubscription?.cancel();
 
@@ -157,9 +165,37 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     }
   }
 
-  void _onExternalControlAction(RecordingExternalControlAction action) {
+  void _onExternalControlAction(RecordingExternalControlEvent event) {
     if (isClosed) return;
-    switch (action) {
+    if (event.isCompleted) {
+      if (!event.success) return;
+      switch (event.action) {
+        case RecordingExternalControlAction.pause:
+          if (state.canPauseRecording) {
+            add(ExternalRecordingPaused(nativeDuration: event.duration));
+          }
+        case RecordingExternalControlAction.resume:
+          if (state.canResumeRecording) {
+            add(ExternalRecordingResumed(nativeDuration: event.duration));
+          }
+        case RecordingExternalControlAction.stop:
+          if (state.canStopRecording && event.path != null) {
+            add(
+              ExternalRecordingStopped(
+                path: event.path!,
+                nativeDuration: event.duration ?? Duration.zero,
+              ),
+            );
+          }
+        case RecordingExternalControlAction.cancel:
+          if (state is RecordingInProgress || state is RecordingPaused) {
+            add(const ExternalRecordingCancelled());
+          }
+      }
+      return;
+    }
+
+    switch (event.action) {
       case RecordingExternalControlAction.pause:
         if (state.canPauseRecording) add(const PauseRecording());
       case RecordingExternalControlAction.resume:
@@ -181,25 +217,54 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     if (state is RecordingInProgress) {
       debugPrint('🔍 BLoC received amplitude: ${event.amplitude}');
       final s = state as RecordingInProgress;
-      final waveformSamples = List<double>.of(s.waveformAmplitudeSamples)
-        ..add(event.amplitude);
-      if (waveformSamples.length > _maxWaveformAmplitudeSamples) {
-        final overflow = waveformSamples.length - _maxWaveformAmplitudeSamples;
-        waveformSamples.removeRange(0, overflow);
-      }
-      final nextSampleCount = s.waveformAmplitudeSampleCount + 1;
-      if (nextSampleCount % 25 == 0) {
-        debugPrint(
-          '🌊 BLoC waveform buffer count=$nextSampleCount '
-          'stored=${waveformSamples.length} '
-          'amp=${event.amplitude.toStringAsFixed(3)}',
-        );
-      }
+      emit(s.copyWith(amplitude: event.amplitude));
+    }
+  }
+
+  void _onUpdateRecordingWaveformBuckets(
+    UpdateRecordingWaveformBuckets event,
+    Emitter<RecordingState> emit,
+  ) {
+    final current = state;
+    if (current is! RecordingInProgress && current is! RecordingPaused) return;
+
+    final existingSamples = current is RecordingInProgress
+        ? current.waveformAmplitudeSamples
+        : (current as RecordingPaused).waveformAmplitudeSamples;
+    final existingCount = current is RecordingInProgress
+        ? current.waveformAmplitudeSampleCount
+        : (current as RecordingPaused).waveformAmplitudeSampleCount;
+
+    if (event.batch.totalCount <= existingCount) return;
+
+    final waveformSamples = List<double>.of(existingSamples)
+      ..addAll(event.batch.samples);
+    if (waveformSamples.length > _maxWaveformAmplitudeSamples) {
+      final overflow = waveformSamples.length - _maxWaveformAmplitudeSamples;
+      waveformSamples.removeRange(0, overflow);
+    }
+
+    if (event.batch.totalCount % 25 == 0 || event.batch.samples.length > 2) {
+      debugPrint(
+        '🌊 BLoC waveform buckets count=${event.batch.totalCount} '
+        'stored=${waveformSamples.length} '
+        'batch=${event.batch.samples.length} '
+        'start=${event.batch.startIndex}',
+      );
+    }
+
+    if (current is RecordingInProgress) {
       emit(
-        s.copyWith(
-          amplitude: event.amplitude,
+        current.copyWith(
           waveformAmplitudeSamples: waveformSamples,
-          waveformAmplitudeSampleCount: nextSampleCount,
+          waveformAmplitudeSampleCount: event.batch.totalCount,
+        ),
+      );
+    } else if (current is RecordingPaused) {
+      emit(
+        current.copyWith(
+          waveformAmplitudeSamples: waveformSamples,
+          waveformAmplitudeSampleCount: event.batch.totalCount,
         ),
       );
     }
@@ -355,13 +420,23 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
 
   void _startAmplitudeUpdates() {
     _amplitudeSubscription?.cancel();
+    _waveformBucketSubscription?.cancel();
     _amplitudeSubscription = _audioService.getRecordingAmplitudeStream().listen(
       (amplitude) => add(UpdateRecordingAmplitude(amplitude)),
       onError: (e) => debugPrint('❌ Amplitude stream error: $e'),
     );
+    _waveformBucketSubscription = _audioService
+        .getRecordingWaveformBucketStream()
+        .listen(
+          (batch) => add(UpdateRecordingWaveformBuckets(batch)),
+          onError: (e) => debugPrint('❌ Waveform bucket stream error: $e'),
+        );
   }
 
-  void _stopAmplitudeUpdates() => _amplitudeSubscription?.cancel();
+  void _stopAmplitudeUpdates() {
+    _amplitudeSubscription?.cancel();
+    _waveformBucketSubscription?.cancel();
+  }
 
   void _startDurationUpdates() {
     _durationSubscription?.cancel();

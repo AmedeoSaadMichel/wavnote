@@ -10,19 +10,25 @@ public struct WavNoteRecordingAttributes: ActivityAttributes {
         public var isPaused: Bool
         public var title: String
         public var amplitudeSeed: Double
+        public var amplitudeSamples: [Double]
+        public var waveformRevision: Int
 
         public init(
             startedAt: Date,
             elapsedSeconds: Int,
             isPaused: Bool,
             title: String,
-            amplitudeSeed: Double
+            amplitudeSeed: Double,
+            amplitudeSamples: [Double] = [],
+            waveformRevision: Int = 0
         ) {
             self.startedAt = startedAt
             self.elapsedSeconds = elapsedSeconds
             self.isPaused = isPaused
             self.title = title
             self.amplitudeSeed = amplitudeSeed
+            self.amplitudeSamples = amplitudeSamples
+            self.waveformRevision = waveformRevision
         }
     }
 

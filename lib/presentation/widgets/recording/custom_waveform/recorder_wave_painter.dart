@@ -127,14 +127,15 @@ class CustomRecorderWavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paintStartTimestamp = DateTime.now().millisecondsSinceEpoch;
-    final paintDiagnostics = _calculatePaintDiagnostics(size);
+    final visibleRange = _visibleIndexRange(size);
+    final paintDiagnostics = _calculatePaintDiagnostics(size, visibleRange);
 
     if (shouldClearLabels) {
       _labels.clear();
       pushBack();
       revertClearLabelCall();
     }
-    for (var i = 0; i < waveData.length; i++) {
+    for (var i = visibleRange.start; i <= visibleRange.end; i++) {
       /// wave gradient
       if (gradient != null) _waveGradient();
 
@@ -174,7 +175,40 @@ class CustomRecorderWavePainter extends CustomPainter {
     }
   }
 
-  _PaintDiagnostics _calculatePaintDiagnostics(Size size) {
+  _VisibleIndexRange _visibleIndexRange(Size size) {
+    if (waveData.isEmpty) {
+      return const _VisibleIndexRange.empty();
+    }
+
+    final halfWidth = size.width * 0.5;
+    final first =
+        ((totalBackDistance.dx - dragOffset.dx + initialPosition - halfWidth) /
+                spacing)
+            .floor() -
+        1;
+    final last =
+        ((totalBackDistance.dx -
+                    dragOffset.dx +
+                    initialPosition +
+                    (halfWidth * 2)) /
+                spacing)
+            .ceil() +
+        1;
+
+    return _VisibleIndexRange(
+      start: first.clamp(0, waveData.length - 1),
+      end: last.clamp(0, waveData.length - 1),
+    );
+  }
+
+  _PaintDiagnostics _calculatePaintDiagnostics(
+    Size size,
+    _VisibleIndexRange visibleRange,
+  ) {
+    if (visibleRange.isEmpty) {
+      return const _PaintDiagnostics.empty();
+    }
+
     final halfWidth = size.width * 0.5;
     var firstVisibleIndex = -1;
     var lastVisibleIndex = -1;
@@ -184,7 +218,7 @@ class CustomRecorderWavePainter extends CustomPainter {
     var minVisibleDx = double.infinity;
     var maxVisibleDx = double.negativeInfinity;
 
-    for (var i = 0; i < waveData.length; i++) {
+    for (var i = visibleRange.start; i <= visibleRange.end; i++) {
       final dx =
           -totalBackDistance.dx +
           dragOffset.dx +
@@ -312,7 +346,10 @@ class CustomRecorderWavePainter extends CustomPainter {
     final height = size.height;
     final dx =
         -totalBackDistance.dx + dragOffset.dx + (spacing * i) - initialPosition;
-    final scaledWaveHeight = waveData[i] * scaleFactor;
+    final scaledWaveHeight = (waveData[i] * scaleFactor).clamp(
+      0.5,
+      double.infinity,
+    );
     final upperDy = height - (showTop ? scaledWaveHeight : 0) - bottomPadding;
     final lowerDy =
         height + (showBottom ? scaledWaveHeight : 0) - bottomPadding;
@@ -363,6 +400,17 @@ class CustomRecorderWavePainter extends CustomPainter {
   }
 }
 
+class _VisibleIndexRange {
+  final int start;
+  final int end;
+
+  const _VisibleIndexRange({required this.start, required this.end});
+
+  const _VisibleIndexRange.empty() : start = 0, end = -1;
+
+  bool get isEmpty => end < start;
+}
+
 class _PaintDiagnostics {
   final int firstVisibleIndex;
   final int lastVisibleIndex;
@@ -381,4 +429,13 @@ class _PaintDiagnostics {
     required this.minVisibleDx,
     required this.maxVisibleDx,
   });
+
+  const _PaintDiagnostics.empty()
+    : firstVisibleIndex = -1,
+      lastVisibleIndex = -1,
+      visibleCount = 0,
+      minVisibleAmplitude = 0.0,
+      maxVisibleAmplitude = 0.0,
+      minVisibleDx = 0.0,
+      maxVisibleDx = 0.0;
 }

@@ -7,57 +7,6 @@ import AVFoundation
 import Logging
 import UIKit
 
-// Event Channel per notificare Dart del completamento del playback
-class PlaybackStreamHandler: NSObject, FlutterStreamHandler {
-    var eventSink: FlutterEventSink?
-    let logger = Logger(label: "com.wavnote.audio_engine.stream_handler")
-
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        self.eventSink = events
-        return nil
-    }
-
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
-        return nil
-    }
-
-    func sendPlaybackComplete() {
-        logger.info("🔊 [NATIVE] -> Flutter: sendPlaybackComplete")
-        eventSink?(["event": "playbackCompleted"])
-    }
-}
-
-// Event Channel per i tick di clock (recording + playback position)
-class ClockStreamHandler: NSObject, FlutterStreamHandler {
-    var eventSink: FlutterEventSink?
-
-    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        self.eventSink = events
-        return nil
-    }
-
-    func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        self.eventSink = nil
-        return nil
-    }
-
-    /// Emette un tick di durata registrazione (da installTap, throttled a 100ms).
-    func sendRecordingTick(positionMs: Int, amplitude: Double) {
-        eventSink?(["type": "recordingTick", "positionMs": positionMs, "amplitude": amplitude])
-    }
-
-    /// Emette un tick di posizione playback (da DispatchSourceTimer, 100ms).
-    func sendPlaybackTick(positionMs: Int, durationMs: Int) {
-        eventSink?(["type": "playbackTick", "positionMs": positionMs, "durationMs": durationMs])
-    }
-
-    /// Inoltra a Flutter i comandi provenienti dalla Live Activity interattiva.
-    func sendLiveActivityControl(action: String) {
-        eventSink?(["type": "liveActivityControl", "action": action])
-    }
-}
-
 // Estensione per aggiungere un logger condiviso
 extension AudioEnginePlugin {
     static var sharedLogger: Logger = {
@@ -91,6 +40,21 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     /// Offset visuale solo per Live Activity, usato da overdub/seek-and-resume.
     /// Non entra nel conteggio dei frame salvati sul file.
     var liveActivityElapsedOffsetMs: Int = 0
+    /// Campioni ampiezza reali compattati per la Live Activity.
+    var liveActivityAmplitudeSamples: [Double] = []
+    var lastLiveActivitySampleTime: CFTimeInterval = 0
+    var liveActivitySampleAppendCount = 0
+    var liveActivityUpdateRequestCount = 0
+    var lastLiveActivityDebugLogTime: CFTimeInterval = 0
+    var pendingLiveActivityControlCompleted: [String: Any]?
+    /// Bucket waveform interni: una barra ogni ~100ms di frame audio reali.
+    var waveformBucketFrameCount: Int64 = 0
+    var waveformBucketPeak: Double = 0
+    var waveformBucketTotalCount = 0
+    var pendingWaveformBucketSamples: [Double] = []
+    static let liveActivityUpdateInterval: CFTimeInterval = 1.0
+    static let liveActivitySampleInterval: CFTimeInterval = 0.035
+    static let maxLiveActivityAmplitudeSamples = 24
 
     // MARK: - Clock state (playback)
     /// Timer nativo che emette playback tick ogni 100ms.
@@ -164,8 +128,50 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         clockEventChannel.setStreamHandler(instance.clockStreamHandler)
     }
 
-    func sendLiveActivityControl(action: String) {
-        clockStreamHandler.sendLiveActivityControl(action: action)
+    @MainActor
+    static func dispatchLiveActivityControl(action: String) async -> Bool {
+        guard let instance = activeInstance else { return false }
+        return await instance.handleLiveActivityControl(action: action)
+    }
+
+    func sendLiveActivityControlCompleted(
+        action: String,
+        success: Bool,
+        durationMs: Int? = nil,
+        path: String? = nil
+    ) {
+        var payload: [String: Any] = [
+            "type": "liveActivityControlCompleted",
+            "action": action,
+            "success": success
+        ]
+        if let durationMs {
+            payload["durationMs"] = durationMs
+        }
+        if let path {
+            payload["path"] = path
+        }
+        pendingLiveActivityControlCompleted = payload
+        DispatchQueue.main.async { [weak self] in
+            self?.clockStreamHandler.eventSink?(payload)
+        }
+    }
+
+    @discardableResult
+    func handleLiveActivityControl(action: String) async -> Bool {
+        switch action {
+        case "pause":
+            return pauseRecordingFromLiveActivity()
+        case "resume":
+            return await resumeRecordingFromLiveActivity()
+        case "stop":
+            return await stopRecordingFromLiveActivity()
+        case "cancel":
+            return cancelRecordingFromLiveActivity()
+        default:
+            logger.error("🎛️ [LIVE_ACTIVITY] Unsupported control action: \(action)")
+            return false
+        }
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -244,6 +250,14 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             result(currentAmplitude)
         case "getRecordingStatus":
             getRecordingStatus(result: result)
+        case "getPendingLiveActivityControlCompleted":
+            result(pendingLiveActivityControlCompleted)
+        case "ackLiveActivityControlCompleted":
+            let action = (call.arguments as? [String: Any])?["action"] as? String
+            if action == nil || pendingLiveActivityControlCompleted?["action"] as? String == action {
+                pendingLiveActivityControlCompleted = nil
+            }
+            result(true)
         case "isRecording":
             result(isRecording)
         case "isPaused":
@@ -677,15 +691,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     @objc private func handleDidEnterBackground(_ notification: Notification) {
         let engineRunning = audioEngine?.isRunning ?? false
         self.logger.info("🌙 [NATIVE] App in background — isRecording=\(isRecording) isPaused=\(isPaused) engineRunning=\(engineRunning) frames=\(framesWrittenThisSegment)")
-        if isRecording && !isPaused {
+        if isRecording {
             return
-        }
-        if isPaused {
-            do {
-                try configureAudioSession(preferredSampleRate: Int(outputSampleRate))
-            } catch {
-                self.logger.error("🌙 [NATIVE] Background session configure ERROR: \(error)")
-            }
         }
     }
 

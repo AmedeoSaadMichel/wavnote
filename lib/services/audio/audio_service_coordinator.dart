@@ -22,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/entities/recording_external_control_action.dart';
+import '../../domain/entities/recording_waveform_bucket_batch.dart';
 import '../../domain/entities/audio_types.dart';
 import '../../core/enums/audio_format.dart';
 import 'audio_recorder_service.dart';
@@ -62,10 +63,13 @@ class AudioServiceCoordinator {
   bool _isInitialized = false;
 
   StreamController<double>? _amplitudeController;
+  StreamController<RecordingWaveformBucketBatch>? _waveformBucketController;
   StreamController<Duration>? _positionController;
   StreamController<ClockTick>? _clockController;
 
   StreamSubscription<RecordingTick>? _engineAmplitudeSubscription;
+  StreamSubscription<RecordingWaveformBucketBatch>?
+  _engineWaveformBucketSubscription;
   StreamSubscription<double>? _recordingAmplitudeSubscription;
   StreamSubscription<Duration>? _recordingPositionSubscription;
 
@@ -82,6 +86,8 @@ class AudioServiceCoordinator {
     if (_isInitialized) return true;
     try {
       _amplitudeController = StreamController<double>.broadcast();
+      _waveformBucketController =
+          StreamController<RecordingWaveformBucketBatch>.broadcast();
       _positionController = StreamController<Duration>.broadcast();
       _clockController = StreamController<ClockTick>.broadcast();
 
@@ -113,6 +119,7 @@ class AudioServiceCoordinator {
   Future<void> dispose() async {
     try {
       _engineAmplitudeSubscription?.cancel();
+      _engineWaveformBucketSubscription?.cancel();
 
       if (_useNativeEngine) {
         await _engineService?.dispose();
@@ -121,6 +128,7 @@ class AudioServiceCoordinator {
       }
 
       await _amplitudeController?.close();
+      await _waveformBucketController?.close();
       await _positionController?.close();
       await _clockController?.close();
       _clockController = null;
@@ -300,6 +308,17 @@ class AudioServiceCoordinator {
     if (!_useNativeEngine || _engineService == null) return;
 
     final status = await _engineService!.getRecordingStatus();
+    final externalControlEvent = _engineService!.syncRecordingStatusFromNative(
+      status,
+    );
+    final pendingControlEvent = await _engineService!
+        .getPendingLiveActivityControlCompleted();
+    if (pendingControlEvent != null) {
+      _engineService!.emitExternalControlEvent(pendingControlEvent);
+      _engineService!.ackLiveActivityControlCompleted(
+        pendingControlEvent.action,
+      );
+    }
     if (!status.isRecording && !_iosNativeActive) return;
 
     _iosNativeActive = status.isRecording;
@@ -324,12 +343,18 @@ class AudioServiceCoordinator {
     if (status.isPaused) {
       _iosPauseStartTime ??= DateTime.now();
       _amplitudeController?.add(0.0);
+      if (externalControlEvent != null) {
+        _engineService!.emitExternalControlEvent(externalControlEvent);
+      }
       return;
     }
 
     _iosPauseStartTime = null;
     if (_engineAmplitudeSubscription == null) {
       _setupEngineAmplitudeStream();
+    }
+    if (externalControlEvent != null) {
+      _engineService!.emitExternalControlEvent(externalControlEvent);
     }
   }
 
@@ -339,11 +364,14 @@ class AudioServiceCoordinator {
   Stream<double> getRecordingAmplitudeStream() =>
       _amplitudeController?.stream ?? const Stream.empty();
 
+  Stream<RecordingWaveformBucketBatch> getRecordingWaveformBucketStream() =>
+      _waveformBucketController?.stream ?? const Stream.empty();
+
   Stream<double>? get amplitudeStream => _amplitudeController?.stream;
 
   Stream<Duration>? get durationStream => _positionController?.stream;
 
-  Stream<RecordingExternalControlAction> get externalControlStream =>
+  Stream<RecordingExternalControlEvent> get externalControlStream =>
       _engineService?.externalControlStream ?? const Stream.empty();
 
   Future<double> getCurrentAmplitude() async {
@@ -485,6 +513,7 @@ class AudioServiceCoordinator {
 
   void _setupEngineAmplitudeStream() {
     _engineAmplitudeSubscription?.cancel();
+    _engineWaveformBucketSubscription?.cancel();
     _engineAmplitudeSubscription = _engineService?.recordingTickStream.listen((
       tick,
     ) {
@@ -494,11 +523,15 @@ class AudioServiceCoordinator {
         RecordingClockTick(position: tick.position, amplitude: tick.amplitude),
       );
     });
+    _engineWaveformBucketSubscription = _engineService?.waveformBucketStream
+        .listen((batch) => _waveformBucketController?.add(batch));
   }
 
   void _cleanupEngineAmplitudeStream() {
     _engineAmplitudeSubscription?.cancel();
+    _engineWaveformBucketSubscription?.cancel();
     _engineAmplitudeSubscription = null;
+    _engineWaveformBucketSubscription = null;
     _amplitudeController?.add(0.0);
   }
 

@@ -11,7 +11,7 @@ struct WavNotePauseRecordingIntent: LiveActivityIntent {
     static var description = IntentDescription("Pause the active Wavnote recording.")
 
     func perform() async throws -> some IntentResult {
-        await WavNoteRecordingControlDispatcher.dispatch("pause")
+        try await WavNoteRecordingControlDispatcher.dispatch("pause")
         return .result()
     }
 }
@@ -22,7 +22,7 @@ struct WavNoteResumeRecordingIntent: LiveActivityIntent {
     static var description = IntentDescription("Resume the paused Wavnote recording.")
 
     func perform() async throws -> some IntentResult {
-        await WavNoteRecordingControlDispatcher.dispatch("resume")
+        try await WavNoteRecordingControlDispatcher.dispatch("resume")
         return .result()
     }
 }
@@ -33,7 +33,7 @@ struct WavNoteStopRecordingIntent: LiveActivityIntent {
     static var description = IntentDescription("Stop and save the active Wavnote recording.")
 
     func perform() async throws -> some IntentResult {
-        await WavNoteRecordingControlDispatcher.dispatch("stop")
+        try await WavNoteRecordingControlDispatcher.dispatch("stop")
         return .result()
     }
 }
@@ -44,17 +44,31 @@ struct WavNoteCancelRecordingIntent: LiveActivityIntent {
     static var description = IntentDescription("Cancel the active Wavnote recording.")
 
     func perform() async throws -> some IntentResult {
-        await WavNoteRecordingControlDispatcher.dispatch("cancel")
+        try await WavNoteRecordingControlDispatcher.dispatch("cancel")
         return .result()
     }
 }
 
 private enum WavNoteRecordingControlDispatcher {
-    static func dispatch(_ action: String) async {
+    static func dispatch(_ action: String) async throws {
         #if WAVNOTE_APP
-        await MainActor.run {
-            AudioEnginePlugin.activeInstance?.sendLiveActivityControl(action: action)
+        let dispatched = await AudioEnginePlugin.dispatchLiveActivityControl(action: action)
+        if !dispatched {
+            throw WavNoteRecordingControlError.dispatchFailed(action)
         }
+        #else
+        throw WavNoteRecordingControlError.dispatchFailed(action)
         #endif
+    }
+}
+
+private enum WavNoteRecordingControlError: LocalizedError {
+    case dispatchFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .dispatchFailed(let action):
+            "WavNote could not dispatch the \(action) recording command."
+        }
     }
 }

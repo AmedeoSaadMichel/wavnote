@@ -278,7 +278,6 @@ extension _RecordingBlocLifecycle on RecordingBloc {
   ) async {
     if (state is! RecordingInProgress) return;
     final s = state as RecordingInProgress;
-    _stopAmplitudeUpdates();
     _stopDurationUpdates();
 
     final result = await _pauseRecordingUseCase.executePause();
@@ -291,11 +290,39 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       return;
     }
 
+    await _emitPausedStateFromInProgress(
+      source: s,
+      duration: nativeDuration,
+      emit: emit,
+    );
+    _stopAmplitudeUpdates();
+  }
+
+  Future<void> _onExternalRecordingPaused(
+    ExternalRecordingPaused event,
+    Emitter<RecordingState> emit,
+  ) async {
+    if (state is! RecordingInProgress) return;
+    final s = state as RecordingInProgress;
+    _stopDurationUpdates();
+    await _emitPausedStateFromInProgress(
+      source: s,
+      duration: event.nativeDuration ?? s.duration,
+      emit: emit,
+    );
+    _stopAmplitudeUpdates();
+  }
+
+  Future<void> _emitPausedStateFromInProgress({
+    required RecordingInProgress source,
+    required Duration duration,
+    required Emitter<RecordingState> emit,
+  }) async {
     // Calcolo seekBarIndex per la source of truth
     int pausedSeekBarIndex = 0;
-    final int segmentDurationMs = nativeDuration.inMilliseconds;
+    final int segmentDurationMs = duration.inMilliseconds;
 
-    if (s.seekBasePath == null) {
+    if (source.seekBasePath == null) {
       final bars = (segmentDurationMs / 100).floor();
       pausedSeekBarIndex = bars > 0 ? bars - 1 : 0;
       debugPrint(
@@ -305,13 +332,13 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       int baseDurationMs = 0;
       try {
         final baseDuration = await _audioService.getAudioDuration(
-          await AppFileUtils.resolve(s.seekBasePath!),
+          await AppFileUtils.resolve(source.seekBasePath!),
         );
         baseDurationMs = baseDuration.inMilliseconds;
       } catch (_) {
         // Fallback se il file base non è leggibile
       }
-      final overwriteStartMs = s.overwriteStartTime?.inMilliseconds ?? 0;
+      final overwriteStartMs = source.overwriteStartTime?.inMilliseconds ?? 0;
       final totalDurationMs = [
         baseDurationMs,
         overwriteStartMs + segmentDurationMs,
@@ -325,34 +352,38 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     }
 
     final pausedState = RecordingPaused(
-      filePath: s.filePath,
-      folderId: s.folderId,
-      folderName: s.folderName,
-      recordings: s.recordings,
-      title: s.title,
-      format: s.format,
-      sampleRate: s.sampleRate,
-      bitRate: s.bitRate,
-      duration: nativeDuration, // <-- Usa la durata nativa del segmento
-      startTime: s.startTime,
-      seekBasePath: s.seekBasePath,
-      originalFilePathForOverwrite: s.originalFilePathForOverwrite,
-      overwriteStartTime: s.overwriteStartTime,
-      truncatedWaveData: s.truncatedWaveData,
-      waveformAmplitudeSamples: s.waveformAmplitudeSamples,
-      waveformAmplitudeSampleCount: s.waveformAmplitudeSampleCount,
+      filePath: source.filePath,
+      folderId: source.folderId,
+      folderName: source.folderName,
+      recordings: source.recordings,
+      title: source.title,
+      format: source.format,
+      sampleRate: source.sampleRate,
+      bitRate: source.bitRate,
+      duration: duration,
+      startTime: source.startTime,
+      seekBasePath: source.seekBasePath,
+      originalFilePathForOverwrite: source.originalFilePathForOverwrite,
+      overwriteStartTime: source.overwriteStartTime,
+      truncatedWaveData: source.truncatedWaveData,
+      waveformAmplitudeSamples: source.waveformAmplitudeSamples,
+      waveformAmplitudeSampleCount: source.waveformAmplitudeSampleCount,
       previewFilePath: null,
-      seekBarIndex: pausedSeekBarIndex, // <-- Passa l'indice calcolato
+      seekBarIndex: pausedSeekBarIndex,
     );
-
-    final previewPath = await _assemblePreviewFile(pausedState);
 
     if (emit.isDone) return;
 
     debugPrint(
       '⏸️ EMIT RecordingPaused durationMs=${pausedState.duration.inMilliseconds} seekBarIndex=${pausedState.seekBarIndex} seekBasePath=${pausedState.seekBasePath} overwriteStartMs=${pausedState.overwriteStartTime?.inMilliseconds}',
     );
-    emit(pausedState.copyWith(previewFilePath: previewPath));
+    emit(pausedState);
+
+    final previewPath = await _assemblePreviewFile(pausedState);
+    if (emit.isDone || state is! RecordingPaused) return;
+    final current = state as RecordingPaused;
+    if (current.filePath != pausedState.filePath) return;
+    emit(current.copyWith(previewFilePath: previewPath));
   }
 
   Future<void> _onResumeRecording(
@@ -397,6 +428,129 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     });
   }
 
+  Future<void> _onExternalRecordingResumed(
+    ExternalRecordingResumed event,
+    Emitter<RecordingState> emit,
+  ) async {
+    if (state is! RecordingPaused) return;
+    final s = state as RecordingPaused;
+
+    if (s.previewFilePath != null) {
+      try {
+        final absolutePreviewPath = await s.resolvedPreviewFilePath;
+        if (absolutePreviewPath != null) File(absolutePreviewPath).deleteSync();
+      } catch (_) {}
+    }
+
+    emit(
+      RecordingInProgress(
+        filePath: s.filePath,
+        folderId: s.folderId,
+        recordings: s.recordings,
+        folderName: s.folderName,
+        format: s.format,
+        sampleRate: s.sampleRate,
+        bitRate: s.bitRate,
+        duration: event.nativeDuration ?? s.duration,
+        amplitude: 0.0,
+        startTime: s.startTime,
+        title: s.title,
+        seekBasePath: s.seekBasePath,
+        originalFilePathForOverwrite: s.originalFilePathForOverwrite,
+        overwriteStartTime: s.overwriteStartTime,
+        truncatedWaveData: s.truncatedWaveData,
+        waveformAmplitudeSamples: s.waveformAmplitudeSamples,
+        waveformAmplitudeSampleCount: s.waveformAmplitudeSampleCount,
+      ),
+    );
+    _startAmplitudeUpdates();
+    _startDurationUpdates();
+  }
+
+  Future<void> _onExternalRecordingStopped(
+    ExternalRecordingStopped event,
+    Emitter<RecordingState> emit,
+  ) async {
+    if (state is! RecordingInProgress && state is! RecordingPaused) return;
+
+    final s = state;
+    final folderId = (s is RecordingInProgress)
+        ? s.folderId
+        : (s as RecordingPaused).folderId;
+    final format = (s is RecordingInProgress)
+        ? s.format
+        : (s as RecordingPaused).format;
+    final sampleRate = (s is RecordingInProgress)
+        ? s.sampleRate
+        : (s as RecordingPaused).sampleRate;
+    final recordings = (s is RecordingInProgress)
+        ? s.recordings
+        : (s as RecordingPaused).recordings;
+    final waveformData = (s is RecordingInProgress)
+        ? s.waveformAmplitudeSamples
+        : (s as RecordingPaused).waveformAmplitudeSamples;
+    final truncatedWaveData = (s is RecordingInProgress)
+        ? s.truncatedWaveData
+        : (s as RecordingPaused).truncatedWaveData;
+
+    await _deletePausedPreviewIfNeeded();
+    _stopAmplitudeUpdates();
+    _stopDurationUpdates();
+    await _audioService.syncNativeRecordingStatus();
+
+    emit(
+      RecordingStopping(
+        recordings: recordings,
+        truncatedWaveData: truncatedWaveData,
+      ),
+    );
+
+    final file = File(event.path);
+    if (!await file.exists()) {
+      emit(const RecordingError('Stopped recording file not found'));
+      return;
+    }
+
+    final duration = event.nativeDuration > Duration.zero
+        ? event.nativeDuration
+        : await _audioService.getAudioDuration(event.path);
+
+    final recordingEntity = RecordingEntity.create(
+      name: 'Recording',
+      filePath: event.path,
+      folderId: folderId ?? 'all_recordings',
+      format: format,
+      duration: duration,
+      fileSize: await file.length(),
+      sampleRate: sampleRate,
+    );
+
+    final result = await _stopRecordingUseCase.finalizeStoppedRecording(
+      recordingEntity,
+      waveformData: waveformData,
+      overrideDuration: duration,
+    );
+    result.fold((failure) => emit(RecordingError(failure.message)), (
+      recording,
+    ) {
+      emit(RecordingCompleted(recording: recording));
+      _refreshFolderCounts();
+    });
+  }
+
+  Future<void> _onExternalRecordingCancelled(
+    ExternalRecordingCancelled event,
+    Emitter<RecordingState> emit,
+  ) async {
+    if (state is! RecordingInProgress && state is! RecordingPaused) return;
+
+    await _deletePausedPreviewIfNeeded();
+    _stopAmplitudeUpdates();
+    _stopDurationUpdates();
+    await _audioService.syncNativeRecordingStatus();
+    emit(const RecordingCancelled());
+  }
+
   Future<void> _onCancelRecording(
     CancelRecording event,
     Emitter<RecordingState> emit,
@@ -405,19 +559,22 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       _stopAmplitudeUpdates();
       _stopDurationUpdates();
 
-      if (state is RecordingPaused) {
-        final pausedState = state as RecordingPaused;
-        final absolutePreviewPath = await pausedState.resolvedPreviewFilePath;
-        if (absolutePreviewPath != null) {
-          try {
-            File(absolutePreviewPath).deleteSync();
-          } catch (_) {}
-        }
-      }
+      await _deletePausedPreviewIfNeeded();
       await _audioService.cancelRecording();
       emit(const RecordingCancelled());
     } catch (e) {
       debugPrint('❌ Error cancelling recording: $e');
+    }
+  }
+
+  Future<void> _deletePausedPreviewIfNeeded() async {
+    if (state is! RecordingPaused) return;
+    final pausedState = state as RecordingPaused;
+    final absolutePreviewPath = await pausedState.resolvedPreviewFilePath;
+    if (absolutePreviewPath != null) {
+      try {
+        File(absolutePreviewPath).deleteSync();
+      } catch (_) {}
     }
   }
 
