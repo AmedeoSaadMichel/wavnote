@@ -111,11 +111,13 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
   String _seekLabel(int barIndex) {
     final waveMs = widget.waveData.length * 100;
     final elapsedMs = widget.elapsed.inMilliseconds;
-    final seekMs = widget.isRecording ? elapsedMs : barIndex * 100;
     // Usa il massimo tra la durata calcolata dalla waveform e quella dal BLoC.
     // Dopo la fine naturale del playback, elapsed contiene la durata del file
     // di preview completo (es. 14.9s) che supera waveData.length*100 (es. 9s).
     final totalMs = elapsedMs > waveMs ? elapsedMs : waveMs;
+    final seekMs = widget.isRecording
+        ? elapsedMs
+        : ((barIndex + 1) * 100).clamp(0, totalMs);
     String fmt(int ms) {
       final d = Duration(milliseconds: ms);
       final m = d.inMinutes.toString().padLeft(2, '0');

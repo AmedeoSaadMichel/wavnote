@@ -217,6 +217,10 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
       );
       print('🔄 Refreshing recordings list for folder: ${folder.id}');
       context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
+    } else if (state is RecordingCancelled) {
+      print('🚫 RecordingCancelled event received');
+      print('🔄 Reloading recordings list for folder: ${folder.id}');
+      context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
     } else if (state is RecordingLoaded) {
       final currentCount = state.recordings.length;
       if (_previousRecordingCount != null &&

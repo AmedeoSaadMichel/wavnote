@@ -20,12 +20,7 @@ struct WavNoteLiveActivityWidget: Widget {
                     TimerText(state: context.state, size: 13, color: WavNoteColors.pink)
                 }
             } compactTrailing: {
-                MiniWaveView(
-                    preferredBars: 14,
-                    height: 16,
-                    seed: context.state.amplitudeSeed,
-                    isPaused: context.state.isPaused
-                )
+                RecordingShortBadgeView(isPaused: context.state.isPaused)
                 .frame(width: 56)
             } minimal: {
                 RecDotView(size: 8)
@@ -41,9 +36,9 @@ private struct LockScreenActivityView: View {
     var body: some View {
         ZStack {
             WavNoteGradient()
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    AppIdentityView(uppercase: true)
+                    AppIdentityView(isPaused: state.isPaused, uppercase: true)
                     Spacer()
                     RecordingShortBadgeView(isPaused: state.isPaused)
                 }
@@ -51,22 +46,16 @@ private struct LockScreenActivityView: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(WavNoteColors.yellow)
                     .lineLimit(1)
-                    .padding(.top, 12)
-                TimerText(state: state, size: 28, color: .white)
-                    .padding(.top, 2)
-                Spacer(minLength: 0)
-                MiniWaveView(
-                    preferredBars: 96,
-                    height: 22,
-                    seed: state.amplitudeSeed,
-                    isPaused: state.isPaused
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .clipped()
+                    .padding(.top, 4)
+                TimerText(state: state, size: 26, color: .white)
+                VisualControlsView(isPaused: state.isPaused, compact: true)
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .frame(maxWidth: .infinity, minHeight: 158)
+        .frame(maxWidth: .infinity, minHeight: 174)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: Color.black.opacity(0.32), radius: 22, y: 14)
     }
@@ -77,11 +66,12 @@ private struct LockScreenActivityView: View {
 }
 
 private struct AppIdentityView: View {
+    let isPaused: Bool
     var uppercase: Bool = false
 
     var body: some View {
         HStack(spacing: 7) {
-            EyeGlyphView()
+            RecordPupilIndicatorView(isPaused: isPaused, size: 23)
             Text(uppercase ? "WAVNOTE" : "Wavnote")
                 .font(.system(size: 13, weight: .semibold))
                 .tracking(uppercase ? 0.4 : 0)
@@ -155,53 +145,6 @@ private struct TimerText: View {
     }
 }
 
-private struct MiniWaveView: View {
-    let preferredBars: Int
-    let height: CGFloat
-    let seed: Double
-    let isPaused: Bool
-
-    var body: some View {
-        if isPaused {
-            barsView(tick: seed * 8.0)
-        } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in
-                barsView(tick: timeline.date.timeIntervalSinceReferenceDate * 7.5 + seed * 2.0)
-            }
-        }
-    }
-
-    private func barsView(tick: Double) -> some View {
-        GeometryReader { geometry in
-            let barWidth: CGFloat = 2.4
-            let spacing: CGFloat = 2
-            let availableWidth = max(geometry.size.width, 1)
-            let fittedBars = Int((availableWidth + spacing) / (barWidth + spacing))
-            let barCount = max(1, min(preferredBars, fittedBars))
-
-            HStack(alignment: .center, spacing: spacing) {
-                ForEach(0..<barCount, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(WavNoteColors.yellow)
-                        .frame(width: barWidth, height: barHeight(index: index, tick: tick))
-                        .shadow(color: WavNoteColors.yellow.opacity(0.55), radius: 4)
-                        .opacity(isPaused ? 0.78 : 0.96)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: height, alignment: .leading)
-        }
-        .frame(height: height)
-    }
-
-    private func barHeight(index: Int, tick: Double) -> CGFloat {
-        if isPaused { return height * 0.42 }
-        let primary = sin(tick + Double(index) * 0.45)
-        let secondary = cos(tick * 0.6 + Double(index) * 0.2)
-        let value = abs(primary * secondary)
-        return height * (0.35 + 0.65 * value)
-    }
-}
-
 private struct RecDotView: View {
     var size: CGFloat = 9
 
@@ -213,95 +156,100 @@ private struct RecDotView: View {
     }
 }
 
-private struct EyeGlyphView: View {
+private struct RecordPupilIndicatorView: View {
+    let isPaused: Bool
+    var size: CGFloat = 30
+
     var body: some View {
         ZStack {
-            EyeShape()
+            Circle()
                 .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.95, blue: 0.55),
-                            WavNoteColors.yellow,
-                            Color(red: 0.78, green: 0.46, blue: 0.10)
-                        ],
-                        center: .topLeading,
-                        startRadius: 1,
-                        endRadius: 22
+                    LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.65, blue: 0.0), WavNoteColors.yellow],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .overlay(
-                    EyeShape()
-                        .stroke(Color(red: 0.36, green: 0.16, blue: 0.05), lineWidth: 1)
-                )
-                .frame(width: 23, height: 17)
-            Circle()
-                .fill(Color(red: 0.24, green: 0.10, blue: 0.05))
-                .frame(width: 9, height: 9)
+                .overlay(Circle().stroke(WavNoteColors.cyan, lineWidth: max(1.2, size * 0.06)))
+                .shadow(color: Color.black.opacity(0.20), radius: size * 0.10, y: size * 0.05)
             Circle()
                 .fill(WavNoteColors.ink)
-                .frame(width: 4, height: 4)
-            Circle()
-                .fill(.white)
-                .frame(width: 2, height: 2)
-                .offset(x: -2, y: -2)
+                .frame(width: size * (isPaused ? 0.28 : 0.65), height: size * (isPaused ? 0.28 : 0.65))
         }
-    }
-}
-
-private struct EyeShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.midY),
-            control: CGPoint(x: rect.midX, y: rect.minY)
-        )
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.midY),
-            control: CGPoint(x: rect.midX, y: rect.maxY)
-        )
-        return path
+        .frame(width: size, height: size)
     }
 }
 
 private struct VisualControlsView: View {
     let isPaused: Bool
+    var compact: Bool = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: compact ? 8 : 10) {
             if #available(iOSApplicationExtension 17.0, *) {
                 Button(intent: WavNoteCancelRecordingIntent()) {
-                    CircleButton(systemName: "xmark", color: WavNoteColors.purple, foreground: .white)
+                    CircleButton(
+                        systemName: "xmark",
+                        color: WavNoteColors.purple,
+                        foreground: .white,
+                        size: compact ? 26 : 30
+                    )
                 }
                 .buttonStyle(.plain)
 
                 if isPaused {
                     Button(intent: WavNoteResumeRecordingIntent()) {
-                        CapsuleButton(title: "RESUME", systemName: "play.fill", color: WavNoteColors.teal)
+                        CapsuleButton(
+                            title: "RESUME",
+                            systemName: "play.fill",
+                            color: WavNoteColors.teal,
+                            height: compact ? 26 : 30
+                        )
                     }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                 } else {
                     Button(intent: WavNotePauseRecordingIntent()) {
-                        CapsuleButton(title: "PAUSE", systemName: "pause.fill", color: WavNoteColors.yellow)
+                        CapsuleButton(
+                            title: "PAUSE",
+                            systemName: "pause.fill",
+                            color: WavNoteColors.yellow,
+                            height: compact ? 26 : 30
+                        )
                     }
                     .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                 }
 
                 Button(intent: WavNoteStopRecordingIntent()) {
-                    CircleButton(systemName: "stop.fill", color: WavNoteColors.red, foreground: .white)
+                    CircleButton(
+                        systemName: "stop.fill",
+                        color: WavNoteColors.red,
+                        foreground: .white,
+                        size: compact ? 26 : 30
+                    )
                 }
                 .buttonStyle(.plain)
             } else {
-                CircleButton(systemName: "xmark", color: WavNoteColors.purple, foreground: .white)
+                CircleButton(
+                    systemName: "xmark",
+                    color: WavNoteColors.purple,
+                    foreground: .white,
+                    size: compact ? 26 : 30
+                )
                 CapsuleButton(
                     title: isPaused ? "RESUME" : "PAUSE",
                     systemName: isPaused ? "play.fill" : "pause.fill",
-                    color: isPaused ? WavNoteColors.teal : WavNoteColors.yellow
+                    color: isPaused ? WavNoteColors.teal : WavNoteColors.yellow,
+                    height: compact ? 26 : 30
                 )
                 .frame(maxWidth: .infinity)
-                CircleButton(systemName: "stop.fill", color: WavNoteColors.red, foreground: .white)
+                CircleButton(
+                    systemName: "stop.fill",
+                    color: WavNoteColors.red,
+                    foreground: .white,
+                    size: compact ? 26 : 30
+                )
             }
         }
         .frame(maxWidth: .infinity)
@@ -316,12 +264,11 @@ private struct ExpandedBottomView: View {
             let width = max(geometry.size.width, 1)
             let compact = width < 330
             let timerSize: CGFloat = compact ? 29 : 32
-            let waveHeight: CGFloat = state.isPaused ? 15 : (compact ? 19 : 22)
             let horizontalInset: CGFloat = compact ? 2 : 6
 
-            VStack(alignment: .center, spacing: compact ? 7 : 8) {
+            VStack(alignment: .center, spacing: compact ? 10 : 12) {
                 HStack(alignment: .center, spacing: compact ? 10 : 14) {
-                    EyeGlyphView()
+                    RecordPupilIndicatorView(isPaused: state.isPaused, size: compact ? 28 : 31)
                     TimerText(state: state, size: timerSize, color: WavNoteColors.yellow)
                         .lineLimit(1)
                         .minimumScaleFactor(0.86)
@@ -331,21 +278,12 @@ private struct ExpandedBottomView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 35, alignment: .center)
 
-                MiniWaveView(
-                    preferredBars: compact ? 64 : 74,
-                    height: waveHeight,
-                    seed: state.amplitudeSeed,
-                    isPaused: state.isPaused
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
-                .clipped()
-
                 VisualControlsView(isPaused: state.isPaused)
                     .padding(.bottom, compact ? 6 : 7)
             }
             .padding(.horizontal, horizontalInset)
         }
-        .frame(height: 112)
+        .frame(height: 86)
     }
 }
 
@@ -353,6 +291,7 @@ private struct CircleButton: View {
     let systemName: String
     let color: Color
     let foreground: Color
+    var size: CGFloat = 30
 
     var body: some View {
         ZStack {
@@ -361,7 +300,7 @@ private struct CircleButton: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(foreground)
         }
-        .frame(width: 30, height: 30)
+        .frame(width: size, height: size)
         .shadow(color: color.opacity(0.40), radius: 10)
     }
 }
@@ -370,6 +309,7 @@ private struct CapsuleButton: View {
     let title: String
     let systemName: String
     let color: Color
+    var height: CGFloat = 30
 
     var body: some View {
         HStack(spacing: 6) {
@@ -378,7 +318,7 @@ private struct CapsuleButton: View {
         }
         .font(.system(size: 11, weight: .bold))
         .foregroundStyle(.black)
-        .frame(maxWidth: .infinity, minHeight: 30)
+        .frame(maxWidth: .infinity, minHeight: height)
         .background(color)
         .clipShape(Capsule())
         .shadow(color: color.opacity(0.40), radius: 10)
@@ -390,21 +330,21 @@ private struct WavNoteGradient: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.10, green: 0.02, blue: 0.20),
-                    Color(red: 0.18, green: 0.04, blue: 0.32),
-                    Color(red: 0.29, green: 0.08, blue: 0.44)
+                    WavNoteColors.primaryPurple,
+                    WavNoteColors.primaryPink,
+                    WavNoteColors.primaryOrange
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             RadialGradient(
-                colors: [WavNoteColors.purple.opacity(0.40), .clear],
+                colors: [WavNoteColors.cyan.opacity(0.18), .clear],
                 center: .topLeading,
                 startRadius: 4,
                 endRadius: 180
             )
             RadialGradient(
-                colors: [WavNoteColors.magenta.opacity(0.32), .clear],
+                colors: [WavNoteColors.yellow.opacity(0.14), .clear],
                 center: .bottomTrailing,
                 startRadius: 4,
                 endRadius: 180
@@ -417,9 +357,12 @@ private enum WavNoteColors {
     static let ink = Color(red: 0.04, green: 0.02, blue: 0.08)
     static let yellow = Color(red: 1.0, green: 0.78, blue: 0.25)
     static let teal = Color(red: 0.10, green: 0.82, blue: 0.74)
-    static let cyan = Color(red: 0.40, green: 0.88, blue: 0.95)
+    static let cyan = Color(red: 0.0, green: 0.74, blue: 0.83)
     static let magenta = Color(red: 0.96, green: 0.22, blue: 0.74)
     static let purple = Color(red: 0.54, green: 0.15, blue: 0.88)
     static let pink = Color(red: 1.0, green: 0.30, blue: 0.52)
     static let red = Color(red: 1.0, green: 0.15, blue: 0.25)
+    static let primaryPurple = Color(red: 0.56, green: 0.18, blue: 0.89)
+    static let primaryPink = Color(red: 0.85, green: 0.13, blue: 1.0)
+    static let primaryOrange = Color(red: 1.0, green: 0.31, blue: 0.31)
 }

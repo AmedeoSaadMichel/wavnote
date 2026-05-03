@@ -47,6 +47,28 @@ class StopRecordingUseCase {
         );
       }
 
+      return finalizeStoppedRecording(
+        recordingEntity,
+        waveformData: waveformData,
+        overrideDuration: overrideDuration,
+      );
+    } catch (e) {
+      debugPrint('❌ StopRecordingUseCase: $e');
+      return Left(
+        FailureUtils.convertExceptionToFailure(
+          e,
+          contextMessage: 'Failed to stop recording',
+        ),
+      );
+    }
+  }
+
+  Future<Either<Failure, RecordingEntity>> finalizeStoppedRecording(
+    RecordingEntity recordingEntity, {
+    List<double>? waveformData,
+    Duration? overrideDuration,
+  }) async {
+    try {
       final namedRecording = await _generateLocationBasedRecording(
         recordingEntity,
       );

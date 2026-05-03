@@ -16,6 +16,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import '../../domain/entities/recording_external_control_action.dart';
+import '../../domain/entities/recording_waveform_bucket_batch.dart';
 
 // Record types per i tick del clock
 typedef RecordingTick = ({Duration position, double amplitude});
@@ -83,8 +84,9 @@ class AudioEngineService {
 
   // Clock streams (clock_events EventChannel — ADR-001)
   StreamController<RecordingTick>? _recordingTickController;
+  StreamController<RecordingWaveformBucketBatch>? _waveformBucketController;
   StreamController<PlaybackTick>? _playbackTickController;
-  StreamController<RecordingExternalControlAction>? _externalControlController;
+  StreamController<RecordingExternalControlEvent>? _externalControlController;
   StreamSubscription<dynamic>? _clockEventSubscription;
 
   double _lastAmplitude = 0.0;
@@ -102,11 +104,14 @@ class AudioEngineService {
   Stream<RecordingTick> get recordingTickStream =>
       _recordingTickController?.stream ?? const Stream.empty();
 
+  Stream<RecordingWaveformBucketBatch> get waveformBucketStream =>
+      _waveformBucketController?.stream ?? const Stream.empty();
+
   // Playback tick stream: position + totalDuration (da lastRenderTime nativo)
   Stream<PlaybackTick> get playbackTickStream =>
       _playbackTickController?.stream ?? const Stream.empty();
 
-  Stream<RecordingExternalControlAction> get externalControlStream =>
+  Stream<RecordingExternalControlEvent> get externalControlStream =>
       _externalControlController?.stream ?? const Stream.empty();
 
   // Derived streams — mantenuti per compatibilità con AudioServiceCoordinator
@@ -158,9 +163,11 @@ class AudioEngineService {
     try {
       _completionController = StreamController<void>.broadcast();
       _recordingTickController = StreamController<RecordingTick>.broadcast();
+      _waveformBucketController =
+          StreamController<RecordingWaveformBucketBatch>.broadcast();
       _playbackTickController = StreamController<PlaybackTick>.broadcast();
       _externalControlController =
-          StreamController<RecordingExternalControlAction>.broadcast();
+          StreamController<RecordingExternalControlEvent>.broadcast();
 
       // Completion events (già presenti, invariati)
       _playbackEventSubscription = _playbackEventChannel
@@ -187,6 +194,22 @@ class AudioEngineService {
                   position: Duration(milliseconds: posMs),
                   amplitude: amp,
                 ));
+              case 'waveformBuckets':
+                final samples =
+                    (event['samples'] as List?)
+                        ?.whereType<num>()
+                        .map((v) => v.toDouble().clamp(0.0, 1.0).toDouble())
+                        .toList() ??
+                    const <double>[];
+                if (samples.isNotEmpty) {
+                  _waveformBucketController?.add(
+                    RecordingWaveformBucketBatch(
+                      startIndex: (event['startIndex'] as num?)?.toInt() ?? 0,
+                      samples: samples,
+                      totalCount: (event['totalCount'] as num?)?.toInt() ?? 0,
+                    ),
+                  );
+                }
               case 'playbackTick':
                 final posMs = (event['positionMs'] as num?)?.toInt() ?? 0;
                 final durMs = (event['durationMs'] as num?)?.toInt() ?? 0;
@@ -199,7 +222,15 @@ class AudioEngineService {
                   event['action'] as String?,
                 );
                 if (action != null) {
-                  _externalControlController?.add(action);
+                  _externalControlController?.add(
+                    RecordingExternalControlEvent.requested(action),
+                  );
+                }
+              case 'liveActivityControlCompleted':
+                final controlEvent = _parseLiveActivityControlCompleted(event);
+                if (controlEvent != null) {
+                  _externalControlController?.add(controlEvent);
+                  ackLiveActivityControlCompleted(controlEvent.action);
                 }
             }
           });
@@ -222,11 +253,13 @@ class AudioEngineService {
 
     await _completionController?.close();
     await _recordingTickController?.close();
+    await _waveformBucketController?.close();
     await _playbackTickController?.close();
     await _externalControlController?.close();
 
     _completionController = null;
     _recordingTickController = null;
+    _waveformBucketController = null;
     _playbackTickController = null;
     _externalControlController = null;
     _playbackEventSubscription = null;
@@ -269,6 +302,100 @@ class AudioEngineService {
     } catch (e) {
       print('AudioEngineService: Failed to start recording: $e');
       return false;
+    }
+  }
+
+  RecordingExternalControlEvent? syncRecordingStatusFromNative(
+    AudioEngineRecordingStatus status,
+  ) {
+    final wasPaused = _isRecordingPaused;
+
+    _isRecording = status.isRecording;
+    _isRecordingPaused = status.isRecording && status.isPaused;
+    if (!status.isRecording) {
+      _currentRecordingPath = null;
+    } else if (status.path != null) {
+      _currentRecordingPath = status.path;
+    }
+
+    if (!status.isRecording || wasPaused == _isRecordingPaused) {
+      return null;
+    }
+
+    return RecordingExternalControlEvent.completed(
+      action: _isRecordingPaused
+          ? RecordingExternalControlAction.pause
+          : RecordingExternalControlAction.resume,
+      success: true,
+      duration: status.duration,
+    );
+  }
+
+  void emitExternalControlEvent(RecordingExternalControlEvent event) {
+    _externalControlController?.add(event);
+  }
+
+  Future<RecordingExternalControlEvent?>
+  getPendingLiveActivityControlCompleted() async {
+    try {
+      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'getPendingLiveActivityControlCompleted',
+      );
+      if (raw == null) return null;
+      return _parseLiveActivityControlCompleted(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  RecordingExternalControlEvent? _parseLiveActivityControlCompleted(
+    Map<dynamic, dynamic> event,
+  ) {
+    final action = RecordingExternalControlAction.fromNative(
+      event['action'] as String?,
+    );
+    if (action == null) return null;
+
+    final durationMs = (event['durationMs'] as num?)?.toInt();
+    final path = event['path'] as String?;
+    final success = event['success'] == true;
+    _syncRecordingFlagsFromExternalControl(action: action, success: success);
+    return RecordingExternalControlEvent.completed(
+      action: action,
+      success: success,
+      duration: durationMs == null ? null : Duration(milliseconds: durationMs),
+      path: path,
+    );
+  }
+
+  void ackLiveActivityControlCompleted(RecordingExternalControlAction action) {
+    unawaited(
+      _channel.invokeMethod<void>('ackLiveActivityControlCompleted', {
+        'action': action.name,
+      }),
+    );
+  }
+
+  void _syncRecordingFlagsFromExternalControl({
+    required RecordingExternalControlAction action,
+    required bool success,
+  }) {
+    if (!success) return;
+    switch (action) {
+      case RecordingExternalControlAction.pause:
+        _isRecording = true;
+        _isRecordingPaused = true;
+      case RecordingExternalControlAction.resume:
+        _isRecording = true;
+        _isRecordingPaused = false;
+      case RecordingExternalControlAction.stop:
+        _isRecording = false;
+        _isRecordingPaused = false;
+        _currentRecordingPath = null;
+      case RecordingExternalControlAction.cancel:
+        _isRecording = false;
+        _isRecordingPaused = false;
+        _currentRecordingPath = null;
     }
   }
 

@@ -2,6 +2,7 @@
 import '../../core/enums/audio_format.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/entities/recording_external_control_action.dart';
+import '../../domain/entities/recording_waveform_bucket_batch.dart';
 import '../../domain/repositories/i_audio_recording_repository.dart';
 import 'audio_service_coordinator.dart';
 
@@ -65,14 +66,22 @@ class RecordingServiceRepository implements IAudioRecordingRepository {
       _coordinator.getCurrentRecordingDuration();
 
   @override
+  Future<void> syncNativeRecordingStatus() =>
+      _coordinator.syncNativeRecordingStatus();
+
+  @override
   Stream<double> getRecordingAmplitudeStream() =>
       _coordinator.getRecordingAmplitudeStream();
+
+  @override
+  Stream<RecordingWaveformBucketBatch> getRecordingWaveformBucketStream() =>
+      _coordinator.getRecordingWaveformBucketStream();
 
   @override
   Stream<Duration>? get durationStream => _coordinator.durationStream;
 
   @override
-  Stream<RecordingExternalControlAction> get externalControlStream =>
+  Stream<RecordingExternalControlEvent> get externalControlStream =>
       _coordinator.externalControlStream;
 
   @override
