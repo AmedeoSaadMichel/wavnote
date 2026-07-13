@@ -14,11 +14,14 @@
 // - Widget testing utilities with proper BLoC setup
 // - Database testing helpers with in-memory databases
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // Import app components
 import 'package:wavnote/presentation/bloc/folder/folder_bloc.dart';
@@ -53,6 +56,15 @@ class TestHelpers {
     // Ensure widget binding is initialized for tests
     TestWidgetsFlutterBinding.ensureInitialized();
 
+    // SQLite su host (macchina di sviluppo/CI) per i test che usano
+    // DatabaseHelper: senza ffi il MethodChannel sqflite non esiste.
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+
+    // Directory unica per isolate: i file di test girano in parallelo e
+    // ognuno deve avere il proprio voice_memo.db, non uno condiviso.
+    final testDir = Directory.systemTemp.createTempSync('wavnote_test_');
+
     const pathProviderChannel = MethodChannel(
       'plugins.flutter.io/path_provider',
     );
@@ -62,7 +74,7 @@ class TestHelpers {
             case 'getApplicationDocumentsDirectory':
             case 'getTemporaryDirectory':
             case 'getApplicationSupportDirectory':
-              return '/tmp/wavnote_test';
+              return testDir.path;
           }
           return null;
         });

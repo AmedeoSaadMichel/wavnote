@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/recording_card/recording_card_main.dart
+// File: lib/presentation/widgets/recording/recording_card/recording_card_main.dart
 //
 // Recording Card Widget - Presentation Layer
 // ==========================================
@@ -49,6 +49,7 @@ import '../../../../services/audio/audio_state_manager.dart'; // Audio state man
 // Widget component imports
 import 'recording_card_info.dart'; // Recording metadata display
 import 'recording_card_actions.dart'; // Swipe action buttons
+import 'recording_card_slider.dart';
 import '../recording_controls.dart'; // Audio playback controls
 
 /// Recording Card with Audio Slider and Interactive Features
@@ -368,7 +369,9 @@ class _RecordingCardState extends State<RecordingCard>
               );
 
               if (!widget.isEditMode) {
-                print('🎯 Calling onTap for recording: ${widget.recording.name}');
+                print(
+                  '🎯 Calling onTap for recording: ${widget.recording.name}',
+                );
                 widget.onTap?.call();
               } else {
                 print('🎯 Edit mode - calling selection toggle');
@@ -382,8 +385,9 @@ class _RecordingCardState extends State<RecordingCard>
                 _hideFavoriteAction();
               }
             },
-            child:
-                widget.isExpanded ? _buildExpandedCard() : _buildCollapsedCard(),
+            child: widget.isExpanded
+                ? _buildExpandedCard()
+                : _buildCollapsedCard(),
           ),
         ),
 
@@ -608,16 +612,6 @@ class _RecordingCardState extends State<RecordingCard>
     );
   }
 
-  SliderThemeData get _sliderTheme => SliderTheme.of(context).copyWith(
-    trackHeight: 6.0,
-    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12.0),
-    overlayShape: const RoundSliderOverlayShape(overlayRadius: 20.0),
-    activeTrackColor: const Color(0xFF8B5CF6),
-    inactiveTrackColor: const Color(0xFF2E1065).withValues(alpha: 0.4),
-    thumbColor: const Color(0xFFA855F7),
-    overlayColor: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-  );
-
   /// Build audio progress slider.
   /// Uses ValueListenableBuilder (via AudioStateManager) for real-time updates
   /// without requiring a full widget rebuild on every position tick.
@@ -646,20 +640,13 @@ class _RecordingCardState extends State<RecordingCard>
                                       duration.inMilliseconds)
                                   .clamp(0.0, 1.0)
                             : 0.0);
-                  return SliderTheme(
-                    data: _sliderTheme,
-                    child: Slider(
-                      value: progress,
-                      min: 0.0,
-                      max: 1.0,
-                      onChangeStart: widget.isLoading
-                          ? null
-                          : _handleSliderChangeStart,
-                      onChanged: widget.isLoading ? null : _handleSliderChanged,
-                      onChangeEnd: widget.isLoading
-                          ? null
-                          : _handleSliderChangeEnd,
-                    ),
+                  return RecordingCardSlider(
+                    value: progress,
+                    isPlaying: widget.isPlaying,
+                    enabled: !widget.isLoading,
+                    onChangeStart: _handleSliderChangeStart,
+                    onChanged: _handleSliderChanged,
+                    onChangeEnd: _handleSliderChangeEnd,
                   );
                 },
               );
@@ -707,16 +694,13 @@ class _RecordingCardState extends State<RecordingCard>
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         children: [
-          SliderTheme(
-            data: _sliderTheme,
-            child: Slider(
-              value: _sliderPosition,
-              min: 0.0,
-              max: 1.0,
-              onChangeStart: widget.isLoading ? null : _handleSliderChangeStart,
-              onChanged: widget.isLoading ? null : _handleSliderChanged,
-              onChangeEnd: widget.isLoading ? null : _handleSliderChangeEnd,
-            ),
+          RecordingCardSlider(
+            value: _sliderPosition,
+            isPlaying: widget.isPlaying,
+            enabled: !widget.isLoading,
+            onChangeStart: _handleSliderChangeStart,
+            onChanged: _handleSliderChanged,
+            onChangeEnd: _handleSliderChangeEnd,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),

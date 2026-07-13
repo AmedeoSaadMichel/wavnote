@@ -61,38 +61,42 @@ class MainScreenHeader extends StatelessWidget {
                             }
                             return GestureDetector(
                               onTap: onShowFormatDialog,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5A2B8C)
-                                      .withValues(alpha: 0.7),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.1),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      currentFormat.icon,
-                                      color: currentFormat.color,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      currentFormat.name,
-                                      style: TextStyle(
-                                        color: currentFormat.color,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                              child: SizedBox(
+                                width: 70,
+                                height: 30,
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF5A2B8C,
+                                    ).withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.1,
                                       ),
+                                      width: 1,
                                     ),
-                                  ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        currentFormat.icon,
+                                        color: currentFormat.color,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        currentFormat.name,
+                                        style: TextStyle(
+                                          color: currentFormat.color,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -142,26 +146,28 @@ class MainScreenHeader extends StatelessWidget {
                       ],
                       GestureDetector(
                         onTap: onToggleEditMode,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF5A2B8C)
-                                .withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              width: 1,
+                        child: SizedBox(
+                          width: 70,
+                          height: 30,
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF5A2B8C,
+                              ).withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                width: 1,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            isEditMode ? 'Done' : 'Edit',
-                            style: const TextStyle(
-                              color: Colors.cyan,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                            child: Text(
+                              isEditMode ? 'Done' : 'Edit',
+                              style: const TextStyle(
+                                color: Colors.cyan,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ),

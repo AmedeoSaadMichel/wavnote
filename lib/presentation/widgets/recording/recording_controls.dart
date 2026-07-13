@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/recording_controls.dart
+// File: lib/presentation/widgets/recording/recording_controls.dart
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -46,22 +46,7 @@ class RecordingControls extends StatelessWidget {
           child: Center(
             child: GestureDetector(
               onTap: onPlayPause,
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: _buildPlayPauseIcon(),
-              ),
+              child: _buildCenterButton(),
             ),
           ),
         ),
@@ -75,7 +60,11 @@ class RecordingControls extends StatelessWidget {
         Expanded(
           flex: 2,
           child: _buildControlButton(
-            icon: const FaIcon(FontAwesomeIcons.skull, color: Colors.cyan, size: 24),
+            icon: const FaIcon(
+              FontAwesomeIcons.skull,
+              color: Colors.cyan,
+              size: 24,
+            ),
             onPressed: onDelete,
           ),
         ),
@@ -83,28 +72,91 @@ class RecordingControls extends StatelessWidget {
     );
   }
 
-  Widget _buildPlayPauseIcon() {
-    if (isLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: CircularProgressIndicator(
-          strokeWidth: 3,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+  Widget _buildCenterButton() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          center: Alignment(-0.35, -0.35),
+          radius: 0.82,
+          colors: [
+            Color(0xFFFFFDF5),
+            Color(0xFFFFF5D6),
+            Color(0xFFFFD84A),
+            Color(0xFFF59E3B),
+          ],
+          stops: [0.0, 0.35, 0.75, 1.0],
         ),
-      );
-    } else if (isPlaying) {
-      return const Icon(
-        Icons.pause,
-        color: Colors.black,
-        size: 32,
-      );
-    } else {
-      return const Icon(
-        Icons.play_arrow,
-        color: Colors.black,
-        size: 32,
-      );
-    }
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.85),
+            blurRadius: 0,
+            spreadRadius: 3,
+          ),
+          BoxShadow(
+            color: const Color(0xFFFFD84A).withValues(alpha: 0.7),
+            blurRadius: 18,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Center(
+        child: isLoading ? _buildLoadingIndicator() : _buildCenterGlyph(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const SizedBox(
+      width: 24,
+      height: 24,
+      child: CircularProgressIndicator(
+        strokeWidth: 3,
+        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0A0612)),
+      ),
+    );
+  }
+
+  Widget _buildCenterGlyph() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [Color(0xFF7BE0FF), Color(0xFF3EC9E8), Color(0xFF0A4A6B)],
+              stops: [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+        Icon(
+          isPlaying ? Icons.pause : Icons.play_arrow,
+          color: const Color(0xFF0A0612),
+          size: 28,
+        ),
+        Positioned(
+          left: 17,
+          top: 14,
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildSkipIcon(String text, IconData icon) {
@@ -144,9 +196,7 @@ class RecordingControls extends StatelessWidget {
                 color: Colors.transparent,
                 shape: BoxShape.circle,
               ),
-              child: FittedBox(
-                child: icon,
-              ),
+              child: FittedBox(child: icon),
             ),
           ),
         ),

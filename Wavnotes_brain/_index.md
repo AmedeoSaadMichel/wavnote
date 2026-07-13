@@ -32,6 +32,9 @@
 ## Analisi
 | File | Topic |
 |------|-------|
+| [[analysis/2026-07-11-analisi-progetto]] | Analisi aggiornata con analyzer e suite completa: 47 issue, 195/239 test verdi |
+| [[analysis/2026-07-09-test-coverage-vs-features]] | Copertura test vs feature map — cosa combacia, gap, priorità |
+| [[analysis/2026-07-08-analisi-generale-progetto]] | Analisi generale stato progetto — salute codice, priorità, cosa non toccare |
 | [[analysis/2026-04-26-bug-sfarfallio-overdub]] | Root cause sfarfallio play/pause (B1) + overdub error (B2) — analisi completa |
 | [[analysis/plans/2026-04-26-fix-b2-overdub]] | Piano di fix B2 — tre task chirurgici (completato) |
 | [[analysis/plans/2026-04-28-background-audio-recording]] | Piano feature registrazione audio in background — iOS first + Android foreground service |
