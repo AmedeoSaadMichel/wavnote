@@ -13,6 +13,7 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | Overdubbing / seek-and-overwrite | `domain/usecases/recording/overwrite_recording_usecase.dart` | ✅ Completato |
 | Playback preview durante pausa overdub | `audio_service_coordinator.dart` (`_nativePlaybackActive` + native engine) | ✅ Fix ripristinato 2026-04-17 |
 | Playback audio (seek, rewind, forward) | `services/audio/audio_player_service.dart` + `recording_list_logic.dart` | ✅ Completato |
+| Live Activity / Dynamic Island playback | `WavNoteLiveActivityExtension` + playback coordinator/native engine | 📝 Da implementare: preview file e ascolto registrazione a schermo chiuso |
 | Trim audio | `services/audio/audio_trimmer_service.dart` + channel `wavnote/audio_trimmer` | ✅ Presente |
 | Formati WAV / M4A / FLAC | `core/enums/audio_format.dart` | ✅ Completato |
 | Sample rate configurabile | `presentation/widgets/dialogs/sample_rate_dialog.dart` | ✅ Completato |

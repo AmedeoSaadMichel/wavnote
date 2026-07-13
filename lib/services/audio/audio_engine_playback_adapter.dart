@@ -31,7 +31,7 @@ class AudioEnginePlaybackAdapter implements IAudioPlaybackEngine {
   StreamSubscription<void>? _completionSub;
 
   AudioEnginePlaybackAdapter({required AudioEngineService engineService})
-      : _engineService = engineService;
+    : _engineService = engineService;
 
   @override
   Future<bool> initialize() async {
@@ -101,6 +101,7 @@ class AudioEnginePlaybackAdapter implements IAudioPlaybackEngine {
   @override
   Future<void> pause() async {
     await _engineService.pausePlayback();
+    _cachedSeekPosition = _currentPosition;
     _status = AudioPlaybackState.paused;
     _stateController.add(AudioPlaybackState.paused);
   }
@@ -118,6 +119,7 @@ class AudioEnginePlaybackAdapter implements IAudioPlaybackEngine {
   @override
   Future<void> seek(Duration position) async {
     _cachedSeekPosition = position;
+    _positionController.add(position);
     if (_status == AudioPlaybackState.playing) {
       await _engineService.seekTo(position);
     }
@@ -142,8 +144,7 @@ class AudioEnginePlaybackAdapter implements IAudioPlaybackEngine {
   Stream<Duration?> get durationStream => _durationController.stream;
 
   @override
-  Stream<AudioPlaybackState> get playbackStateStream =>
-      _stateController.stream;
+  Stream<AudioPlaybackState> get playbackStateStream => _stateController.stream;
 
   @override
   Stream<void> get completionStream => _engineService.completionStream;

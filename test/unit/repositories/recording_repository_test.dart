@@ -15,6 +15,7 @@
 // - Database error handling and recovery
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wavnote/data/database/database_helper.dart';
 import 'package:wavnote/data/repositories/recording_repository.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
@@ -33,6 +34,15 @@ void main() {
     setUp(() async {
       // Create repository instance
       repository = RecordingRepository();
+
+      // Isolamento: svuota la tabella recordings tra un test e l'altro
+      // (il DB sqflite_common_ffi è condiviso da tutta la suite).
+      final db = await DatabaseHelper.database;
+      try {
+        await db.delete(DatabaseHelper.recordingsTable);
+      } catch (_) {
+        // Tabella non ancora creata alla prima run: ci pensa il repository.
+      }
     });
 
     group('CRUD Operations', () {
@@ -137,8 +147,8 @@ void main() {
         final result = await repository.updateRecording(updatedRecording);
 
         // Assert
-        expect(result, isTrue);
-        
+        expect(result.name, equals('Updated Name'));
+
         final retrievedRecording = await repository.getRecordingById('test_recording_1');
         expect(retrievedRecording!.name, equals('Updated Name'));
       });
@@ -171,12 +181,14 @@ void main() {
         final result = await repository.softDeleteRecording('test_recording_1');
 
         // Assert
-        expect(result, isTrue);
-        
-        // Should not appear in regular queries
-        final allRecordings = await repository.getAllRecordings();
-        expect(allRecordings.any((r) => r.id == 'test_recording_1'), isFalse);
-        
+        expect(result.isRight(), isTrue);
+
+        // Non deve più comparire nelle viste utente (getAllRecordings è
+        // volutamente senza filtro is_deleted: usata solo per debug/waveform)
+        final visibleRecordings =
+            await repository.getRecordingsByFolder('all_recordings');
+        expect(visibleRecordings.any((r) => r.id == 'test_recording_1'), isFalse);
+
         // Should appear in recently deleted folder
         final deletedRecordings = await repository.getRecordingsByFolder('recently_deleted');
         expect(deletedRecordings.any((r) => r.id == 'test_recording_1'), isTrue);
@@ -194,8 +206,8 @@ void main() {
         final result = await repository.restoreRecording('test_recording_1');
 
         // Assert
-        expect(result, isTrue);
-        
+        expect(result.isRight(), isTrue);
+
         // Should appear in regular queries again
         final allRecordings = await repository.getAllRecordings();
         expect(allRecordings.any((r) => r.id == 'test_recording_1'), isTrue);
@@ -217,8 +229,8 @@ void main() {
         final result = await repository.permanentlyDeleteRecording('test_recording_1');
 
         // Assert
-        expect(result, isTrue);
-        
+        expect(result.isRight(), isTrue);
+
         // Should not appear anywhere
         final allRecordings = await repository.getAllRecordings();
         expect(allRecordings.any((r) => r.id == 'test_recording_1'), isFalse);
@@ -231,17 +243,29 @@ void main() {
         // Arrange
         final oldRecording = TestHelpers.createTestRecording(
           id: 'old_recording',
-          createdAt: DateTime.now().subtract(const Duration(days: 16)), // Older than 15 days
         );
         final recentRecording = TestHelpers.createTestRecording(
           id: 'recent_recording',
-          createdAt: DateTime.now().subtract(const Duration(days: 5)), // Within 15 days
         );
 
         await repository.createRecording(oldRecording);
         await repository.createRecording(recentRecording);
         await repository.softDeleteRecording('old_recording');
         await repository.softDeleteRecording('recent_recording');
+
+        // La scadenza dipende da deleted_at (impostato "adesso" dal soft
+        // delete): retrodata la cancellazione oltre i 15 giorni.
+        final db = await DatabaseHelper.database;
+        await db.update(
+          DatabaseHelper.recordingsTable,
+          {
+            'deleted_at': DateTime.now()
+                .subtract(const Duration(days: 16))
+                .toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: ['old_recording'],
+        );
 
         // Act
         final deletedCount = await repository.cleanupExpiredRecordings();
@@ -355,9 +379,10 @@ void main() {
         }
 
         // Assert
-        final activeRecordings = await repository.getAllRecordings();
+        final activeRecordings =
+            await repository.getRecordingsByFolder('all_recordings');
         expect(activeRecordings.length, equals(2));
-        
+
         final deletedRecordings = await repository.getRecordingsByFolder('recently_deleted');
         expect(deletedRecordings.length, equals(3));
       });
@@ -466,37 +491,35 @@ void main() {
         final afterToggle2 = await repository.getRecordingById('test_recording_1');
 
         // Assert
-        expect(result1, isTrue);
+        expect(result1.isRight(), isTrue);
         expect(afterToggle1!.isFavorite, isTrue);
-        
-        expect(result2, isTrue);
+
+        expect(result2.isRight(), isTrue);
         expect(afterToggle2!.isFavorite, isFalse);
       });
     });
 
     group('Error Handling', () {
       test('handles database errors gracefully', () async {
-        // Test with invalid recording data
-        expect(
-          () async => await repository.createRecording(
-            TestHelpers.createTestRecording(id: ''), // Invalid empty ID
-          ),
-          throwsA(isA<Exception>()),
-        );
+        // deleteRecording su id inesistente restituisce Left, non lancia
+        final result = await repository.deleteRecording('non_existent');
+        expect(result.isLeft(), isTrue);
       });
 
       test('handles non-existent recording operations gracefully', () async {
         // Act & Assert
-        final updateResult = await repository.updateRecording(
-          TestHelpers.createTestRecording(id: 'non_existent'),
+        expect(
+          () => repository.updateRecording(
+            TestHelpers.createTestRecording(id: 'non_existent'),
+          ),
+          throwsStateError,
         );
-        expect(updateResult, isFalse);
 
         final toggleResult = await repository.toggleFavorite('non_existent');
-        expect(toggleResult, isFalse);
+        expect(toggleResult.isLeft(), isTrue);
 
         final deleteResult = await repository.softDeleteRecording('non_existent');
-        expect(deleteResult, isFalse);
+        expect(deleteResult.isLeft(), isTrue);
       });
 
       test('handles concurrent operations safely', () async {

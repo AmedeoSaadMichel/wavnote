@@ -24,11 +24,11 @@
 		D1A100000000000000000001 /* WavNoteLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000002 /* WavNoteLiveActivityController.swift */; };
 		D1A100000000000000000003 /* WavNoteRecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */; };
 		D1A100000000000000000005 /* WavNoteRecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */; };
-		D1A100000000000000000020 /* WavNoteRecordingControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */; };
-		D1A100000000000000000021 /* WavNoteRecordingControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */; };
 		D1A100000000000000000007 /* WavNoteLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000006 /* WavNoteLiveActivityBundle.swift */; };
 		D1A100000000000000000009 /* WavNoteLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000008 /* WavNoteLiveActivityWidget.swift */; };
 		D1A10000000000000000000C /* WavNoteLiveActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = D1A10000000000000000000B /* WavNoteLiveActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D1A100000000000000000020 /* WavNoteRecordingControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */; };
+		D1A100000000000000000021 /* WavNoteRecordingControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */; };
 		EB8F4EAD2F8B945A00F4ABE7 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = EB8F4EAC2F8B945A00F4ABE7 /* Logging */; };
 		EB8F4EAF2F8B948200F4ABE7 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = EB8F4EAE2F8B948200F4ABE7 /* Logging */; };
 		EB8F4EB12F8B959E00F4ABE7 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = EB8F4EB02F8B959E00F4ABE7 /* Logging */; };
@@ -106,11 +106,11 @@
 		C0DEF0012026050300000006 /* AudioEnginePlugin+Streams.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Streams.swift"; sourceTree = "<group>"; };
 		D1A100000000000000000002 /* WavNoteLiveActivityController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteLiveActivityController.swift; sourceTree = "<group>"; };
 		D1A100000000000000000004 /* WavNoteRecordingAttributes.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingAttributes.swift; sourceTree = "<group>"; };
-		D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingControlIntents.swift; sourceTree = "<group>"; };
 		D1A100000000000000000006 /* WavNoteLiveActivityBundle.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteLiveActivityBundle.swift; sourceTree = "<group>"; };
 		D1A100000000000000000008 /* WavNoteLiveActivityWidget.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteLiveActivityWidget.swift; sourceTree = "<group>"; };
 		D1A10000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D1A10000000000000000000B /* WavNoteLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WavNoteLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingControlIntents.swift; sourceTree = "<group>"; };
 		DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E77A6D0E1D0940F51466178D /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		EB8F4EB62F8B967900F4ABE7 /* SwiftLogPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftLogPlugin.swift; sourceTree = "<group>"; };
@@ -227,6 +227,15 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		A12626CA03BC3F20A64B2901 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F9BB8509EC16DE7C306BDE85 /* Pods_Runner.framework */,
+				DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		D1A10000000000000000000E /* WavNoteLiveActivityExtension */ = {
 			isa = PBXGroup;
 			children = (
@@ -244,15 +253,6 @@
 				D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */,
 			);
 			path = Shared;
-			sourceTree = "<group>";
-		};
-		A12626CA03BC3F20A64B2901 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				F9BB8509EC16DE7C306BDE85 /* Pods_Runner.framework */,
-				DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -646,7 +646,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WAVNOTE_APP";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -826,6 +826,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8P9QB7RFMB;
 				ENABLE_BITCODE = NO;
@@ -834,8 +836,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WAVNOTE_APP";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -858,7 +861,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WAVNOTE_APP";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -885,7 +888,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote.liveactivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -914,7 +917,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote.liveactivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -941,7 +944,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.wavnote.liveactivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.liveactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;

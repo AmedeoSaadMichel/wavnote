@@ -33,6 +33,7 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | H7 | `settings_bloc.dart` | File a 803 righe: supera il limite assoluto del progetto. Richiede conferma esplicita prima di refactor. | 🟡 Media |
 | H8 | Test suite | Stabilizzazione completa `test/unit` seguendo `analysis/plans/2026-04-27-piano-risanamento-progetto.md`. | 🟡 Media |
 | H9 | `IAudioServiceRepository` | Cleanup finale seguendo `analysis/plans/2026-04-27-cleanup-iaudioservicerepository.md`. | 🟡 Media |
+| H10 | Dynamic Island playback | Implementare Live Activity / Dynamic Island anche quando l'utente ascolta una preview di file o una registrazione con schermo chiuso/bloccato. Deve mostrare stato playback e controlli coerenti con il player, separati dalla Live Activity di registrazione. | 🔴 Alta |
 
 ## Workaround architetturali noti (post ADR-001)
 
