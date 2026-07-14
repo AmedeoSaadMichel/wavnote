@@ -1,0 +1,34 @@
+# File: .github/workflows/ci.yml
+#
+# Gate CI: analyze + test su ogni push e pull request.
+# L'analyzer fallisce solo sugli errori (il backlog di warning/info — 47
+# issue al 2026-07-14 — non blocca; da smaltire in sessioni dedicate).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.5
+          cache: true
+
+      - name: Dipendenze
+        run: flutter pub get
+
+      - name: Analyze (solo errori bloccanti)
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Test
+        run: flutter test

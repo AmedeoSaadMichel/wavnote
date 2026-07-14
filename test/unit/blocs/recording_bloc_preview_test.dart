@@ -70,6 +70,9 @@ void main() {
       when(
         () => mockAudio.getRecordingAmplitudeStream(),
       ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockAudio.externalControlStream,
+      ).thenAnswer((_) => const Stream.empty());
       when(() => mockAudio.durationStream).thenReturn(null);
       when(
         () => mockAudio.getCurrentRecordingDuration(),
@@ -208,24 +211,27 @@ void main() {
       ],
     );
 
-    // ── Test 5: completamento naturale — seekBarIndex invariato ──────────
+    // ── Test 5: completamento naturale — seekBarIndex a fine traccia ─────
+    // Contratto confermato (2026-07-14): il handler applica sempre
+    // stoppedSeekBarIndex; su natural completion la UI passa l'ultimo indice
+    // e la seekbar si parcheggia a fine traccia.
 
     blocTest<RecordingBloc, RecordingState>(
       'StopRecordingPreview(isNaturalCompletion=true): '
-      'seekBarIndex rimane al valore seed',
+      'seekBarIndex si aggiorna a stoppedSeekBarIndex (fine traccia)',
       build: () => bloc,
       seed: () => seedState,
       act: (b) => b.add(
         const StopRecordingPreview(
           isNaturalCompletion: true,
-          stoppedSeekBarIndex: 99, // ignorato in natural completion
+          stoppedSeekBarIndex: 99,
         ),
       ),
       expect: () => [
         isA<RecordingPaused>().having(
           (s) => s.seekBarIndex,
           'seekBarIndex',
-          50, // invariato rispetto al seed
+          99,
         ),
       ],
     );

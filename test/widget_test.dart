@@ -1,16 +1,18 @@
 // File: test/widget_test.dart
-// 
+//
 // WavNote App Widget Tests
 // =======================
 //
-// Integration tests for the main WavNote application widget and core
-// user interface components. These tests verify that the app initializes
-// correctly and core UI elements are present and functional.
+// Smoke test dell'app: la MainScreen viene montata con BLoC mock (il boot
+// completo di WavNoteApp richiede il DI di produzione, non disponibile in
+// ambiente di test), mentre WavNoteApp nudo viene verificato solo per
+// robustezza del bootstrap.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:wavnote/app.dart';
+import 'package:wavnote/presentation/screens/main/main_screen.dart';
 import 'helpers/test_helpers.dart';
 
 void main() {
@@ -19,19 +21,17 @@ void main() {
       // Initialize test environment
       await TestHelpers.initializeTestEnvironment();
 
-      // Build the app with proper test setup
+      // La MainScreen è montata con BLoC mock via createTestApp.
       await tester.pumpWidget(
         TestHelpers.createTestApp(
-          child: const WavNoteApp(),
+          child: const MainScreen(),
         ),
       );
-
-      // Wait for async initialization to complete
-      await tester.pumpAndSettle(const Duration(seconds: 3));
+      await TestHelpers.pumpAndSettleWithTimeout(tester);
 
       // Verify the main app title is displayed
       expect(find.text('Voice Memos'), findsOneWidget);
-      
+
       // Verify the cosmic gradient background is applied
       expect(find.byType(Container), findsWidgets);
     });
@@ -40,32 +40,25 @@ void main() {
       // Initialize test environment
       await TestHelpers.initializeTestEnvironment();
 
-      // Build the app
       await tester.pumpWidget(
         TestHelpers.createTestApp(
-          child: const WavNoteApp(),
+          child: const MainScreen(),
         ),
       );
+      await TestHelpers.pumpAndSettleWithTimeout(tester);
 
-      // Wait for initialization and data loading
-      await tester.pumpAndSettle(const Duration(seconds: 3));
-
-      // Look for common folder elements (these should exist in default folders)
-      // We'll look for text that should appear regardless of empty state
+      // Header presente indipendentemente dallo stato delle cartelle
       expect(find.text('Voice Memos'), findsOneWidget);
     });
 
     testWidgets('App handles initialization errors gracefully', (WidgetTester tester) async {
-      // Test error handling during app startup
-      await tester.pumpWidget(
-        TestHelpers.createTestApp(
-          child: const WavNoteApp(),
-        ),
-      );
+      await TestHelpers.initializeTestEnvironment();
 
-      // App should not crash even if initialization has issues
-      await tester.pumpAndSettle();
-      
+      // WavNoteApp nudo: senza il DI di produzione il boot non può arrivare
+      // alla MainScreen, ma non deve crashare (skeleton o error screen).
+      await tester.pumpWidget(const WavNoteApp());
+      await TestHelpers.pumpAndSettleWithTimeout(tester);
+
       // The app widget should be built successfully
       expect(find.byType(MaterialApp), findsOneWidget);
     });

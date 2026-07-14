@@ -32,6 +32,8 @@
 ## Analisi
 | File | Topic |
 |------|-------|
+| [[analysis/2026-07-14-analisi-qualita-test]] | Qualità della suite post-risanamento: nucleo forte, ~70 test di facciata, buchi su lifecycle nativo |
+| [[analysis/2026-07-14-triage-test-falliti]] | Triage dei 44 test falliti: root cause per categoria e ordine di risanamento |
 | [[analysis/2026-07-11-analisi-progetto]] | Analisi aggiornata con analyzer e suite completa: 47 issue, 195/239 test verdi |
 | [[analysis/2026-07-09-test-coverage-vs-features]] | Copertura test vs feature map — cosa combacia, gap, priorità |
 | [[analysis/2026-07-08-analisi-generale-progetto]] | Analisi generale stato progetto — salute codice, priorità, cosa non toccare |

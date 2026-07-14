@@ -89,8 +89,9 @@ void main() {
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
         // Assert
+        // La card compatta mostra nome e metadati; i controlli play/pause
+        // vivono solo nella variante espansa (RecordingControls).
         expect(find.text('Test Recording'), findsOneWidget);
-        expect(find.byIcon(Icons.play_arrow), findsWidgets);
         expect(tester.takeException(), isNull);
       });
 
@@ -156,15 +157,16 @@ void main() {
 
     group('Audio Playback Controls', () {
       testWidgets('shows play button when not playing', (WidgetTester tester) async {
-        // Act
+        // Act — i controlli sono visibili solo nella card espansa; la slider
+        // anima in loop, quindi pump puntuale invece di pumpAndSettle.
         await tester.pumpWidget(
           TestHelpers.createTestApp(
             child: Scaffold(
-              body: createTestRecordingCard(isPlaying: false),
+              body: createTestRecordingCard(isExpanded: true, isPlaying: false),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
         // Assert
         expect(find.byIcon(Icons.play_arrow), findsWidgets);
@@ -172,18 +174,19 @@ void main() {
       });
 
       testWidgets('shows pause button when playing', (WidgetTester tester) async {
-        // Act
+        // Act — controlli visibili solo nella card espansa.
         await tester.pumpWidget(
           TestHelpers.createTestApp(
             child: Scaffold(
               body: createTestRecordingCard(
+                isExpanded: true,
                 isPlaying: true,
                 currentPosition: const Duration(seconds: 30),
               ),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
         // Assert
         expect(find.byIcon(Icons.pause), findsWidgets);
@@ -218,15 +221,16 @@ void main() {
       });
 
       testWidgets('displays loading indicator when loading', (WidgetTester tester) async {
-        // Act
+        // Act — il loading indicator sta nel bottone centrale della card
+        // espansa (RecordingControls).
         await tester.pumpWidget(
           TestHelpers.createTestApp(
             child: Scaffold(
-              body: createTestRecordingCard(isLoading: true),
+              body: createTestRecordingCard(isExpanded: true, isLoading: true),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
         // Assert
         expect(find.byType(CircularProgressIndicator), findsWidgets);
@@ -236,18 +240,19 @@ void main() {
 
     group('Edit Mode and Selection', () {
       testWidgets('shows selection controls in edit mode', (WidgetTester tester) async {
-        // Act
+        // Act — la UI attuale usa un overlay circolare custom, non un
+        // Checkbox: se selezionata mostra Icons.check.
         await tester.pumpWidget(
           TestHelpers.createTestApp(
             child: Scaffold(
-              body: createTestRecordingCard(isEditMode: true),
+              body: createTestRecordingCard(isEditMode: true, isSelected: true),
             ),
           ),
         );
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
         // Assert
-        expect(find.byType(Checkbox), findsWidgets);
+        expect(find.byIcon(Icons.check), findsWidgets);
         expect(tester.takeException(), isNull);
       });
 
@@ -358,13 +363,20 @@ void main() {
         );
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
-        // Try to find and tap favorite button
+        // Il bottone preferiti compare solo dopo swipe sinistra→destra
+        // sulla card (favorite action).
+        await tester.drag(
+          find.byType(RecordingCard),
+          const Offset(120, 0),
+          warnIfMissed: false,
+        );
+        await TestHelpers.pumpAndSettleWithTimeout(tester);
+
         final favoriteButtons = find.byIcon(Icons.favorite_border);
-        if (favoriteButtons.evaluate().isNotEmpty) {
-          await tester.tap(favoriteButtons.first);
-          await tester.pump();
-          expect(favoriteToggleCalled, isTrue);
-        }
+        expect(favoriteButtons, findsWidgets);
+        await tester.tap(favoriteButtons.first, warnIfMissed: false);
+        await tester.pump();
+        expect(favoriteToggleCalled, isTrue);
 
         expect(tester.takeException(), isNull);
       });

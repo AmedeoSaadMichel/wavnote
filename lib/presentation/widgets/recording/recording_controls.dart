@@ -45,7 +45,7 @@ class RecordingControls extends StatelessWidget {
           flex: 3,
           child: Center(
             child: GestureDetector(
-              onTap: onPlayPause,
+              onTap: isLoading ? null : onPlayPause,
               child: _buildCenterButton(),
             ),
           ),

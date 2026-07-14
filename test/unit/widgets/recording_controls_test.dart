@@ -204,7 +204,11 @@ void main() {
         final progressIndicator = tester.widget<CircularProgressIndicator>(
           find.byType(CircularProgressIndicator),
         );
-        expect(progressIndicator.color, equals(Colors.white));
+        // Il colore è impostato via valueColor (scuro, su bottone giallo).
+        expect(
+          progressIndicator.valueColor?.value,
+          equals(const Color(0xFF0A0612)),
+        );
         expect(progressIndicator.strokeWidth, equals(3.0));
       });
     });
@@ -624,9 +628,16 @@ void main() {
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
         // Assert
-        // Check that buttons have adequate touch targets (48dp minimum)
-        final playButton = find.byIcon(Icons.play_arrow);
-        final playButtonSize = tester.getSize(playButton);
+        // Check that buttons have adequate touch targets (48dp minimum).
+        // Si misura l'area tappabile (GestureDetector), non il glifo
+        // dell'icona che è volutamente più piccolo (28px).
+        final playTapTarget = find
+            .ancestor(
+              of: find.byIcon(Icons.play_arrow),
+              matching: find.byType(GestureDetector),
+            )
+            .first;
+        final playButtonSize = tester.getSize(playTapTarget);
         expect(playButtonSize.width, greaterThanOrEqualTo(48.0));
         expect(playButtonSize.height, greaterThanOrEqualTo(48.0));
       });
@@ -656,7 +667,9 @@ void main() {
         await tester.tap(find.byIcon(Icons.graphic_eq));
         await tester.pump();
 
-        // Assert
+        // Assert: l'eccezione del callback viene riportata dal framework
+        // ma il widget resta montato e funzionante.
+        expect(tester.takeException(), isA<Exception>());
         expect(find.byType(RecordingControls), findsOneWidget);
       });
 

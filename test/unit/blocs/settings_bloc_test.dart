@@ -454,7 +454,11 @@ void main() {
         build: () => bloc,
         seed: () => SettingsLoaded(settings: testSettings),
         act: (bloc) => bloc.add(const ExportSettings()),
-        expect: () => [isA<SettingsLoaded>()],
+        // Il handler riemette lo stesso SettingsLoaded: bloc deduplica gli
+        // stati uguali (Equatable), quindi non viene emesso nulla. L'export
+        // attuale serializza in JSON e mantiene lo stato senza errori.
+        expect: () => <SettingsState>[],
+        verify: (bloc) => expect(bloc.state, isA<SettingsLoaded>()),
       );
 
       blocTest<SettingsBloc, SettingsState>(
@@ -476,7 +480,7 @@ void main() {
         ),
         act: (bloc) => bloc.add(
           ImportSettings(const {
-            'audioFormat': 1, // wav index
+            'audioFormat': 0, // AudioFormat.wav (enum: wav=0, m4a=1, flac=2)
             'sampleRate': 48000,
             'bitRate': 256000,
           }),

@@ -1,4 +1,5 @@
 // File: test/unit/services/audio_recorder_service_test.dart
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'dart:async';
 
@@ -9,6 +10,28 @@ import 'package:wavnote/services/audio/audio_recorder_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Il package `record` crea il recorder via method channel: senza un
+  // handler mock, in test scatta MissingPluginException fuori dal try/catch
+  // del servizio. Rispondiamo con valori neutri alle chiamate del plugin.
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.llfbandit.record/messages'),
+          (call) async {
+            if (call.method == 'hasPermission') return false;
+            return null;
+          },
+        );
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('com.llfbandit.record/messages'),
+          null,
+        );
+  });
 
   group('AudioRecorderService Memory Management', () {
     late AudioRecorderService service;
