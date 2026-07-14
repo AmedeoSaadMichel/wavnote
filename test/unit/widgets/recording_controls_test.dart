@@ -15,6 +15,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:wavnote/presentation/widgets/recording/recording_controls.dart';
 
@@ -381,19 +382,14 @@ void main() {
         );
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
-        // Try to tap delete button (could be FontAwesome skull icon)
-        final deleteButton = find.byWidgetPredicate((widget) => 
-          widget.toString().contains('skull') || 
-          (widget is Icon && widget.icon == Icons.delete));
-        
-        if (deleteButton.evaluate().isNotEmpty) {
-          await tester.tap(deleteButton.first);
-          await tester.pump();
-          expect(deleteCalled, isTrue);
-        } else {
-          // Skip assertion if delete button not found
-          expect(deleteCalled, isFalse);
-        }
+        // Il bottone delete è lo skull FontAwesome (FaIcon, non Icon).
+        final deleteButton = find.byWidgetPredicate(
+          (w) => w is FaIcon && w.icon == FontAwesomeIcons.skull,
+        );
+        expect(deleteButton, findsOneWidget);
+        await tester.tap(deleteButton);
+        await tester.pump();
+        expect(deleteCalled, isTrue);
       });
 
       testWidgets('does not call onPlayPause when loading', (WidgetTester tester) async {

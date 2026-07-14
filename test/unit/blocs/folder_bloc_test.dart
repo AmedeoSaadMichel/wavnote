@@ -132,6 +132,7 @@ void main() {
           isA<FolderCreated>(),
         ],
         verify: (bloc) {
+          verify(() => mockRepository.createFolder(any())).called(1);
           final state = bloc.state;
           if (state is FolderCreated) {
             expect(state.createdFolder.name, equals('Work'));
@@ -192,6 +193,7 @@ void main() {
         // poi lo stato di successo FolderDeleted.
         expect: () => [isA<FolderLoaded>(), isA<FolderDeleted>()],
         verify: (bloc) {
+          verify(() => mockRepository.deleteFolder('folder_1')).called(1);
           final state = bloc.state;
           if (state is FolderDeleted) {
             expect(state.deletedFolderId, equals('folder_1'));
@@ -210,6 +212,11 @@ void main() {
         seed: () => const FolderLoaded(defaultFolders: [], customFolders: []),
         act: (bloc) => bloc.add(const DeleteFolder(folderId: 'non_existent')),
         expect: () => [isA<FolderError>()],
+        // La cartella non esiste nello stato: il bloc fallisce prima di
+        // toccare il repository.
+        verify: (_) {
+          verifyNever(() => mockRepository.deleteFolder(any()));
+        },
       );
     });
 
