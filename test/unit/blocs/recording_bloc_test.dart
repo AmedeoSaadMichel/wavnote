@@ -161,6 +161,16 @@ void main() {
           isA<recording_bloc.RecordingStarting>(),
           isA<recording_bloc.RecordingInProgress>(),
         ],
+        verify: (_) {
+          verify(
+            () => mockStartRecordingUseCase.execute(
+              folderId: 'test_folder',
+              format: AudioFormat.m4a,
+              sampleRate: any(named: 'sampleRate'),
+              bitRate: any(named: 'bitRate'),
+            ),
+          ).called(1);
+        },
       );
 
       blocTest<RecordingBloc, recording_bloc.RecordingState>(
@@ -187,6 +197,9 @@ void main() {
           isA<recording_bloc.RecordingStopping>(),
           isA<recording_bloc.RecordingCompleted>(),
         ],
+        verify: (_) {
+          verify(() => mockStopRecordingUseCase.execute()).called(1);
+        },
       );
 
       blocTest<RecordingBloc, recording_bloc.RecordingState>(
@@ -209,6 +222,9 @@ void main() {
         ),
         act: (testBloc) => testBloc.add(const PauseRecording()),
         expect: () => [isA<recording_bloc.RecordingPaused>()],
+        verify: (_) {
+          verify(() => mockPauseRecordingUseCase.executePause()).called(1);
+        },
       );
 
       blocTest<RecordingBloc, recording_bloc.RecordingState>(

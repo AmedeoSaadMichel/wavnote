@@ -8,8 +8,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'package:wavnote/presentation/widgets/recording/recording_card/recording_card.dart';
+import 'package:wavnote/presentation/widgets/recording/recording_controls.dart';
 import 'package:wavnote/domain/entities/recording_entity.dart';
 import 'package:wavnote/core/enums/audio_format.dart';
 
@@ -202,20 +204,19 @@ void main() {
           TestHelpers.createTestApp(
             child: Scaffold(
               body: createTestRecordingCard(
+                isExpanded: true,
                 onPlayPause: () => playPauseCalled = true,
               ),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
-        // Try to find and tap play button
         final playButtons = find.byIcon(Icons.play_arrow);
-        if (playButtons.evaluate().isNotEmpty) {
-          await tester.tap(playButtons.first);
-          await tester.pump();
-          expect(playPauseCalled, isTrue);
-        }
+        expect(playButtons, findsWidgets);
+        await tester.tap(playButtons.first, warnIfMissed: false);
+        await tester.pump();
+        expect(playPauseCalled, isTrue);
 
         expect(tester.takeException(), isNull);
       });
@@ -270,12 +271,9 @@ void main() {
         );
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
-        // Assert
-        final checkboxes = find.byType(Checkbox);
-        if (checkboxes.evaluate().isNotEmpty) {
-          final checkbox = tester.widget<Checkbox>(checkboxes.first);
-          expect(checkbox.value, isTrue);
-        }
+        // Assert: l'overlay di selezione custom mostra Icons.check
+        // quando la card è selezionata.
+        expect(find.byIcon(Icons.check), findsWidgets);
         expect(tester.takeException(), isNull);
       });
 
@@ -296,13 +294,10 @@ void main() {
         );
         await TestHelpers.pumpAndSettleWithTimeout(tester);
 
-        // Try to find and tap selection control
-        final checkboxes = find.byType(Checkbox);
-        if (checkboxes.evaluate().isNotEmpty) {
-          await tester.tap(checkboxes.first);
-          await tester.pump();
-          expect(selectionToggleCalled, isTrue);
-        }
+        // In edit mode il tap sulla card chiama onSelectionToggle.
+        await tester.tap(find.byType(RecordingCard), warnIfMissed: false);
+        await tester.pump();
+        expect(selectionToggleCalled, isTrue);
 
         expect(tester.takeException(), isNull);
       });
@@ -390,20 +385,26 @@ void main() {
           TestHelpers.createTestApp(
             child: Scaffold(
               body: createTestRecordingCard(
+                isExpanded: true,
                 onDelete: () => deleteCalled = true,
               ),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
-        // Try to find and tap delete button
-        final deleteButtons = find.byIcon(Icons.delete);
-        if (deleteButtons.evaluate().isNotEmpty) {
-          await tester.tap(deleteButtons.first);
-          await tester.pump();
-          expect(deleteCalled, isTrue);
-        }
+        // Il delete è lo skull dentro RecordingControls (card espansa).
+        // find.byIcon non matcha FaIcon: serve un predicate.
+        final deleteButton = find.descendant(
+          of: find.byType(RecordingControls),
+          matching: find.byWidgetPredicate(
+            (w) => w is FaIcon && w.icon == FontAwesomeIcons.skull,
+          ),
+        );
+        expect(deleteButton, findsOneWidget);
+        await tester.tap(deleteButton, warnIfMissed: false);
+        await tester.pump();
+        expect(deleteCalled, isTrue);
 
         expect(tester.takeException(), isNull);
       });
@@ -498,25 +499,25 @@ void main() {
           TestHelpers.createTestApp(
             child: Scaffold(
               body: createTestRecordingCard(
+                isExpanded: true,
                 onPlayPause: () => tapCount++,
               ),
             ),
           ),
         );
-        await TestHelpers.pumpAndSettleWithTimeout(tester);
+        await tester.pump(const Duration(milliseconds: 100));
 
         // Act - Rapid taps
         final playButtons = find.byIcon(Icons.play_arrow);
-        if (playButtons.evaluate().isNotEmpty) {
-          for (int i = 0; i < 5; i++) {
-            await tester.tap(playButtons.first);
-            await tester.pump(const Duration(milliseconds: 50));
-          }
+        expect(playButtons, findsWidgets);
+        for (int i = 0; i < 5; i++) {
+          await tester.tap(playButtons.first, warnIfMissed: false);
+          await tester.pump(const Duration(milliseconds: 50));
         }
 
         // Assert
         expect(tester.takeException(), isNull);
-        expect(tapCount, greaterThanOrEqualTo(0));
+        expect(tapCount, 5);
       });
     });
 
