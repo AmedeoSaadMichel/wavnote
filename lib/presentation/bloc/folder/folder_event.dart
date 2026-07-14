@@ -87,32 +87,6 @@ class RenameFolderEvent extends FolderEvent {
       'RenameFolderEvent { folderId: $folderId, newName: $newName }';
 }
 
-/// Event to sort folders by different criteria
-class SortFolders extends FolderEvent {
-  final FolderSortType sortType;
-
-  const SortFolders({required this.sortType});
-
-  @override
-  List<Object> get props => [sortType];
-
-  @override
-  String toString() => 'SortFolders { sortType: $sortType }';
-}
-
-/// Event to search/filter folders
-class FilterFolders extends FolderEvent {
-  final String searchQuery;
-
-  const FilterFolders({required this.searchQuery});
-
-  @override
-  List<Object> get props => [searchQuery];
-
-  @override
-  String toString() => 'FilterFolders { searchQuery: $searchQuery }';
-}
-
 /// Event to toggle edit mode for multi-selection
 class ToggleFolderEditMode extends FolderEvent {
   const ToggleFolderEditMode();
@@ -153,22 +127,4 @@ class DeleteSelectedFolders extends FolderEvent {
 
   @override
   String toString() => 'DeleteSelectedFolders { folderIds: $folderIds }';
-}
-
-/// Enum for folder sorting options
-enum FolderSortType { name, createdDate, recordingCount, lastModified }
-
-extension FolderSortTypeExtension on FolderSortType {
-  String get displayName {
-    switch (this) {
-      case FolderSortType.name:
-        return 'Name';
-      case FolderSortType.createdDate:
-        return 'Date Created';
-      case FolderSortType.recordingCount:
-        return 'Recording Count';
-      case FolderSortType.lastModified:
-        return 'Last Modified';
-    }
-  }
 }

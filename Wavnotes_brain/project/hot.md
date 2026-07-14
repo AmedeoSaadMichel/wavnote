@@ -43,6 +43,7 @@
 - Nota comportamento repo: `getAllRecordings()` volutamente NON filtra i soft-deleted (usata solo da debug handler e waveform service); il filtro utente è in `getRecordingsByFolder`.
 
 - Analisi qualità test 2026-07-14: `analysis/2026-07-14-analisi-qualita-test.md`. Sintesi: ~180/286 casi proteggono davvero; geolocation_service_test è quasi tutto facciata (mock definiti mai usati, 47 assert isA<String>); zero verify() nei bloc test; buchi invariati su lifecycle Dynamic Island, bucket nativi e Swift (zero XCTest). Priorità: gate CI subito, poi test lifecycle e bucket, poi bonifica del teatro.
+- Follow-up 2026-07-14 (decisioni utente): creato gate CI `.github/workflows/ci.yml` (analyze con warning/info non fatali + flutter test, Flutter 3.35.5); rimossi eventi morti `FilterFolders`/`SortFolders` + enum `FolderSortType` da folder_event.dart e relativi test skip; rimossi i 2 test integration skip — deciso che la MainScreen NON mostra RecordingError (gli errori vivono nel bottom sheet/lista). Suite: 279 verdi, 0 falliti, 0 skip. Restano da fare: test lifecycle (post validazione device), test bucket nativi, bonifica test teatro.
 
 ## Prossimo step
 

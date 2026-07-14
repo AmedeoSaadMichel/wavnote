@@ -276,22 +276,6 @@ void main() {
         expect(bloc.state, isA<FolderState>());
       });
 
-      // FilterFolders e SortFolders sono definiti in folder_event.dart ma il
-      // bloc non registra alcun handler: add() lancia StateError. Skip finché
-      // non si decide se implementare gli handler o rimuovere gli eventi.
-      test('handles filter folders', skip: 'Nessun handler on<FilterFolders> registrato nel FolderBloc', () {
-        bloc.add(const FilterFolders(searchQuery: 'work'));
-
-        // Should handle folder filtering
-        expect(bloc.state, isA<FolderState>());
-      });
-
-      test('handles sort folders', skip: 'Nessun handler on<SortFolders> registrato nel FolderBloc', () {
-        bloc.add(const SortFolders(sortType: FolderSortType.name));
-
-        // Should handle folder sorting
-        expect(bloc.state, isA<FolderState>());
-      });
     });
 
     group('Error Handling', () {

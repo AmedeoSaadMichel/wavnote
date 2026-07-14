@@ -112,37 +112,10 @@ void main() {
       await _testRecordingWithFormat(tester, mockRecordingBloc, AudioFormat.wav);
     });
 
-    // La MainScreen attuale non renderizza gli stati di errore del
-    // RecordingBloc (emette solo CleanupExpiredRecordings): gli errori di
-    // registrazione sono mostrati altrove (bottom sheet / lista). Skip
-    // finché non si decide se la MainScreen debba mostrare questi errori.
-    testWidgets('Recording permission handling workflow', (tester) async {
-      // Test permission denied scenario
-      when(() => mockRecordingBloc.state).thenReturn(
-        const RecordingError('Microphone permission denied'),
-      );
-
-      await tester.pumpWidget(buildTestApp());
-
-      await tester.pump();
-
-      // Should show permission error
-      expect(find.textContaining('permission'), findsWidgets);
-    }, skip: true); // MainScreen non mostra RecordingError
-
-    testWidgets('Recording error handling workflow', (tester) async {
-      // Test recording error scenario
-      when(() => mockRecordingBloc.state).thenReturn(
-        const RecordingError('Audio service error'),
-      );
-
-      await tester.pumpWidget(buildTestApp());
-
-      await tester.pump();
-
-      // Should show error message
-      expect(find.textContaining('error'), findsWidgets);
-    }, skip: true); // MainScreen non mostra RecordingError
+    // Nota (decisione 2026-07-14): la MainScreen non mostra gli stati di
+    // errore del RecordingBloc per scelta — gli errori di registrazione
+    // vengono mostrati dove avviene la registrazione (bottom sheet / lista).
+    // I vecchi test "permission/error handling workflow" sono stati rimossi.
 
     testWidgets('Multiple recordings workflow', (tester) async {
       await tester.pumpWidget(buildTestApp());
