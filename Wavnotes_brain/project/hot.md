@@ -4,6 +4,7 @@
 
 ## Stato corrente
 
+- Risanamento test 2026-07-14 COMPLETATO su branch `test/triage-test-falliti`: suite da 239/44 a **279 verdi / 0 falliti / 4 skip documentati**; analyzer invariato (47 issue). Dettagli e decisioni in `analysis/2026-07-14-triage-test-falliti.md`. Unica modifica a lib/: `recording_controls.dart` ignora il tap play/pause durante il loading. Falsi allarmi chiariti: touch target ok (56px reali, il test misurava il glifo), import settings ok (test usava indice enum sbagliato). Contratto confermato dall'utente: `stoppedSeekBarIndex` sempre applicato su StopRecordingPreview, anche natural completion. Decisioni aperte dietro i 4 skip: implementare o rimuovere FilterFolders/SortFolders (eventi senza handler); MainScreen deve mostrare gli stati RecordingError? Modifiche NON committate.
 - Fix signing iOS 2026-07-13: Bundle Identifier della Live Activity allineato al prefisso dell'app (`com.amedeosaadmichel.wavnote.liveactivity`), dopo la modifica del Bundle ID principale eseguita in Xcode.
 - UI 2026-07-13: slider della recording card interpolato per 120 ms tra i tick di posizione; l'onda decorativa ora scorre senza inversione ping-pong. Drag immediato invariato.
 - Analisi 2026-07-11: `flutter analyze` rileva 47 issue (14 warning, 33 info), senza errori di compilazione; suite completa 239 test, 195 verdi e 44 falliti, soprattutto widget/integration test non riallineati alla UI corrente. Dettagli in `analysis/2026-07-11-analisi-progetto.md`.
@@ -40,6 +41,8 @@
 - Test 2026-07-09: aggiunta dev dependency `sqflite_common_ffi`; `test_helpers.dart` ora inizializza SQLite ffi con directory DB unica per isolate (i file di test girano in parallelo). `folder_repository_test` riscritto contro FolderRepository reale (23 test). `recording_repository_test` riparato: era marcito (26/27 falliti, API vecchia bool vs Either) → 27/27 verdi. Nuovo `audio_engine_playback_adapter_test.dart` (9 test): 8 verdi, 1 rosso volutamente.
 - Fix 2026-07-09 (confermato utente): rimossa `_currentPosition = position;` da `seek()` in `audio_engine_playback_adapter.dart`. La riga rendeva sempre falso `shouldRestartFromSeek` in `play()` → seek in pausa + play riprendeva dalla posizione nativa pre-seek. Il fix pause/play del 2026-05-07 resta intatto (`pause()` cachea la posizione; `seek()` emette subito sullo stream per la UI). `audio_engine_playback_adapter_test.dart` ora 9/9 verdi. Da validare a orecchio sul device: pausa → slider → play nella card salvata.
 - Nota comportamento repo: `getAllRecordings()` volutamente NON filtra i soft-deleted (usata solo da debug handler e waveform service); il filtro utente è in `getRecordingsByFolder`.
+
+- Analisi qualità test 2026-07-14: `analysis/2026-07-14-analisi-qualita-test.md`. Sintesi: ~180/286 casi proteggono davvero; geolocation_service_test è quasi tutto facciata (mock definiti mai usati, 47 assert isA<String>); zero verify() nei bloc test; buchi invariati su lifecycle Dynamic Island, bucket nativi e Swift (zero XCTest). Priorità: gate CI subito, poi test lifecycle e bucket, poi bonifica del teatro.
 
 ## Prossimo step
 

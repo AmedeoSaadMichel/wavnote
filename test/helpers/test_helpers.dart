@@ -37,6 +37,8 @@ import 'package:wavnote/domain/repositories/i_location_repository.dart';
 
 import 'package:wavnote/domain/repositories/i_folder_repository.dart';
 import 'package:wavnote/domain/repositories/i_settings_repository.dart';
+import 'package:wavnote/domain/repositories/i_audio_trimmer_repository.dart';
+import 'package:wavnote/config/dependency_injection.dart';
 
 /// Test helpers and utilities for WavNote testing
 class TestHelpers {
@@ -123,9 +125,26 @@ class TestHelpers {
     // Setup default mock behaviors
     when(() => mockAudioService.initialize()).thenAnswer((_) async => true);
     when(() => mockAudioService.dispose()).thenAnswer((_) async {});
+    when(() => mockAudioService.needsDisposal).thenReturn(false);
+    when(
+      () => mockAudioService.getRecordingAmplitudeStream(),
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockAudioService.externalControlStream,
+    ).thenAnswer((_) => const Stream.empty());
+    when(
+      () => mockAudioService.getRecordingWaveformBucketStream(),
+    ).thenAnswer((_) => const Stream.empty());
     when(
       () => mockRecordingRepository.getAllRecordings(),
     ).thenAnswer((_) async => <RecordingEntity>[]);
+
+    // Il costruttore del RecordingBloc risolve il trimmer via GetIt.
+    if (!sl.isRegistered<IAudioTrimmerRepository>()) {
+      sl.registerSingleton<IAudioTrimmerRepository>(
+        MockAudioTrimmerRepository(),
+      );
+    }
 
     return RecordingBloc(
       audioService: mockAudioService,
@@ -257,6 +276,9 @@ class MockLocationRepository extends Mock implements ILocationRepository {}
 class MockFolderRepository extends Mock implements IFolderRepository {}
 
 class MockSettingsRepository extends Mock implements ISettingsRepository {}
+
+class MockAudioTrimmerRepository extends Mock
+    implements IAudioTrimmerRepository {}
 
 /// Test constants
 class TestConstants {

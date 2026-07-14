@@ -38,6 +38,7 @@ void main() {
   setUpAll(() async {
     await TestHelpers.initializeTestEnvironment();
     registerFallbackValue(AudioFormat.m4a);
+    registerFallbackValue(Duration.zero);
   });
 
   group('RecordingBloc — OverwriteRecording', () {
@@ -61,8 +62,18 @@ void main() {
 
       when(() => mockAudio.initialize()).thenAnswer((_) async => true);
       when(() => mockAudio.dispose()).thenAnswer((_) async {});
+      when(() => mockAudio.needsDisposal).thenReturn(false);
+      when(
+        () => mockAudio.stopRecording(raw: any(named: 'raw')),
+      ).thenAnswer((_) async => null);
       when(
         () => mockAudio.getRecordingAmplitudeStream(),
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockAudio.externalControlStream,
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockAudio.getRecordingWaveformBucketStream(),
       ).thenAnswer((_) => const Stream.empty());
       when(
         () => mockAudio.getCurrentRecordingDuration(),
@@ -91,6 +102,7 @@ void main() {
             format: any(named: 'format'),
             sampleRate: any(named: 'sampleRate'),
             bitRate: any(named: 'bitRate'),
+            initialElapsedOffset: any(named: 'initialElapsedOffset'),
           ),
         ).thenAnswer((_) async => true);
         return bloc;
@@ -130,6 +142,7 @@ void main() {
             format: any(named: 'format'),
             sampleRate: any(named: 'sampleRate'),
             bitRate: any(named: 'bitRate'),
+            initialElapsedOffset: any(named: 'initialElapsedOffset'),
           ),
         ).thenAnswer((_) async => true);
         return bloc;

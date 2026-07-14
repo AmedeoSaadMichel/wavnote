@@ -273,9 +273,10 @@ void main() {
         expect(result, isA<String>());
         expect(result.isNotEmpty, isTrue);
         
-        // Check if it follows timestamp format when fallback is used
+        // Check if it follows date format when fallback is used
+        // (il servizio usa 'Recording giorno/mese/anno', senza ora)
         if (result.contains('Recording')) {
-          expect(result, matches(r'Recording \d{4}-\d{2}-\d{2} \d{2}:\d{2}'));
+          expect(result, matches(r'Recording \d{1,2}/\d{1,2}/\d{4}'));
         }
       });
     });

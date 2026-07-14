@@ -79,6 +79,12 @@ void main() {
         () => mockAudioService.getRecordingAmplitudeStream(),
       ).thenAnswer((_) => const Stream.empty());
       when(
+        () => mockAudioService.externalControlStream,
+      ).thenAnswer((_) => const Stream.empty());
+      when(
+        () => mockAudioService.getRecordingWaveformBucketStream(),
+      ).thenAnswer((_) => const Stream.empty());
+      when(
         () => mockAudioService.hasMicrophonePermission(),
       ).thenAnswer((_) async => true);
       when(
