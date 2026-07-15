@@ -88,6 +88,13 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     private var lastClockEmitTime: CFTimeInterval = 0
     private var playbackClockTimer: DispatchSourceTimer?
 
+    /// Frame scritti nei segmenti già chiusi (accumulati attraverso pause/resume).
+    private var framesInPreviousSegments: Int64 = 0
+    /// Frame scritti nel segmento corrente (resettato a ogni nuovo file).
+    private var framesWrittenThisSegment: Int64 = 0
+    /// Sample rate del file WAV di output (impostato a startRecording).
+    private var outputSampleRate: Double = 44100
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(
             name: "com.wavnote/audio_engine",
@@ -175,6 +182,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             }
         case "getAmplitude":
             result(currentAmplitude)
+        case "getRecordingStatus":
+            getRecordingStatus(result: result)
         case "isRecording":
             result(isRecording)
         case "isPaused":
@@ -300,6 +309,9 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             let wavSettings = buildRecordingSettings(format: "wav", sampleRate: cappedSampleRate, bitRate: bitRate)
             recordingSettings = wavSettings
             recordingSegments = []
+            framesInPreviousSegments = 0
+            framesWrittenThisSegment = 0
+            lastClockEmitTime = 0
 
             let wavURL = fileURL.deletingPathExtension().appendingPathExtension("wav")
             let wavPath = wavURL.path
@@ -334,6 +346,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             }
 
             let outputFormat = audioFile!.processingFormat
+            outputSampleRate = outputFormat.sampleRate
             var converter: AVAudioConverter? = nil
             if !inputFormat.isEqual(outputFormat) {
                 converter = AVAudioConverter(from: inputFormat, to: outputFormat)
@@ -356,6 +369,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 if shouldLog {
                     self.logger.trace("🎙️ [NATIVE-macOS] tap buffer #\(bufferCount) — frames=\(buffer.frameLength)")
                 }
+                var writtenOutputFrames: Int64 = 0
                 do {
                     if let converter = converter {
                         let pcmBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: buffer.frameCapacity)
@@ -368,13 +382,16 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                             self.logger.error("🎙️ [NATIVE-macOS] converter ERROR: \(err)")
                         } else if let pcmBuffer = pcmBuffer {
                             try self.audioFile?.write(from: pcmBuffer)
+                            writtenOutputFrames = Int64(pcmBuffer.frameLength)
                         }
                     } else {
                         try self.audioFile?.write(from: buffer)
+                        writtenOutputFrames = Int64(buffer.frameLength)
                     }
                 } catch {
                     self.logger.error("🎙️ [NATIVE-macOS] tap write ERROR: \(error)")
                 }
+                self.framesWrittenThisSegment += writtenOutputFrames
                 if let ch = buffer.floatChannelData?[0] {
                     let n = Int(buffer.frameLength)
                     var sq: Float = 0
@@ -385,7 +402,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                     let now = CFAbsoluteTimeGetCurrent()
                     if now - self.lastClockEmitTime >= 0.1 {
                         self.lastClockEmitTime = now
-                        let positionMs = Int(Double(self.audioFile?.length ?? 0) / outputFormat.sampleRate * 1000)
+                        let totalFrames = self.framesInPreviousSegments + self.framesWrittenThisSegment
+                        let positionMs = Int(Double(totalFrames) / self.outputSampleRate * 1000)
                         self.clockStreamHandler.sendRecordingTick(
                             positionMs: positionMs,
                             amplitude: Double(amp)
@@ -425,6 +443,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         }
         audioEngine?.pause()
         if let path = recordingFilePath {
+            framesInPreviousSegments += framesWrittenThisSegment
+            framesWrittenThisSegment = 0
             audioFile = nil   // ARC chiude il file → header WAV aggiornato
             recordingSegments.append(path)
             // Riapri in lettura per verificare che il file sia stato chiuso correttamente
@@ -458,6 +478,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             self.logger.debug("▶️ [NATIVE-macOS] resumeRecording: nuovo frammento → \(contPath)")
             audioFile = try AVAudioFile(forWriting: URL(fileURLWithPath: contPath), settings: settings)
             recordingFilePath = contPath
+            framesWrittenThisSegment = 0
+            lastClockEmitTime = 0
             try audioEngine?.start()
             isPaused = false
             result(true)
@@ -485,6 +507,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         isRecording = false
         isPaused = false
         currentAmplitude = 0.0
+        framesInPreviousSegments = 0
+        framesWrittenThisSegment = 0
 
         guard !recordingSegments.isEmpty else {
             recordingSettings = nil
@@ -586,7 +610,20 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         isRecording = false
         isPaused = false
         recordingFilePath = nil
+        framesInPreviousSegments = 0
+        framesWrittenThisSegment = 0
         result(true)
+    }
+
+    private func getRecordingStatus(result: @escaping FlutterResult) {
+        let durationMs = Int(Double(framesInPreviousSegments + framesWrittenThisSegment) / outputSampleRate * 1000)
+        result([
+            "isRecording": isRecording,
+            "isPaused": isPaused,
+            "path": recordingFilePath ?? NSNull(),
+            "durationMs": durationMs,
+            "amplitude": Double(currentAmplitude)
+        ])
     }
 
     // MARK: - Standalone Format Conversion

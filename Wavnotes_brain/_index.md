@@ -32,6 +32,7 @@
 ## Analisi
 | File | Topic |
 |------|-------|
+| [[analysis/2026-07-15-divergenza-recording-ios-macos]] | Perché la registrazione si comporta diversamente su iOS e macOS: plugin macOS fork non riallineato, 5 divergenze |
 | [[analysis/2026-07-14-analisi-qualita-test]] | Qualità della suite post-risanamento: nucleo forte, ~70 test di facciata, buchi su lifecycle nativo |
 | [[analysis/2026-07-14-triage-test-falliti]] | Triage dei 44 test falliti: root cause per categoria e ordine di risanamento |
 | [[analysis/2026-07-11-analisi-progetto]] | Analisi aggiornata con analyzer e suite completa: 47 issue, 195/239 test verdi |
