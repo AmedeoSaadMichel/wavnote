@@ -105,16 +105,9 @@ extension AudioEnginePlugin {
 
             let outputFormat = audioFile!.processingFormat
             outputSampleRate = outputFormat.sampleRate
-            var converter: AVAudioConverter? = nil
-            if !inputFormat.isEqual(outputFormat) {
-                self.logger.debug("🎙️ [NATIVE] startRecording: converter — \(inputFormat.sampleRate)Hz → \(outputFormat.sampleRate)Hz")
-                converter = AVAudioConverter(from: inputFormat, to: outputFormat)
-                if converter == nil {
-                    self.logger.error("🎙️ [NATIVE] startRecording ERROR: impossibile creare AVAudioConverter")
-                    result(FlutterError(code: "FORMAT_ERROR", message: "Cannot create audio format converter", details: nil))
-                    return
-                }
-            }
+            logger.debug("Registrazione PCM: input=\(inputFormat.sampleRate) Hz, output=\(outputFormat.sampleRate) Hz")
+            recordingPCMConverter = inputFormat.isEqual(outputFormat)
+                ? nil : try RecordingPCMConverter(from: inputFormat, to: outputFormat)
 
             var bufferCount = 0
             let tapInput = inputNode!
@@ -134,21 +127,13 @@ extension AudioEnginePlugin {
 
                 var writtenOutputFrames: Int64 = 0
                 do {
-                    if let converter = converter {
-                        let pcmBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: buffer.frameCapacity)
-                        var error: NSError? = nil
-                        converter.convert(to: pcmBuffer!, error: &error) { _, outStatus in
-                            outStatus.pointee = .haveData
-                            return buffer
-                        }
-                        if let err = error {
-                            self.logger.error("🎙️ [NATIVE] converter ERROR: \(err)")
-                        } else if let pcmBuffer = pcmBuffer {
-                            try self.audioFile?.write(from: pcmBuffer)
-                            writtenOutputFrames = Int64(pcmBuffer.frameLength)
+                    guard let file = self.audioFile else { return }
+                    if let converter = self.recordingPCMConverter {
+                        writtenOutputFrames = try converter.convert(buffer) { output in
+                            try file.write(from: output)
                         }
                     } else {
-                        try self.audioFile?.write(from: buffer)
+                        try file.write(from: buffer)
                         writtenOutputFrames = Int64(buffer.frameLength)
                     }
                 } catch {
@@ -307,6 +292,11 @@ extension AudioEnginePlugin {
             logger.debug("⏸️ [NATIVE] pauseRecording: PRIMA chiusura — frames=\(frames) (\(Double(frames)/sr)s ≈ \(Int((Double(frames)/sr)*10)) bars@100ms)")
         }
         audioEngine?.pause()
+        do { try finishRecordingConversion() }
+        catch {
+            return (nil, FlutterError(code: "CONVERSION_ERROR",
+                                      message: error.localizedDescription, details: nil))
+        }
         if let path = recordingFilePath {
             framesInPreviousSegments += framesWrittenThisSegment
             framesWrittenThisSegment = 0
@@ -449,6 +439,12 @@ extension AudioEnginePlugin {
         }
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
+        do { try finishRecordingConversion() }
+        catch {
+            result(FlutterError(code: "CONVERSION_ERROR", message: error.localizedDescription, details: nil))
+            return
+        }
+        recordingPCMConverter = nil
         flushWaveformBucket()
         if let path = recordingFilePath, audioFile != nil {
             audioFile = nil
@@ -632,6 +628,7 @@ extension AudioEnginePlugin {
         self.logger.error("❌ [NATIVE] cancelRecording")
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
+        recordingPCMConverter = nil
         audioFile = nil
         audioPlayer?.stop()
         playbackEngine?.stop()

@@ -1,0 +1,150 @@
+{
+  "file": "registrazione fornita dall’utente, identificativo omesso",
+  "sample_rate": 44100,
+  "decoded_frames": 1106880,
+  "peak_dbfs": -1.644132719748609,
+  "rms_dbfs": -21.38771650909572,
+  "samples_at_or_above_0_999": 0,
+  "adjacent_100ms_pairs_correlation_over_0_99": [
+    {
+      "first_start_seconds": 0.0,
+      "second_start_seconds": 0.1,
+      "duration_seconds": 0.1,
+      "correlation": 0.998778,
+      "rms_difference": 6.9e-05
+    },
+    {
+      "first_start_seconds": 1.2,
+      "second_start_seconds": 1.3,
+      "duration_seconds": 0.1,
+      "correlation": 0.999854,
+      "rms_difference": 3e-05
+    },
+    {
+      "first_start_seconds": 2.4,
+      "second_start_seconds": 2.5,
+      "duration_seconds": 0.1,
+      "correlation": 0.999799,
+      "rms_difference": 0.002862
+    },
+    {
+      "first_start_seconds": 3.6,
+      "second_start_seconds": 3.7,
+      "duration_seconds": 0.1,
+      "correlation": 0.999833,
+      "rms_difference": 3e-05
+    },
+    {
+      "first_start_seconds": 4.4,
+      "second_start_seconds": 4.5,
+      "duration_seconds": 0.1,
+      "correlation": 0.999799,
+      "rms_difference": 2.2e-05
+    },
+    {
+      "first_start_seconds": 5.6,
+      "second_start_seconds": 5.7,
+      "duration_seconds": 0.1,
+      "correlation": 0.999759,
+      "rms_difference": 0.002792
+    },
+    {
+      "first_start_seconds": 6.8,
+      "second_start_seconds": 6.9,
+      "duration_seconds": 0.1,
+      "correlation": 0.999864,
+      "rms_difference": 0.001623
+    },
+    {
+      "first_start_seconds": 8.0,
+      "second_start_seconds": 8.1,
+      "duration_seconds": 0.1,
+      "correlation": 0.999836,
+      "rms_difference": 0.001572
+    },
+    {
+      "first_start_seconds": 9.3,
+      "second_start_seconds": 9.4,
+      "duration_seconds": 0.1,
+      "correlation": 0.999859,
+      "rms_difference": 0.000588
+    },
+    {
+      "first_start_seconds": 10.5,
+      "second_start_seconds": 10.6,
+      "duration_seconds": 0.1,
+      "correlation": 0.999856,
+      "rms_difference": 0.001289
+    },
+    {
+      "first_start_seconds": 11.7,
+      "second_start_seconds": 11.8,
+      "duration_seconds": 0.1,
+      "correlation": 0.999884,
+      "rms_difference": 0.000782
+    },
+    {
+      "first_start_seconds": 13.0,
+      "second_start_seconds": 13.1,
+      "duration_seconds": 0.1,
+      "correlation": 0.999431,
+      "rms_difference": 0.000143
+    },
+    {
+      "first_start_seconds": 14.2,
+      "second_start_seconds": 14.3,
+      "duration_seconds": 0.1,
+      "correlation": 0.999698,
+      "rms_difference": 0.001837
+    },
+    {
+      "first_start_seconds": 15.4,
+      "second_start_seconds": 15.5,
+      "duration_seconds": 0.1,
+      "correlation": 0.999871,
+      "rms_difference": 0.001155
+    },
+    {
+      "first_start_seconds": 16.7,
+      "second_start_seconds": 16.8,
+      "duration_seconds": 0.1,
+      "correlation": 0.999791,
+      "rms_difference": 0.002271
+    },
+    {
+      "first_start_seconds": 17.9,
+      "second_start_seconds": 18.0,
+      "duration_seconds": 0.1,
+      "correlation": 0.999841,
+      "rms_difference": 0.000408
+    },
+    {
+      "first_start_seconds": 18.3,
+      "second_start_seconds": 18.4,
+      "duration_seconds": 0.1,
+      "correlation": 0.99967,
+      "rms_difference": 3.2e-05
+    },
+    {
+      "first_start_seconds": 19.5,
+      "second_start_seconds": 19.6,
+      "duration_seconds": 0.1,
+      "correlation": 0.999828,
+      "rms_difference": 2.5e-05
+    },
+    {
+      "first_start_seconds": 20.7,
+      "second_start_seconds": 20.8,
+      "duration_seconds": 0.1,
+      "correlation": 0.999865,
+      "rms_difference": 0.000195
+    },
+    {
+      "first_start_seconds": 21.9,
+      "second_start_seconds": 22.0,
+      "duration_seconds": 0.1,
+      "correlation": 0.999762,
+      "rms_difference": 5.9e-05
+    }
+  ]
+}

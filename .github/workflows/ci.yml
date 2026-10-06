@@ -32,3 +32,11 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  native-audio-test:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test continuità e durata del convertitore PCM
+        run: test/native/run_pcm_tests.sh

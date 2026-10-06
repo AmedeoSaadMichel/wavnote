@@ -31,6 +31,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     var framesInPreviousSegments: Int64 = 0
     /// Frame scritti nel segmento corrente (resettato a ogni nuovo file).
     var framesWrittenThisSegment: Int64 = 0
+    var recordingPCMConverter: RecordingPCMConverter?
     /// Sample rate del file WAV di output (impostato a startRecording).
     var outputSampleRate: Double = 44100
     /// Timestamp dell'ultimo tick di clock emesso (CACurrentMediaTime). Throttle a 100ms.
@@ -569,6 +570,11 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         return AVAudioConverter(from: inputFormat, to: outputFormat) != nil
     }
 
+    func finishRecordingConversion() throws {
+        guard let file = audioFile, let converter = recordingPCMConverter else { return }
+        framesWrittenThisSegment += try converter.finish { try file.write(from: $0) }
+    }
+
     // MARK: - Audio Interruption Handling
 
     /// Registra l'observer per le interruzioni audio (telefonate, Siri, ecc.).
@@ -594,6 +600,8 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 // Pausa automatica: chiudi il file corrente come in pauseRecording
                 audioEngine?.pause()
                 if let path = recordingFilePath {
+                    do { try finishRecordingConversion() }
+                    catch { logger.error("Conversione interrotta: \(error)") }
                     framesInPreviousSegments += framesWrittenThisSegment
                     framesWrittenThisSegment = 0
                     audioFile = nil

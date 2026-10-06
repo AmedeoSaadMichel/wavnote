@@ -32,6 +32,7 @@
 ## Analisi
 | File | Topic |
 |------|-------|
+| [[analysis/2026-10-06-audio-quality]] | Audio iPhone: bug resampler riprodotto offline, impostazioni qualità ignorate; causa su device da confermare |
 | [[analysis/2026-10-06-trim-ui-redraw]] | Trim: waveform spostata/riscalata e titolo temporaneo durante Starting; regressioni TDD e fix UI |
 | [[analysis/2026-07-15-divergenza-recording-ios-macos]] | Perché la registrazione si comporta diversamente su iOS e macOS: plugin macOS fork non riallineato, 5 divergenze |
 | [[analysis/2026-07-14-analisi-qualita-test]] | Qualità della suite post-risanamento: nucleo forte, ~70 test di facciata, buchi su lifecycle nativo |
@@ -63,6 +64,7 @@
 ## Decision Records
 | File | Topic |
 |------|-------|
+| [[project/adr/2026-10-06-native-pcm-conversion]] | Convertitore PCM condiviso iOS/macOS e test nativi di continuità/durata |
 | [[project/adr/2026-04-14-audio-clock-push-based]] | ADR-001 — AudioClock push-based nativo end-to-end |
 | [[project/adr/2026-04-28-presentation-file-splitting]] | ADR-002 — Split chirurgico dei file presentation troppo grandi |
 

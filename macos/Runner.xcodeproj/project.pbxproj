@@ -21,6 +21,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		AC2026100600000000000005 /* AudioEnginePlugin+Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000006 /* AudioEnginePlugin+Conversion.swift */; };
+		AC2026100600000000000003 /* AudioEnginePlugin+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */; };
+		AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000002 /* RecordingPCMConverter.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
@@ -67,6 +70,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AC2026100600000000000006 /* AudioEnginePlugin+Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Conversion.swift"; sourceTree = "<group>"; };
+		AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Playback.swift"; sourceTree = "<group>"; };
+		AC2026100600000000000002 /* RecordingPCMConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../../ios/Shared/RecordingPCMConverter.swift"; sourceTree = "<group>"; };
 		060401785B7A2C01AB9C59F9 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		12817F376A07437777B04390 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -188,6 +194,9 @@
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				AA0001002D0A000000000001 /* AudioEnginePlugin.swift */,
+				AC2026100600000000000006 /* AudioEnginePlugin+Conversion.swift */,
+				AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */,
+				AC2026100600000000000002 /* RecordingPCMConverter.swift */,
 				AA0001022D0A000000000002 /* AudioTrimmerPlugin.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
@@ -455,6 +464,9 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				AA0001012D0A000000000001 /* AudioEnginePlugin.swift in Sources */,
+				AC2026100600000000000005 /* AudioEnginePlugin+Conversion.swift in Sources */,
+				AC2026100600000000000003 /* AudioEnginePlugin+Playback.swift in Sources */,
+				AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */,
 				AA0001032D0A000000000002 /* AudioTrimmerPlugin.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				EB8F4EBE2F8B9C4300F4ABE7 /* SwiftLogPlugin.swift in Sources */,
