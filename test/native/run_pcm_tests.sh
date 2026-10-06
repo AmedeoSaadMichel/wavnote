@@ -6,5 +6,6 @@ test_dir=$(mktemp -d "${TMPDIR:-/tmp}/wavnote-pcm-tests.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT HUP INT TERM
 swiftc -module-cache-path "$test_dir/modules" \
   "$project_root/ios/Shared/RecordingPCMConverter.swift" \
+  "$project_root/ios/Shared/PCMTrim.swift" \
   "$project_root/test/native/main.swift" -o "$test_dir/pcm-tests"
 "$test_dir/pcm-tests"

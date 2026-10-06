@@ -38,7 +38,7 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
 
   private func trimAudio(args: [String: Any], result: @escaping FlutterResult) {
     guard
-      let inputPath = args["inputPath"] as? String,
+      let inputPath = (args["inputPath"] ?? args["filePath"]) as? String,
       let startTimeMs = args["startTimeMs"] as? Int,
       let durationMs = args["durationMs"] as? Int,
       let outputPath = args["outputPath"] as? String
@@ -49,23 +49,16 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
 
     let format = (args["format"] as? String) ?? "m4a"
 
-    if format == "wav" {
-        pcmExtractSegment(inputPath: inputPath, startTimeMs: startTimeMs, durationMs: durationMs, outputPath: outputPath) { res in
-            if let err = res as? FlutterError {
-                result(err)
-            } else {
-                result(nil)
-            }
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try PCMTrim.extract(inputPath: inputPath, startTimeMs: startTimeMs,
+                            durationMs: durationMs, outputPath: outputPath, format: format)
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "TRIM_FAILED", message: error.localizedDescription, details: nil))
         }
-    } else {
-        let asset = AVURLAsset(url: URL(fileURLWithPath: inputPath))
-        exportSegmentiOS(asset: asset, startTimeMs: startTimeMs, durationMs: durationMs, outputPath: outputPath, format: format) { success in
-            if success {
-                result(nil)
-            } else {
-                result(FlutterError(code: "TRIM_FAILED", message: "Export session failed", details: nil))
-            }
-        }
+      }
     }
   }
 
@@ -313,83 +306,14 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
       // Usiamo un blocco anonimo o autoreleasepool per assicurarci che gli oggetti AVAudioFile
       // vengano deallocati e i file chiusi (header WAV finalizzato) PRIMA del completion.
       let result: Any? = autoreleasepool {
-          do {
-            let origFile = try AVAudioFile(forReading: URL(fileURLWithPath: originalPath))
-            let insFile = try AVAudioFile(forReading: URL(fileURLWithPath: insertionPath))
-
-            let sampleRate = origFile.fileFormat.sampleRate
-            let startFrame = AVAudioFramePosition((Double(startTimeMs) / 1000.0) * sampleRate)
-            let overwriteFrames = AVAudioFramePosition((Double(overwriteDurationMs) / 1000.0) * sampleRate)
-
-            let outFile = try AVAudioFile(forWriting: URL(fileURLWithPath: outputPath), settings: origFile.fileFormat.settings)
-            let chunkFrames: AVAudioFrameCount = 65536
-
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: origFile.processingFormat, frameCapacity: chunkFrames) else {
-                return FlutterError(code: "BUFFER_ERROR", message: "Could not allocate PCM buffer", details: nil)
-            }
-
-            // 1. Write HEAD
-            origFile.framePosition = 0
-            var remainingHead = startFrame
-            while remainingHead > 0 {
-                let toRead = min(chunkFrames, AVAudioFrameCount(remainingHead))
-                buffer.frameLength = toRead
-                try origFile.read(into: buffer, frameCount: toRead)
-                if buffer.frameLength == 0 { break }
-                try outFile.write(from: buffer)
-                remainingHead -= Int64(buffer.frameLength)
-            }
-
-            // 2. Write INSERTION
-            insFile.framePosition = 0
-            let needsConversion = !insFile.processingFormat.isEqual(outFile.processingFormat)
-
-            guard let insBuffer = AVAudioPCMBuffer(pcmFormat: insFile.processingFormat, frameCapacity: chunkFrames) else {
-                return FlutterError(code: "BUFFER_ERROR", message: "Could not allocate insertion buffer", details: nil)
-            }
-
-            let converter = needsConversion ? AVAudioConverter(from: insFile.processingFormat, to: outFile.processingFormat) : nil
-            var remainingIns = insFile.length
-
-            while remainingIns > 0 {
-                let toRead = min(chunkFrames, AVAudioFrameCount(remainingIns))
-                insBuffer.frameLength = toRead
-                try insFile.read(into: insBuffer, frameCount: toRead)
-                if insBuffer.frameLength == 0 { break }
-
-                if !needsConversion {
-                    try outFile.write(from: insBuffer)
-                } else if let conv = converter, let convBuf = AVAudioPCMBuffer(pcmFormat: outFile.processingFormat, frameCapacity: toRead) {
-                    var inputDone = false
-                    var convError: NSError? = nil
-                    conv.convert(to: convBuf, error: &convError) { _, status in
-                        if !inputDone { inputDone = true; status.pointee = .haveData; return insBuffer }
-                        status.pointee = .endOfStream; return nil
-                    }
-                    if convError == nil { try outFile.write(from: convBuf) }
-                }
-                remainingIns -= Int64(insBuffer.frameLength)
-            }
-
-            // 3. Write TAIL
-            let tailStartFrame = startFrame + overwriteFrames
-            if tailStartFrame < origFile.length {
-                origFile.framePosition = tailStartFrame
-                var remainingTail = origFile.length - tailStartFrame
-                while remainingTail > 0 {
-                    let toRead = min(chunkFrames, AVAudioFrameCount(remainingTail))
-                    buffer.frameLength = toRead
-                    try origFile.read(into: buffer, frameCount: toRead)
-                    if buffer.frameLength == 0 { break }
-                    try outFile.write(from: buffer)
-                    remainingTail -= Int64(buffer.frameLength)
-                }
-            }
-
-            return nil
-          } catch {
-            return FlutterError(code: "PCM_ERROR", message: error.localizedDescription, details: nil)
-          }
+        do {
+          try PCMTrim.overwrite(originalPath: originalPath, insertionPath: insertionPath,
+                                startTimeMs: startTimeMs, overwriteDurationMs: overwriteDurationMs,
+                                outputPath: outputPath)
+          return nil
+        } catch {
+          return FlutterError(code: "PCM_ERROR", message: error.localizedDescription, details: nil)
+        }
       }
 
       DispatchQueue.main.async { completion(result) }
@@ -432,45 +356,6 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
               DispatchQueue.main.async { completion(nil) }
           } catch {
               DispatchQueue.main.async { completion(error) }
-          }
-      }
-  }
-
-  private func pcmExtractSegment(
-      inputPath: String,
-      startTimeMs: Int,
-      durationMs: Int,
-      outputPath: String,
-      completion: @escaping (Any?) -> Void
-  ) {
-      DispatchQueue.global(qos: .userInitiated).async {
-          do {
-              let inFile = try AVAudioFile(forReading: URL(fileURLWithPath: inputPath))
-              let sampleRate = inFile.fileFormat.sampleRate
-              let startFrame = AVAudioFramePosition((Double(startTimeMs) / 1000.0) * sampleRate)
-              let totalFramesToRead = AVAudioFrameCount((Double(durationMs) / 1000.0) * sampleRate)
-
-              inFile.framePosition = startFrame
-
-              let outFile = try AVAudioFile(forWriting: URL(fileURLWithPath: outputPath), settings: inFile.fileFormat.settings)
-              let chunkFrames: AVAudioFrameCount = 65536
-              guard let buffer = AVAudioPCMBuffer(pcmFormat: inFile.processingFormat, frameCapacity: chunkFrames) else {
-                  DispatchQueue.main.async { completion(FlutterError(code: "BUFFER_ERROR", message: "Failed to allocate buffer", details: nil)) }
-                  return
-              }
-
-              var remaining = Int64(totalFramesToRead)
-              while remaining > 0 {
-                  let toRead = min(chunkFrames, AVAudioFrameCount(remaining))
-                  buffer.frameLength = toRead
-                  try inFile.read(into: buffer, frameCount: toRead)
-                  if buffer.frameLength == 0 { break }
-                  try outFile.write(from: buffer)
-                  remaining -= Int64(buffer.frameLength)
-              }
-              DispatchQueue.main.async { completion(nil) }
-          } catch {
-              DispatchQueue.main.async { completion(FlutterError(code: "PCM_ERROR", message: error.localizedDescription, details: nil)) }
           }
       }
   }

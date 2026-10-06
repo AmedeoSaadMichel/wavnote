@@ -83,3 +83,5 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | `ios/SwiftLogPlugin.swift` | Eliminato | Bridge Swift era nativo, ora gestito diversamente |
 | `lib/presentation/bloc/recording/recording_bloc_lifecycle.dart` | Modificato | Fix playback rotto dopo refactor 2026-04-17 |
 | `lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart` | Modificato | UI bottom sheet con sessionCounter |
+
+- Bip post-trim: applicato micro-fade 5 ms nei plugin nativi per trim e giunzioni WAV; validazione iPhone pendente. Avvio/seek player senza rampa restano una possibile causa distinta se il bip persiste.

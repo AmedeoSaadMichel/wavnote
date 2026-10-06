@@ -95,3 +95,7 @@
 - [[analysis/plans/2026-04-29-waveform-background-catchup]]
 - [[project/tech-debt]]
 - [[_index]]
+
+- Analisi bip post-trim: taglio PCM e avvio/seek playback senza rampe; discontinuità possibile, da confermare localizzando il bip. Vedi `analysis/2026-10-06-trim-click.md`. Applicate rampe di 5 ms in `PCMTrim.swift` su trim e giunzioni WAV, con export M4A sfumato. Verifica su iPhone ancora necessaria.
+
+- Trim anti-click verificato: test nativi verdi (RED 24 verifiche fallite senza inviluppo), build iOS/macOS riuscite. Modifiche locali; prossimo passo riascolto di un nuovo trim su iPhone 14 dopo ricompilazione.

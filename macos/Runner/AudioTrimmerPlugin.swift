@@ -52,49 +52,16 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
     }
     self.logger.debug("✂️ [NATIVE-macOS] trimAudio: filePath=\(filePath) startTime=\(startTimeMs) durationMs=\(durationMs) outputPath=\(outputPath)")
 
-    let asset = AVURLAsset(url: URL(fileURLWithPath: filePath))
-    let startTime = CMTime(value: CMTimeValue(startTimeMs), timescale: 1000)
-    let trimDuration = CMTime(value: CMTimeValue(durationMs), timescale: 1000)
-    let timeRange = CMTimeRange(start: startTime, duration: trimDuration)
-
-    guard let exportSession = AVAssetExportSession(
-      asset: asset,
-      presetName: AVAssetExportPresetPassthrough
-    ) else {
-      result(FlutterError(code: "EXPORT_FAILED", message: "Could not create export session", details: nil))
-      return
-    }
-
     let format = (args["format"] as? String) ?? "m4a"
-    let fileType: AVFileType = format == "wav" ? .wav : .m4a
-    let tempPath = outputPath + ".tmp"
-
-    exportSession.outputURL = URL(fileURLWithPath: tempPath)
-    exportSession.outputFileType = fileType
-    exportSession.timeRange = timeRange
-
-    exportSession.exportAsynchronously {
-      switch exportSession.status {
-      case .completed:
-        do {
-          let fm = FileManager.default
-          if fm.fileExists(atPath: outputPath) {
-            try fm.removeItem(atPath: outputPath)
-          }
-          try fm.moveItem(atPath: tempPath, toPath: outputPath)
-          self.logger.debug("✂️ [NATIVE-macOS] trimAudio: COMPLETED → \(outputPath)")
-          result(nil)
-        } catch {
-          self.logger.error("✂️ [NATIVE-macOS] trimAudio: FILE_ERROR → \(error)")
-          result(FlutterError(code: "FILE_ERROR", message: error.localizedDescription, details: nil))
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try PCMTrim.extract(inputPath: filePath, startTimeMs: startTimeMs,
+                            durationMs: durationMs, outputPath: outputPath, format: format)
+        DispatchQueue.main.async { result(nil) }
+      } catch {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "TRIM_FAILED", message: error.localizedDescription, details: nil))
         }
-      default:
-        self.logger.error("✂️ [NATIVE-macOS] trimAudio: EXPORT_FAILED → \(exportSession.error?.localizedDescription ?? "Unknown")")
-        result(FlutterError(
-          code: "EXPORT_FAILED",
-          message: exportSession.error?.localizedDescription ?? "Unknown export error",
-          details: nil
-        ))
       }
     }
   }
@@ -222,6 +189,22 @@ class AudioTrimmerPlugin: NSObject, FlutterPlugin {
     guard insertionExists else {
       self.logger.error("🔁 [OVERWRITE] ❌ File insertion non trovato: \(insertionPath)")
       result(FlutterError(code: "FILE_NOT_FOUND", message: "Insertion file does not exist: \(insertionPath)", details: nil))
+      return
+    }
+
+    if format == "wav" {
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          try PCMTrim.overwrite(originalPath: originalPath, insertionPath: insertionPath,
+                                startTimeMs: startTimeMs, overwriteDurationMs: overwriteDurationMs,
+                                outputPath: outputPath)
+          DispatchQueue.main.async { result(nil) }
+        } catch {
+          DispatchQueue.main.async {
+            result(FlutterError(code: "PCM_ERROR", message: error.localizedDescription, details: nil))
+          }
+        }
+      }
       return
     }
 

@@ -15,3 +15,7 @@ Plugin macOS separato in file principale, playback e conversione per rispettare 
 - [[analysis/2026-10-06-audio-quality]]
 - [[project/tech-debt]]
 - [[_index]]
+
+## Estensione: trim senza discontinuità
+
+`PCMTrim.swift` condivide estrazione e overwrite WAV tra i due plugin. L'inviluppo opera su campioni PCM prima dell'eventuale export AppleM4A, senza cambiare la durata; lo stesso codice viene esercitato dai test nativi su file reali. Il file destinazione viene pubblicato solo dopo la chiusura del writer.
