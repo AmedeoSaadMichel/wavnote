@@ -587,10 +587,11 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     return BlocBuilder<RecordingBloc, RecordingState>(
       buildWhen: (prev, curr) {
         // Per RecordingPaused: ricostruisci solo quando cambiano le proprietà
-        // rilevanti per il bottom sheet (preview, seek, durata).
-        // Evita rebuild inutili su altri campi (title, format, ecc.)
+        // rilevanti per il bottom sheet (titolo, preview, seek, durata).
+        // Evita rebuild inutili su altri campi (format, ecc.)
         if (prev is RecordingPaused && curr is RecordingPaused) {
-          return prev.isPlayingPreview != curr.isPlayingPreview ||
+          return prev.title != curr.title ||
+              prev.isPlayingPreview != curr.isPlayingPreview ||
               prev.seekBarIndex != curr.seekBarIndex ||
               prev.duration != curr.duration;
         }
