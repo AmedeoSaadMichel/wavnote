@@ -20,6 +20,16 @@ class RecordingCompactView extends StatelessWidget {
   final Animation<double> pulseAnimation;
   final VoidCallback onToggle;
   final int sessionCounter;
+  final bool isPaused;
+  final bool isReviewMode;
+  final VoidCallback? onPause;
+  final VoidCallback? onDone;
+  final VoidCallback? onPlay;
+  final bool isPlayingPreview;
+  final int seekBarIndex;
+  final int seekVersion;
+  final int futureBarsCount;
+  final ValueChanged<int>? onSeekBarIndexChanged;
 
   const RecordingCompactView({
     super.key,
@@ -32,52 +42,96 @@ class RecordingCompactView extends StatelessWidget {
     required this.pulseAnimation,
     required this.onToggle,
     this.sessionCounter = 0,
+    this.isPaused = false,
+    this.isReviewMode = false,
+    this.onPause,
+    this.onDone,
+    this.onPlay,
+    this.isPlayingPreview = false,
+    this.seekBarIndex = 0,
+    this.seekVersion = 0,
+    this.futureBarsCount = 0,
+    this.onSeekBarIndexChanged,
   });
 
   String get _formattedTime => elapsed.formatted;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.max,
-      // stretch → tutti i figli ricevono larghezza tight = larghezza colonna
-      // (evita vincoli loose che rompono Expanded/LayoutBuilder annidati)
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
       children: [
-        // ── Handle bar ──────────────────────────────────────────────
-        const SizedBox(height: 12),
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(2),
+        Column(
+          mainAxisSize: MainAxisSize.max,
+          // stretch → tutti i figli ricevono larghezza tight = larghezza colonna
+          // (evita vincoli loose che rompono Expanded/LayoutBuilder annidati)
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Handle bar ──────────────────────────────────────────────
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            SizedBox(height: isReviewMode ? 48 : 12),
+
+            // ── Area centrale ────────────────────────────────────────────
+            // LayoutBuilder con soglia minima: evita il RenderFlex overflow
+            // durante i ~300ms in cui AnimatedContainer anima da height=180
+            // a minHeight. In quel lasso isRecording è già true ma lo spazio
+            // disponibile è ancora < 80px → mostriamo SizedBox.shrink() finché
+            // non c'è abbastanza spazio per il contenuto.
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if ((!isRecording && !isPaused) ||
+                      constraints.maxHeight < 80) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildRecordingContent();
+                },
+              ),
+            ),
+
+            // ── Bottone record ───────────────────────────────────────────
+            SizedBox(height: 110, child: Center(child: _buildRecordButton())),
+            const SizedBox(height: 8),
+          ],
+        ),
+        if (isReviewMode && isPaused)
+          Positioned(
+            top: 76,
+            right: 16,
+            child: IconButton(
+              tooltip: isPlayingPreview ? 'Pause preview' : 'Play preview',
+              onPressed: onPlay,
+              icon: Icon(
+                isPlayingPreview ? Icons.pause_rounded : Icons.play_arrow,
+                color: Colors.cyan,
+              ),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-
-        // ── Area centrale ────────────────────────────────────────────
-        // LayoutBuilder con soglia minima: evita il RenderFlex overflow
-        // durante i ~300ms in cui AnimatedContainer anima da height=180
-        // a minHeight. In quel lasso isRecording è già true ma lo spazio
-        // disponibile è ancora < 80px → mostriamo SizedBox.shrink() finché
-        // non c'è abbastanza spazio per il contenuto.
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (!isRecording || constraints.maxHeight < 80) {
-                return const SizedBox.shrink();
-              }
-              return _buildRecordingContent();
-            },
+        if (isReviewMode)
+          Positioned(
+            top: 20,
+            right: 16,
+            child: IconButton(
+              tooltip: 'Done',
+              onPressed: onDone,
+              icon: const Icon(Icons.check_rounded, color: Colors.cyan),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
+              ),
+            ),
           ),
-        ),
-
-        // ── Bottone record ───────────────────────────────────────────
-        SizedBox(height: 110, child: Center(child: _buildRecordButton())),
-        const SizedBox(height: 8),
       ],
     );
   }
@@ -97,16 +151,19 @@ class RecordingCompactView extends StatelessWidget {
 
         // Titolo
         if (title != null)
-          Text(
-            title!,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: isReviewMode ? 64 : 16),
+            child: Text(
+                title!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
           ),
 
         const SizedBox(height: 4),
@@ -139,11 +196,21 @@ class RecordingCompactView extends StatelessWidget {
                   waveSegments: waveSegments,
                   size: Size(constraints.maxWidth, constraints.maxHeight),
                   waveColor: Colors.cyan,
-                  spacing: 1.5,
                   waveThickness: 2.5,
                   scaleFactor: constraints.maxHeight * 0.50,
                   currentDuration: elapsed,
                   centerBars: true,
+                  isPaused: isPaused,
+                  showPlayhead: isReviewMode,
+                  spacing: isReviewMode ? 2.0 : 1.5,
+                  seekVersion: seekVersion,
+                  futureBarsCount: futureBarsCount,
+                  onSeekBarIndexChanged: onSeekBarIndexChanged,
+                  externalSeekBarIndex: isPaused || isPlayingPreview
+                      ? (waveData.isNotEmpty
+                            ? seekBarIndex.clamp(0, waveData.length - 1)
+                            : seekBarIndex)
+                      : null,
                 );
               },
             ),
@@ -158,7 +225,10 @@ class RecordingCompactView extends StatelessWidget {
       isRecording: isRecording,
       size: 80,
       pulseAnimation: pulseAnimation,
-      onTap: onToggle,
+      overlayIcon: isReviewMode
+          ? (isRecording ? Icons.pause_rounded : Icons.play_arrow)
+          : null,
+      onTap: isReviewMode && isRecording ? (onPause ?? onToggle) : onToggle,
     );
   }
 }

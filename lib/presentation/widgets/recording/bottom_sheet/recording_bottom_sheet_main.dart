@@ -118,6 +118,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   // Bottom sheet drag state
   late double maxHeight; // Max expanded height (set in build)
   late double minHeight; // Compact sheet height — set in build (50% screen)
+  bool _hasPausedInSession = false;
   double _sheetOffset = 0; // 0 = collapsed, 1 = fully expanded
   double _dragStartY = 0; // Initial Y drag position
   double _startHeight = 0; // Height when drag started
@@ -187,6 +188,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     );
 
     // Start pulse animation when recording
+    _hasPausedInSession = widget.isPaused;
     if (widget.isRecording) {
       _pulseController.repeat(reverse: true);
     }
@@ -314,6 +316,8 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     // tra l'ultimo timer tick e la durata esatta finale restituita dal nativo.
     // Reset seekBarIndex sull'ultima barra registrata + auto-espandi a fullscreen.
     if (widget.isPaused && !oldWidget.isPaused) {
+      final shouldExpand = !_hasPausedInSession;
+      _hasPausedInSession = true;
       final finalElapsedMs = widget.elapsed.inMilliseconds + _seekTimeOffsetMs;
       final finalExpectedBars = (finalElapsedMs / 100).floor();
       final recordedBars = _waveData.length - _futureBarsCount;
@@ -365,13 +369,15 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         debugPrint(
           '⏸️ BOTTOM SHEET pause finalize elapsedMs=$finalElapsedMs finalExpectedBars=$finalExpectedBars recordedBars=$recordedBars remainingFutureBars=$remainingFutureBars localSeekBarIndex=$_seekBarIndex waveDataLength=${_waveData.length}',
         );
-        _sheetOffset = 1.0;
+        // Solo il primo stop apre automaticamente la vista extended.
+        // I successivi mantengono l'altezza scelta dall'utente.
+        if (shouldExpand) _sheetOffset = 1.0;
       });
       _seekTimeOffsetMs = 0;
       _pendingAmplitudeSamples.clear();
       _lastConsumedBlocAmplitudeSampleCount =
           widget.waveformAmplitudeSampleCount;
-      _sheetAnimationController.animateTo(1.0);
+      if (shouldExpand) _sheetAnimationController.animateTo(1.0);
     }
 
     // Control pulse animation based on recording state
@@ -488,6 +494,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   }
 
   void _resetWaveformState({required int consumedSampleCount}) {
+    _hasPausedInSession = false;
     _waveData.clear();
     _waveSegments.clear();
     _currentSegment = 0;
@@ -622,17 +629,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
         curve: Curves.easeInOutCubic,
         height: currentHeight,
         child: GestureDetector(
-          // In pausa il drag è disabilitato: la sheet resta in fullscreen
-          // e non può essere compattata manualmente.
-          onVerticalDragStart: (canExpand && !widget.isPaused)
-              ? _onVerticalDragStart
-              : null,
-          onVerticalDragUpdate: (canExpand && !widget.isPaused)
-              ? _onVerticalDragUpdate
-              : null,
-          onVerticalDragEnd: (canExpand && !widget.isPaused)
-              ? _onVerticalDragEnd
-              : null,
+          onVerticalDragStart: canExpand ? _onVerticalDragStart : null,
+          onVerticalDragUpdate: canExpand ? _onVerticalDragUpdate : null,
+          onVerticalDragEnd: canExpand ? _onVerticalDragEnd : null,
           child: _buildContainer(),
         ),
       ),
@@ -740,6 +739,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                 )
               : RecordingCompactView(
                   key: ValueKey(widget.sessionCounter),
+                  isPaused: widget.isPaused,
+                  isReviewMode: _hasPausedInSession,
+                  onPause: widget.onPause,
+                  onDone: widget.onDone,
+                  onPlay: () {
+                    if (widget.isPlayingPreview) {
+                      widget.onStopPreview?.call();
+                    } else {
+                      widget.onPlayFromPosition?.call();
+                    }
+                  },
+                  isPlayingPreview: widget.isPlayingPreview,
+                  seekBarIndex: _seekBarIndex,
+                  seekVersion: _seekVersion,
+                  futureBarsCount: _futureBarsCount,
+                  onSeekBarIndexChanged: (index) {
+                    setState(() => _seekBarIndex = index);
+                    widget.onSeekBarIndexChanged?.call(index);
+                  },
                   title: displayTitle,
                   elapsed: displayElapsed,
                   isRecording: widget.isRecording,
