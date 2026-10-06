@@ -137,6 +137,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   int _overwriteCount = 0;
   int _seekBarIndex = 0;
 
+  // RecordingStarting non espone il titolo: conserva quello della sessione.
+  String? _titleBeforeStarting;
+
   /// Incrementato ad ogni seek-and-resume per segnalare a RecordingWaveform
   /// di riposizionare la waveform sulla bacchetta gialla.
   int _seekVersion = 0;
@@ -193,6 +196,10 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void didUpdateWidget(RecordingBottomSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (widget.isStarting && !oldWidget.isStarting) {
+      _titleBeforeStarting = oldWidget.title;
+    }
+
     // Reset completo dello stato interno quando inizia una nuova sessione (es. dopo aver premuto Done)
     if (widget.sessionCounter != oldWidget.sessionCounter) {
       setState(() {
@@ -204,10 +211,14 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
     // Quando lo stop arriva dalla Live Activity, il bottom sheet può restare
     // montato e conservare le barre della registrazione precedente.
+    // Anche il trim passa da RecordingStarting con elapsed a zero: i dati
+    // di overwrite distinguono questa continuazione da una nuova sessione.
     final isFreshRecordingStart =
         widget.isRecording &&
         !oldWidget.isRecording &&
         !oldWidget.isPaused &&
+        !widget.isOverwrite &&
+        widget.truncatedWaveData == null &&
         widget.elapsed.inMilliseconds <= 500 &&
         _waveData.isNotEmpty;
     if (isFreshRecordingStart) {
@@ -260,13 +271,15 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       _seekTimeOffsetMs = targetLength * 100;
 
       setState(() {
-        // Se abbiamo fullWaveData, usiamo quella come base
+        // Ripristina la base solo se manca la waveform locale della sessione.
         final fullData = widget.fullWaveData;
-        if (fullData != null && fullData.isNotEmpty) {
-          _waveData.clear();
-          _waveData.addAll(fullData);
-          _waveSegments.clear();
-          _waveSegments.addAll(List.filled(fullData.length, _currentSegment));
+        if (_waveData.isEmpty && fullData != null && fullData.isNotEmpty) {
+          // fullData può essere la stessa lista passata al BLoC al resume.
+          // Conserviamo le barre locali e i loro colori; ripristiniamo solo
+          // quando il widget non ha già una waveform della sessione corrente.
+          final restoredData = List<double>.of(fullData);
+          _waveData.addAll(restoredData);
+          _waveSegments.addAll(List.filled(restoredData.length, 0));
         }
 
         _futureBarsCount = _waveData.length - targetLength;
@@ -628,6 +641,9 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   /// Build container with clean design
   Widget _buildContainer() {
+    final displayTitle = widget.isStarting && _waveData.isNotEmpty
+        ? _titleBeforeStarting
+        : widget.title;
     final displayElapsed = widget.isRecording && _seekTimeOffsetMs > 0
         ? Duration(
             milliseconds: widget.elapsed.inMilliseconds + _seekTimeOffsetMs,
@@ -660,7 +676,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
           child: _sheetOffset > 0.7
               ? RecordingFullscreenView(
                   key: const ValueKey('fullscreen'),
-                  title: widget.title,
+                  title: displayTitle,
                   elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   isPaused: widget.isPaused,
@@ -724,7 +740,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                 )
               : RecordingCompactView(
                   key: ValueKey(widget.sessionCounter),
-                  title: widget.title,
+                  title: displayTitle,
                   elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   amplitude: widget.amplitude,

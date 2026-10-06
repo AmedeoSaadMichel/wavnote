@@ -1,4 +1,4 @@
-// File: presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
+// File: lib/presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'control_buttons.dart';
@@ -141,7 +141,9 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
             Flexible(flex: 8, child: _buildWaveform(context)),
             // Seek label sempre visibile — aggiornata dal BLoC ogni secondo
             Flexible(flex: 2, child: _buildSeekLabel()),
-            // Controlli rewind/forward SOLO in pausa — con transizione
+            // Controlli visibili solo in pausa. Lo spazio resta riservato:
+            // togliendolo al trim, tutti i Flexible cambiano altezza e la
+            // waveform viene spostata e riscalata durante la transizione.
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               transitionBuilder: (child, animation) => FadeTransition(
@@ -160,7 +162,7 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
                       height: 80,
                       child: _buildPlaybackControls(),
                     )
-                  : const SizedBox.shrink(key: ValueKey('empty')),
+                  : const SizedBox(height: 80, key: ValueKey('empty')),
             ),
             Flexible(flex: 4, child: _buildActionButton()),
           ],

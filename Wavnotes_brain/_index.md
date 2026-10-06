@@ -32,6 +32,7 @@
 ## Analisi
 | File | Topic |
 |------|-------|
+| [[analysis/2026-10-06-trim-ui-redraw]] | Trim: waveform spostata/riscalata e titolo temporaneo durante Starting; regressioni TDD e fix UI |
 | [[analysis/2026-07-15-divergenza-recording-ios-macos]] | Perché la registrazione si comporta diversamente su iOS e macOS: plugin macOS fork non riallineato, 5 divergenze |
 | [[analysis/2026-07-14-analisi-qualita-test]] | Qualità della suite post-risanamento: nucleo forte, ~70 test di facciata, buchi su lifecycle nativo |
 | [[analysis/2026-07-14-triage-test-falliti]] | Triage dei 44 test falliti: root cause per categoria e ordine di risanamento |

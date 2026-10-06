@@ -7,6 +7,7 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | # | Area | Descrizione sintetica | Priorità |
 |---|------|-----------------------|---------|
 | B1 | Fullscreen bottom sheet | **Sfarfallio play/pause preview**: multiple emissioni BLoC in cascata (`PlayRecordingPreview` → `_updateCardIds` → `UpdateSeekBarIndex` ogni 100ms) + `AnimatedSwitcher` con `FadeTransition` 400ms che risponde ad ogni rebuild. Finestra async in `_playRecordingPreview()` tra emit sincrono e start effettivo del player. | 🟡 Media |
+| B3 | Trim / layout fullscreen | **Corretto lato UI 2026-10-06**: lo slot controlli scompariva durante Starting/InProgress, modificando altezza/posizione della waveform e scala delle barre; Starting mostrava il titolo predefinito. Slot da 80 px conservato e titolo preservato nel widget. Due regressioni RED → GREEN; 66 test correlati verdi. Validazione su dispositivo da eseguire. Vedi [[analysis/2026-10-06-trim-ui-redraw]]. | 🟡 Validazione device |
 | B2 | Overdub / seek-and-resume | **✅ Risolto 2026-04-26**: Tre fix — (1) `pathToOverwrite` ora usa `baseRecordingEntity.filePath` (WAV nativo) invece di `s.filePath` (estensione logica non esistente su disco); (2) `isSeekResume` usa `!identical` per catturare tutti i seek-resume; (3) `waveformDataForPlayer` aggiunto a `RecordingInProgress.copyWith`. Da verificare su device con M4A/FLAC. | ✅ Risolto |
 
 ## TODO aperti nel codice
