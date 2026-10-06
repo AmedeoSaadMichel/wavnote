@@ -2,6 +2,7 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  private var fileActions: RecordingFileActions?
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -9,6 +10,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    fileActions = RecordingFileActions(controller: flutterViewController)
 
     // Registra SwiftLogPlugin PRIMA degli altri plugin: bootstrap swift-log
     // prima che i Logger di AudioEngine/AudioTrimmer vengano creati.

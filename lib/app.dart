@@ -15,6 +15,7 @@ import 'presentation/bloc/folder/folder_bloc.dart';
 import 'presentation/bloc/recording/recording_bloc.dart';
 import 'presentation/bloc/settings/settings_bloc.dart';
 import 'presentation/widgets/common/skeleton_screen.dart';
+import 'presentation/widgets/common/shared_audio_import_listener.dart';
 
 class WavNoteApp extends StatefulWidget {
   const WavNoteApp({super.key});
@@ -25,6 +26,7 @@ class WavNoteApp extends StatefulWidget {
 
 class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
   late final Future<GoRouter> _routerFuture;
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -95,6 +97,12 @@ class _WavNoteAppState extends State<WavNoteApp> with WidgetsBindingObserver {
             showPerformanceOverlay: false,
             showSemanticsDebugger: false,
             routerConfig: snapshot.data!,
+            scaffoldMessengerKey: _messengerKey,
+            builder: (context, child) => SharedAudioImportListener(
+              router: snapshot.data!,
+              messengerKey: _messengerKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
             theme: _buildTheme(),
           );
         },

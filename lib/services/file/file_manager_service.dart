@@ -273,7 +273,7 @@ class FileManagerService {
       if (stat.size == 0) return false;
       final extension = path.extension(audioFile.path).toLowerCase();
       final supportedExtensions = AudioFormat.values
-          .map((format) => '.${format.fileExtension}')
+          .map((format) => format.fileExtension)
           .toList();
 
       if (!supportedExtensions.contains(extension)) return false;

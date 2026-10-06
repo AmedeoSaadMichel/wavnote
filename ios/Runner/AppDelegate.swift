@@ -4,6 +4,8 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var fileActions: RecordingFileActions?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -28,6 +30,7 @@ import UIKit
     // Usiamo il suo binaryMessenger — l'unico che corrisponde al canale Dart.
     if let controller = window?.rootViewController as? FlutterViewController {
       SwiftLogPlugin.setup(messenger: controller.binaryMessenger)
+      fileActions = RecordingFileActions(controller: controller)
     }
 
     return result

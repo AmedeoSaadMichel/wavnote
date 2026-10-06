@@ -1,5 +1,9 @@
 // File: lib/presentation/screens/recording/recording_list_screen.dart
 import 'dart:async';
+import 'dart:io';
+import '../../../domain/repositories/i_recording_repository.dart';
+import '../../../services/file/voice_memo_import_service.dart';
+import '../../widgets/dialogs/voice_memo_import_dialog.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -261,6 +265,20 @@ class _RecordingListScreenState extends State<RecordingListScreen>
   @override
   Future<void> stopExpandedPlayback() => _playbackCoordinator.stopPlayback();
 
+  Future<void> _showVoiceMemoImport() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => VoiceMemoImportDialog(
+        folder: folder,
+        service: VoiceMemoImportService(sl<IRecordingRepository>()),
+      ),
+    );
+    if (mounted) {
+      context.read<RecordingBloc>().add(LoadRecordings(folderId: folder.id));
+    }
+  }
+
   /// Show dialog to select audio recording format (same as main screen)
   void _showAudioFormatDialog() {
     // Get current format from settings
@@ -487,6 +505,11 @@ class _RecordingListScreenState extends State<RecordingListScreen>
                       },
                       onShowFormatDialog: _showAudioFormatDialog,
                       onMoveSelected: moveSelectedRecordings,
+                      onImportVoiceMemos:
+                          (Platform.isIOS || Platform.isMacOS) &&
+                              folder.id != 'recently_deleted'
+                          ? _showVoiceMemoImport
+                          : null,
                     ),
                     Expanded(child: _buildRecordingsList(context)),
                     // Spazio pari all'altezza del bottom sheet in idle (180px)
@@ -704,12 +727,14 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onShowFormatDialog;
   final VoidCallback onMoveSelected;
+  final VoidCallback? onImportVoiceMemos;
 
   const _RecordingListHeaderWrapper({
     required this.folder,
     required this.onBack,
     required this.onShowFormatDialog,
     required this.onMoveSelected,
+    this.onImportVoiceMemos,
   });
 
   @override
@@ -719,6 +744,7 @@ class _RecordingListHeaderWrapper extends StatelessWidget {
       onBack: onBack,
       onShowFormatDialog: onShowFormatDialog,
       onMoveSelected: onMoveSelected,
+      onImportVoiceMemos: onImportVoiceMemos,
     );
   }
 }

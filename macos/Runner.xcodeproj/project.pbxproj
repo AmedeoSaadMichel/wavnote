@@ -25,6 +25,7 @@
 		AC2026100600000000000003 /* AudioEnginePlugin+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */; };
 		AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000002 /* RecordingPCMConverter.swift */; };
 		AC2026100600000000000007 /* PCMTrim.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000008 /* PCMTrim.swift */; };
+		AC2026100600000000000009 /* RecordingFileActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC202610060000000000000A /* RecordingFileActions.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
@@ -75,6 +76,7 @@
 		AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Playback.swift"; sourceTree = "<group>"; };
 		AC2026100600000000000002 /* RecordingPCMConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../../ios/Shared/RecordingPCMConverter.swift"; sourceTree = "<group>"; };
 		AC2026100600000000000008 /* PCMTrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../../ios/Shared/PCMTrim.swift"; sourceTree = "<group>"; };
+		AC202610060000000000000A /* RecordingFileActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFileActions.swift; sourceTree = "<group>"; };
 		060401785B7A2C01AB9C59F9 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		12817F376A07437777B04390 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -200,6 +202,7 @@
 				AC2026100600000000000004 /* AudioEnginePlugin+Playback.swift */,
 				AC2026100600000000000002 /* RecordingPCMConverter.swift */,
 				AC2026100600000000000008 /* PCMTrim.swift */,
+				AC202610060000000000000A /* RecordingFileActions.swift */,
 				AA0001022D0A000000000002 /* AudioTrimmerPlugin.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
@@ -471,6 +474,7 @@
 				AC2026100600000000000003 /* AudioEnginePlugin+Playback.swift in Sources */,
 				AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */,
 				AC2026100600000000000007 /* PCMTrim.swift in Sources */,
+				AC2026100600000000000009 /* RecordingFileActions.swift in Sources */,
 				AA0001032D0A000000000002 /* AudioTrimmerPlugin.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				EB8F4EBE2F8B9C4300F4ABE7 /* SwiftLogPlugin.swift in Sources */,

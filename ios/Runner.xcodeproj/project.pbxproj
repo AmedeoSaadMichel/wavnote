@@ -7,18 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000002 /* RecordingPCMConverter.swift */; };
-		AC2026100600000000000007 /* PCMTrim.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000008 /* PCMTrim.swift */; };
+		021134CF22718D55DF30A1DD /* SharedAudioInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C91DD0E465DAEF9B6D93FAB /* SharedAudioInbox.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		8319F6F264B84F2D945AC40D /* WavNoteShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = EE715EF03ED112F2AA49B376 /* WavNoteShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		89C2CD52A7EE44AA5E637F97 /* SharedAudioInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C91DD0E465DAEF9B6D93FAB /* SharedAudioInbox.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		9D9D3CA0F8EDF929D844FC9D /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */; };
+		9DF748F98DBFF65A5A3F3044 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D340FD3D81F4A394D26046E0 /* ShareViewController.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* AudioTrimmerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* AudioTrimmerPlugin.swift */; };
 		A6330CEDF1945ED9C478F938 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F9BB8509EC16DE7C306BDE85 /* Pods_Runner.framework */; };
+		AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000002 /* RecordingPCMConverter.swift */; };
+		AC2026100600000000000007 /* PCMTrim.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC2026100600000000000008 /* PCMTrim.swift */; };
+		AC2026100600000000000009 /* RecordingFileActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC202610060000000000000A /* RecordingFileActions.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* AudioEnginePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A4 /* AudioEnginePlugin.swift */; };
 		C0DEF0012026042800000001 /* AudioEnginePlugin+Recording.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0012026042800000002 /* AudioEnginePlugin+Recording.swift */; };
 		C0DEF0012026042800000003 /* AudioEnginePlugin+Playback.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0012026042800000004 /* AudioEnginePlugin+Playback.swift */; };
@@ -37,9 +42,17 @@
 		EB8F4EB32F8B963500F4ABE7 /* InMemoryLogging in Frameworks */ = {isa = PBXBuildFile; productRef = EB8F4EB22F8B963500F4ABE7 /* InMemoryLogging */; };
 		EB8F4EB52F8B963500F4ABE7 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = EB8F4EB42F8B963500F4ABE7 /* Logging */; };
 		EB8F4EB72F8B967900F4ABE7 /* SwiftLogPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB8F4EB62F8B967900F4ABE7 /* SwiftLogPlugin.swift */; };
+		EC658F95C8ECC18DA65A7558 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 292394969AEA2E9129499E2E /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		2382CD4E42D9EB36F77E91B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D184D9A004C0A12318FFF866;
+			remoteInfo = WavNoteShareExtension;
+		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -74,6 +87,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				D1A10000000000000000000C /* WavNoteLiveActivityExtension.appex in Embed App Extensions */,
+				8319F6F264B84F2D945AC40D /* WavNoteShareExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -81,20 +95,23 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		AC2026100600000000000002 /* RecordingPCMConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecordingPCMConverter.swift"; sourceTree = "<group>"; };
-		AC2026100600000000000008 /* PCMTrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PCMTrim.swift"; sourceTree = "<group>"; };
 		023D2B0A18B3E31E601F0284 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		1413864A60A29193C426BBB7 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		292394969AEA2E9129499E2E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		35403A803DC3A930507D47D7 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		4C91DD0E465DAEF9B6D93FAB /* SharedAudioInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedAudioInbox.swift; sourceTree = "<group>"; };
+		551F6FF27E1B658FB71843E1 /* Runner.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		5AB4B032F1E3391D97DC2E0B /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		6A674621435F7CC91B423F5B /* WavNoteShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = WavNoteShareExtension.entitlements; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		7D65761BE38A8108D3641AF0 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,6 +121,9 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9B418D57A692E9EAF26550AF /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F3 /* AudioTrimmerPlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioTrimmerPlugin.swift; sourceTree = "<group>"; };
+		AC2026100600000000000002 /* RecordingPCMConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPCMConverter.swift; sourceTree = "<group>"; };
+		AC2026100600000000000008 /* PCMTrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PCMTrim.swift; sourceTree = "<group>"; };
+		AC202610060000000000000A /* RecordingFileActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFileActions.swift; sourceTree = "<group>"; };
 		B2C3D4E5F6A7B8C9D0E1F2A4 /* AudioEnginePlugin.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioEnginePlugin.swift; sourceTree = "<group>"; };
 		C0DEF0012026042800000002 /* AudioEnginePlugin+Recording.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Recording.swift"; sourceTree = "<group>"; };
 		C0DEF0012026042800000004 /* AudioEnginePlugin+Playback.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "AudioEnginePlugin+Playback.swift"; sourceTree = "<group>"; };
@@ -115,13 +135,23 @@
 		D1A10000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D1A10000000000000000000B /* WavNoteLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WavNoteLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WavNoteRecordingControlIntents.swift; sourceTree = "<group>"; };
+		D340FD3D81F4A394D26046E0 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E77A6D0E1D0940F51466178D /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		EB8F4EB62F8B967900F4ABE7 /* SwiftLogPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftLogPlugin.swift; sourceTree = "<group>"; };
+		EE715EF03ED112F2AA49B376 /* WavNoteShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WavNoteShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9BB8509EC16DE7C306BDE85 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		80975FF071BC222DC1C2A565 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EC658F95C8ECC18DA65A7558 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EB1CF9000F007C117D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -161,6 +191,17 @@
 			path = RunnerTests;
 			sourceTree = "<group>";
 		};
+		5A7F1CF4E4EA1E14C54E57B9 /* WavNoteShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				D340FD3D81F4A394D26046E0 /* ShareViewController.swift */,
+				7D65761BE38A8108D3641AF0 /* Info.plist */,
+				6A674621435F7CC91B423F5B /* WavNoteShareExtension.entitlements */,
+			);
+			name = WavNoteShareExtension;
+			path = WavNoteShareExtension;
+			sourceTree = "<group>";
+		};
 		8A95E3BA338426050363219A /* Pods */ = {
 			isa = PBXGroup;
 			children = (
@@ -172,6 +213,14 @@
 				9B418D57A692E9EAF26550AF /* Pods-RunnerTests.profile.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		924CA39BE20825A84163FB63 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				292394969AEA2E9129499E2E /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -196,6 +245,7 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				8A95E3BA338426050363219A /* Pods */,
 				A12626CA03BC3F20A64B2901 /* Frameworks */,
+				5A7F1CF4E4EA1E14C54E57B9 /* WavNoteShareExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -205,6 +255,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				D1A10000000000000000000B /* WavNoteLiveActivityExtension.appex */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
+				EE715EF03ED112F2AA49B376 /* WavNoteShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -212,6 +263,7 @@
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				AC202610060000000000000A /* RecordingFileActions.swift */,
 				97C146FA1CF9000F007C117D /* Main.storyboard */,
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
@@ -227,6 +279,7 @@
 				D1A100000000000000000002 /* WavNoteLiveActivityController.swift */,
 				EB8F4EB62F8B967900F4ABE7 /* SwiftLogPlugin.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				551F6FF27E1B658FB71843E1 /* Runner.entitlements */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -236,6 +289,7 @@
 			children = (
 				F9BB8509EC16DE7C306BDE85 /* Pods_Runner.framework */,
 				DFCF1DD501FF75074CD261AD /* Pods_RunnerTests.framework */,
+				924CA39BE20825A84163FB63 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -257,6 +311,7 @@
 				AC2026100600000000000002 /* RecordingPCMConverter.swift */,
 				AC2026100600000000000008 /* PCMTrim.swift */,
 				D1A100000000000000000022 /* WavNoteRecordingControlIntents.swift */,
+				4C91DD0E465DAEF9B6D93FAB /* SharedAudioInbox.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -302,11 +357,29 @@
 			);
 			dependencies = (
 				D1A100000000000000000015 /* PBXTargetDependency */,
+				C91E8BE12E78A7E8B082F563 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D184D9A004C0A12318FFF866 /* WavNoteShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F9E2E0CFDF778DE6D40A29AE /* Build configuration list for PBXNativeTarget "WavNoteShareExtension" */;
+			buildPhases = (
+				E758852306FD42008C155E0B /* Sources */,
+				80975FF071BC222DC1C2A565 /* Frameworks */,
+				8E2FB99AD903776439E8C401 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WavNoteShareExtension;
+			productName = WavNoteShareExtension;
+			productReference = EE715EF03ED112F2AA49B376 /* WavNoteShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		D1A100000000000000000013 /* WavNoteLiveActivityExtension */ = {
 			isa = PBXNativeTarget;
@@ -342,6 +415,19 @@
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
 						LastSwiftMigration = 1100;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
+					};
+					D184D9A004C0A12318FFF866 = {
+						CreatedOnToolsVersion = 16.0;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 					D1A100000000000000000013 = {
 						CreatedOnToolsVersion = 15.0;
@@ -367,12 +453,20 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				D1A100000000000000000013 /* WavNoteLiveActivityExtension */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
+				D184D9A004C0A12318FFF866 /* WavNoteShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		331C807F294A63A400263BE5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8E2FB99AD903776439E8C401 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -529,6 +623,7 @@
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* AudioEnginePlugin.swift in Sources */,
 				AC2026100600000000000001 /* RecordingPCMConverter.swift in Sources */,
 				AC2026100600000000000007 /* PCMTrim.swift in Sources */,
+				AC2026100600000000000009 /* RecordingFileActions.swift in Sources */,
 				C0DEF0012026042800000001 /* AudioEnginePlugin+Recording.swift in Sources */,
 				C0DEF0012026042800000003 /* AudioEnginePlugin+Playback.swift in Sources */,
 				C0DEF0012026050300000005 /* AudioEnginePlugin+Streams.swift in Sources */,
@@ -537,6 +632,7 @@
 				D1A100000000000000000020 /* WavNoteRecordingControlIntents.swift in Sources */,
 				EB8F4EB72F8B967900F4ABE7 /* SwiftLogPlugin.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				021134CF22718D55DF30A1DD /* SharedAudioInbox.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -551,6 +647,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E758852306FD42008C155E0B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DF748F98DBFF65A5A3F3044 /* ShareViewController.swift in Sources */,
+				89C2CD52A7EE44AA5E637F97 /* SharedAudioInbox.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -558,6 +663,12 @@
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		C91E8BE12E78A7E8B082F563 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = WavNoteShareExtension;
+			target = D184D9A004C0A12318FFF866 /* WavNoteShareExtension */;
+			targetProxy = 2382CD4E42D9EB36F77E91B1 /* PBXContainerItemProxy */;
 		};
 		D1A100000000000000000015 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -586,6 +697,33 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		098A1F592021E25E879D2365 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = WavNoteShareExtension/WavNoteShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8P9QB7RFMB;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WavNoteShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		249021D3217E4FDB00AE95B9 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -646,6 +784,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8P9QB7RFMB;
 				ENABLE_BITCODE = NO;
@@ -710,6 +849,34 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
+			};
+			name = Profile;
+		};
+		5B296B58B868329A3E23E51F /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = WavNoteShareExtension/WavNoteShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8P9QB7RFMB;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WavNoteShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Profile;
 		};
@@ -834,6 +1001,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -861,6 +1029,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8P9QB7RFMB;
 				ENABLE_BITCODE = NO;
@@ -961,6 +1130,34 @@
 			};
 			name = Profile;
 		};
+		DDCF6B409799FD693F9BCA56 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = WavNoteShareExtension/WavNoteShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8P9QB7RFMB;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WavNoteShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.amedeosaadmichel.wavnote.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1000,6 +1197,16 @@
 				D1A100000000000000000016 /* Debug */,
 				D1A100000000000000000017 /* Release */,
 				D1A100000000000000000018 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F9E2E0CFDF778DE6D40A29AE /* Build configuration list for PBXNativeTarget "WavNoteShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DDCF6B409799FD693F9BCA56 /* Release */,
+				098A1F592021E25E879D2365 /* Debug */,
+				5B296B58B868329A3E23E51F /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

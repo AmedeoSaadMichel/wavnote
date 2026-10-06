@@ -11,6 +11,7 @@ import '../../bloc/settings/settings_bloc.dart';
 class RecordingListHeader extends StatelessWidget {
   final String folderName;
   final VoidCallback onBack;
+  final VoidCallback? onImportVoiceMemos;
   final VoidCallback? onShowFormatDialog;
   final VoidCallback? onMoveSelected;
 
@@ -20,12 +21,17 @@ class RecordingListHeader extends StatelessWidget {
     required this.onBack,
     this.onShowFormatDialog,
     this.onMoveSelected,
+    this.onImportVoiceMemos,
   });
 
   /// Show confirmation dialog for deleting selected recordings
-  void _showDeleteConfirmation(BuildContext context, RecordingLoaded recordingState) {
+  void _showDeleteConfirmation(
+    BuildContext context,
+    RecordingLoaded recordingState,
+  ) {
     final selectedCount = recordingState.selectedRecordings.length;
-    final shouldExitEditMode = selectedCount == recordingState.recordings.length;
+    final shouldExitEditMode =
+        selectedCount == recordingState.recordings.length;
     final isRecentlyDeleted = folderName == 'Recently Deleted';
 
     showDialog(
@@ -33,10 +39,17 @@ class RecordingListHeader extends StatelessWidget {
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF2D1B69),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
-            isRecentlyDeleted ? 'Permanently Delete Recordings' : 'Delete Recordings',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            isRecentlyDeleted
+                ? 'Permanently Delete Recordings'
+                : 'Delete Recordings',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           content: Text(
             isRecentlyDeleted
@@ -56,21 +69,24 @@ class RecordingListHeader extends StatelessWidget {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
                 final recordingBloc = context.read<RecordingBloc>();
-                recordingBloc.add(DeleteSelectedRecordings(
-                  folderId: isRecentlyDeleted ? 'recently_deleted' : 'all_recordings',
-                ));
+                recordingBloc.add(
+                  DeleteSelectedRecordings(
+                    folderId: isRecentlyDeleted
+                        ? 'recently_deleted'
+                        : 'all_recordings',
+                  ),
+                );
                 if (shouldExitEditMode) {
                   recordingBloc.add(const ToggleEditMode());
                 }
               },
               style: TextButton.styleFrom(
                 backgroundColor: Colors.red.withValues(alpha: 0.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -105,6 +121,19 @@ class RecordingListHeader extends StatelessWidget {
                       size: 24,
                     ),
                   ),
+                  if (!isEditMode && onImportVoiceMemos != null)
+                    IconButton(
+                      tooltip: 'Importa Memo Vocali',
+                      onPressed:
+                          recordingState is RecordingLoaded ||
+                              recordingState is RecordingInitial
+                          ? onImportVoiceMemos
+                          : null,
+                      icon: const Icon(
+                        Icons.file_download_outlined,
+                        color: AppConstants.accentCyan,
+                      ),
+                    ),
                   // Folder title with format button (left-aligned like main screen)
                   Expanded(
                     flex: 4,
