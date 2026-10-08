@@ -99,3 +99,15 @@
 - Analisi bip post-trim: taglio PCM e avvio/seek playback senza rampe; discontinuità possibile, da confermare localizzando il bip. Vedi `analysis/2026-10-06-trim-click.md`. Applicate rampe di 5 ms in `PCMTrim.swift` su trim e giunzioni WAV, con export M4A sfumato. Verifica su iPhone ancora necessaria.
 
 - Trim anti-click verificato: test nativi verdi (RED 24 verifiche fallite senza inviluppo), build iOS/macOS riuscite. Modifiche locali; prossimo passo riascolto di un nuovo trim su iPhone 14 dopo ricompilazione.
+
+- Card registrazione: swipe opposto su un lato aperto riporta al centro; un secondo gesto apre l’altro lato. Una sola transizione per drag in `recording_card_main.dart`; test simmetrici con aggiornamenti multipli. TDD RED 2 fallimenti, GREEN 24 test card superati. Modifiche locali.
+
+- More Actions card: aggiunti Rinomina, Mostra in File/Finder e Condividi. Menu/dialogo in `recording_more_actions.dart`, repository + evento BLoC per rinomina; `RecordingFileActionsService` registrato nell'attuale SSOT DI (`lib/config/dependency_injection.dart`), canale nativo su iOS/macOS. 286 test verdi e build iOS/macOS riuscite; verifica pannelli su iPhone pendente. Modifiche locali, include il fix swipe precedente non ancora committato.
+
+- Titolo durante registrazione: tap nelle viste compatta/fullscreen apre il dialogo di rinomina condiviso; callback `onTitleChanged` collegata all’evento esistente, supporta anche la pausa. Nome manuale protetto dalla geolocalizzazione tardiva. 290 test Flutter verdi, inclusi tap, validazione, annullamento, continuità e priorità del titolo manuale. Modifiche locali.
+
+- Fix titolo salvato: la rinomina live ora passa il titolo manuale a StopRecordingUseCase e finalizzazione stop nativo; il percorso seek/trim mantiene lo stesso nome prima di creare entità e rinominare il file. Naming automatico resta per registrazioni senza titolo manuale. TDD: due test RED con nome posizione errato; GREEN suite 293 test.
+
+- Mostra file iOS: sostituito il directoryURL del picker con vista nativa della cartella effettiva, elenco ordinato e scroll al file evidenziato/selezionato; tap apre Quick Look. La schermata resta dentro WavNote; su macOS Finder già seleziona il file. 5 test menu verdi; controllo device necessario. Preservato codice di importazione presente, aggiunto fallback iOS 13 per renderne compilabile il picker.
+
+- Verifica finale posizione file: build iOS debug no-codesign riuscita, 5 test More Actions verdi, diff-check pulito.

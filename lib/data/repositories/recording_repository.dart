@@ -1,4 +1,4 @@
-// File: data/repositories/recording_repository.dart
+// File: lib/data/repositories/recording_repository.dart
 import 'package:dartz/dartz.dart';
 import '../../domain/entities/recording_entity.dart';
 import '../../domain/repositories/i_recording_repository.dart';
@@ -45,6 +45,23 @@ class RecordingRepository implements IRecordingRepository {
   @override
   Future<RecordingEntity> updateRecording(RecordingEntity recording) async =>
       _crudOps.updateRecording(recording);
+
+  @override
+  Future<Either<Failure, RecordingEntity>> renameRecording(String id, String name) async {
+    try {
+      final recording = await _crudOps.getRecordingById(id);
+      if (recording == null) {
+        return const Left(RecordingActionFailure(message: 'Registrazione non trovata.'));
+      }
+      if (!recording.isValidName(name)) {
+        return const Left(RecordingActionFailure(message: 'Inserisci un nome valido, fino a 100 caratteri.'));
+      }
+      final saved = await _crudOps.updateRecording(recording.rename(name));
+      return Right(saved);
+    } catch (_) {
+      return const Left(RecordingActionFailure(message: 'Impossibile rinominare la registrazione. Riprova.'));
+    }
+  }
 
   @override
   Future<Either<Failure, Unit>> deleteRecording(String id) async =>

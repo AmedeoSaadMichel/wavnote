@@ -27,6 +27,7 @@ class StopRecordingUseCase {
        _locationRepository = locationRepository;
 
   Future<Either<Failure, RecordingEntity>> execute({
+    String? title,
     List<double>? waveformData,
     Duration? overrideDuration,
     bool raw = false,
@@ -49,6 +50,7 @@ class StopRecordingUseCase {
 
       return finalizeStoppedRecording(
         recordingEntity,
+        title: title,
         waveformData: waveformData,
         overrideDuration: overrideDuration,
       );
@@ -65,12 +67,14 @@ class StopRecordingUseCase {
 
   Future<Either<Failure, RecordingEntity>> finalizeStoppedRecording(
     RecordingEntity recordingEntity, {
+    String? title,
     List<double>? waveformData,
     Duration? overrideDuration,
   }) async {
     try {
       final namedRecording = await _generateLocationBasedRecording(
         recordingEntity,
+        title: title,
       );
       final finalRecording = _addWaveformData(
         namedRecording,
@@ -99,8 +103,9 @@ class StopRecordingUseCase {
   }
 
   Future<RecordingEntity> _generateLocationBasedRecording(
-    RecordingEntity recording,
-  ) async {
+    RecordingEntity recording, {
+    String? title,
+  }) async {
     try {
       String locationName;
       try {
@@ -139,6 +144,9 @@ class StopRecordingUseCase {
         }
         newName = '$locationName ${highestNumber + 1}';
       }
+
+      // Il nome scelto dall'utente ha priorità sulla numerazione automatica.
+      if (title != null && recording.isValidName(title)) newName = title.trim();
 
       final recordingWithName = recording.copyWith(
         name: newName,
@@ -179,7 +187,9 @@ class StopRecordingUseCase {
       debugPrint(
         '❌ StopRecordingUseCase: Error generating location-based name: $e',
       );
-      return recording;
+      return title != null && recording.isValidName(title)
+          ? recording.copyWith(name: title.trim())
+          : recording;
     }
   }
 

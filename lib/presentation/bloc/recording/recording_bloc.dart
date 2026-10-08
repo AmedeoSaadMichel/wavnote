@@ -48,6 +48,8 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioTrimmerRepository _trimmerService;
   final FolderBloc? _folderBloc;
 
+  bool _hasUserEditedTitle = false;
+
   StreamSubscription<double>? _amplitudeSubscription;
   StreamSubscription<RecordingWaveformBucketBatch>? _waveformBucketSubscription;
   StreamSubscription<Duration>? _durationSubscription;
@@ -114,6 +116,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     on<RequestRecordingPermissions>(_onRequestRecordingPermissions);
 
     on<LoadRecordings>(_onLoadRecordings);
+    on<RenameRecording>(_onRenameRecording);
     on<ToggleEditMode>(_onToggleEditMode);
     on<ToggleRecordingSelection>(_onToggleRecordingSelection);
     on<ClearRecordingSelection>(_onClearRecordingSelection);
@@ -398,8 +401,12 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     UpdateRecordingTitle event,
     Emitter<RecordingState> emit,
   ) {
+    if (event.isAutomatic && _hasUserEditedTitle) return;
+    if (!event.isAutomatic) _hasUserEditedTitle = true;
     if (state is RecordingInProgress) {
       emit((state as RecordingInProgress).copyWith(title: event.title));
+    } else if (state is RecordingPaused) {
+      emit((state as RecordingPaused).copyWith(title: event.title));
     }
   }
 
@@ -407,7 +414,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
     try {
       final loc = await _locationRepository.getRecordingLocationName();
       if (loc.isNotEmpty && !isClosed && state is RecordingInProgress) {
-        add(UpdateRecordingTitle(title: loc));
+        add(UpdateRecordingTitle(title: loc, isAutomatic: true));
       }
     } catch (_) {}
   }

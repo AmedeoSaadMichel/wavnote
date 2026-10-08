@@ -1,7 +1,20 @@
-// File: presentation/bloc/recording/recording_bloc_management.dart
+// File: lib/presentation/bloc/recording/recording_bloc_management.dart
 part of 'recording_bloc.dart';
 
 extension _RecordingBlocManagement on RecordingBloc {
+  Future<void> _onRenameRecording(RenameRecording event, Emitter<RecordingState> emit) async {
+    if (state is! RecordingLoaded) return;
+    final result = await _recordingRepository.renameRecording(event.recordingId, event.name);
+    // Non sovrascrive uno stato di registrazione avviato durante il salvataggio.
+    if (state is! RecordingLoaded) return;
+    final current = state as RecordingLoaded;
+    result.fold(
+      (failure) => emit(current.copyWith(actionError: failure.userMessage)),
+      (saved) => emit(current.copyWith(recordings: current.recordings
+          .map((r) => r.id == saved.id ? saved : r).toList())),
+    );
+  }
+
   // ==== LOAD ====
   Future<void> _onLoadRecordings(
     LoadRecordings event,

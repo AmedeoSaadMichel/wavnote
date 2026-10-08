@@ -17,6 +17,7 @@
 //   final repo  = sl<RecordingRepository>();
 
 import 'dart:io';
+import '../services/file/recording_file_actions_service.dart';
 import 'package:get_it/get_it.dart';
 
 import '../data/repositories/recording_repository.dart';
@@ -52,6 +53,10 @@ final GetIt sl = GetIt.instance;
 /// Must be called once in main(), after the database is open.
 /// Safe to call multiple times (GetIt will not re-register).
 Future<void> setupDependencies() async {
+  if (!sl.isRegistered<RecordingFileActionsService>()) {
+    sl.registerLazySingleton<RecordingFileActionsService>(() => RecordingFileActionsService());
+  }
+
   // ── Services ──────────────────────────────────────────────
   if (!sl.isRegistered<AudioRecorderService>()) {
     sl.registerLazySingleton<AudioRecorderService>(

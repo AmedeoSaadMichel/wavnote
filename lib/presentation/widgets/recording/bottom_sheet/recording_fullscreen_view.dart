@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'control_buttons.dart';
+import '../editable_recording_title.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 
 /// Vista fullscreen del bottom sheet di registrazione.
@@ -18,6 +19,7 @@ import '../custom_waveform/flutter_sound_waveform.dart';
 /// - Bottone chat (sempre visibile in alto a destra)
 class RecordingFullscreenView extends StatefulWidget {
   final String? title;
+  final ValueChanged<String>? onTitleChanged;
   final Duration elapsed;
   final bool isRecording;
   final bool isPaused;
@@ -52,6 +54,7 @@ class RecordingFullscreenView extends StatefulWidget {
   const RecordingFullscreenView({
     super.key,
     required this.title,
+    this.onTitleChanged,
     required this.elapsed,
     required this.isRecording,
     this.isPaused = false,
@@ -192,14 +195,20 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
   Widget _buildTitle() {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text(
-        widget.title ?? 'New Recording',
-        style: const TextStyle(
-          color: Colors.cyan,
-          fontSize: 28,
-          fontWeight: FontWeight.w600,
+      child: EditableRecordingTitle(
+        title: widget.title ?? 'New Recording',
+        onChanged: widget.isRecording || widget.isPaused
+            ? widget.onTitleChanged
+            : null,
+        child: Text(
+          widget.title ?? 'New Recording',
+          style: const TextStyle(
+            color: Colors.cyan,
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
         ),
-        textAlign: TextAlign.center,
       ),
     );
   }

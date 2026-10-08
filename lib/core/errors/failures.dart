@@ -1,4 +1,4 @@
-// File: core/errors/failures.dart
+// File: lib/core/errors/failures.dart
 //
 // CONVENZIONE DI GESTIONE DEGLI ERRORI IN WAVNOTE
 // ===============================================
@@ -119,4 +119,9 @@ enum FailureSeverity {
   error, // Standard errors
   warning, // Non-critical issues
   info, // Informational messages
+}
+
+/// Errore recuperabile di un’azione su una registrazione salvata.
+class RecordingActionFailure extends Failure {
+  const RecordingActionFailure({required super.message, super.code});
 }

@@ -71,6 +71,32 @@ void main() {
       );
     }
 
+    for (final direction in [-1.0, 1.0]) {
+      testWidgets('lo swipe opposto chiude prima di aprire il lato $direction', (tester) async {
+        await tester.pumpWidget(TestHelpers.createTestApp(
+          child: Scaffold(body: createTestRecordingCard()),
+        ));
+        final title = find.text('Test Recording');
+        final centerX = tester.getCenter(title).dx;
+        Future<void> swipe(double sign) async {
+          final gesture = await tester.startGesture(tester.getCenter(title));
+          // Più aggiornamenti nello stesso gesto: la chiusura non deve riaprire.
+          for (var i = 0; i < 5; i++) {
+            await gesture.moveBy(Offset(sign * 30, 0));
+            await tester.pump(const Duration(milliseconds: 20));
+          }
+          await gesture.up();
+          await tester.pump(const Duration(milliseconds: 350));
+        }
+        await swipe(direction);
+        expect((tester.getCenter(title).dx - centerX).sign, direction);
+        await swipe(-direction);
+        expect(tester.getCenter(title).dx, closeTo(centerX, 0.1));
+        await swipe(-direction);
+        expect((tester.getCenter(title).dx - centerX).sign, -direction);
+      });
+    }
+
     group('Basic Widget Rendering', () {
       testWidgets('renders recording card with basic information', (WidgetTester tester) async {
         // Arrange

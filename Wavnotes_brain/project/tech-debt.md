@@ -85,3 +85,13 @@ _Aggiorna a fine sessione se aggiungi o risolvi un item._
 | `lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart` | Modificato | UI bottom sheet con sessionCounter |
 
 - Bip post-trim: applicato micro-fade 5 ms nei plugin nativi per trim e giunzioni WAV; validazione iPhone pendente. Avvio/seek player senza rampa restano una possibile causa distinta se il bip persiste.
+
+- Risolto swipe card tra lati: il gesto opposto chiude senza aprire immediatamente altre azioni. Regression test entrambe le direzioni e necessità di un nuovo gesto; 24 test card verdi.
+
+- More Actions: implementati rinomina persistente, reveal File/Finder e share iOS/macOS; verificare su iPhone 14 browser File (directoryURL è una directory iniziale suggerita dal sistema), share e rinomina. I pannelli nativi non sono ancora implementati per Android/Windows/Linux.
+
+- Risolto callback titolo non collegato alle viste del recorder: `EditableRecordingTitle` usa il dialogo condiviso e `onTitleChanged`. BLoC supporta pausa e priorità del nome manuale. Regression test verdi.
+
+- Risolto titolo live perso allo stop: use case rigenerava sempre nome dalla posizione. Aggiunto titolo opzionale con priorità manuale, collegato agli stop standard/nativo e al salvataggio dopo trim. Test regressione salvataggio e wiring BLoC.
+
+- Posizione file iOS: implementata lista in-app della cartella reale con target evidenziato e scroll automatico; verifica su iPhone della vista e dell'anteprima Quick Look pendente.

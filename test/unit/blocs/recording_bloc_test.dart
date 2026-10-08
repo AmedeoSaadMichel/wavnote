@@ -127,6 +127,80 @@ void main() {
 
     group('Recording Lifecycle', () {
       blocTest<RecordingBloc, recording_bloc.RecordingState>(
+      'passa il titolo scelto al salvataggio finale',
+      build: () {
+        when(() => mockStopRecordingUseCase.execute(title: 'Nome scelto'))
+            .thenAnswer((_) async => Right(TestHelpers.createTestRecording(name: 'Nome scelto')));
+        return recordingBloc;
+      },
+      seed: () => RecordingInProgress(filePath: '/test/audio.wav', format: AudioFormat.wav,
+        sampleRate: 44100, bitRate: 128000, duration: const Duration(seconds: 30),
+        amplitude: 0.5, startTime: DateTime(2026), title: 'Automatico'),
+      act: (bloc) async {
+        bloc.add(const UpdateRecordingTitle(title: 'Nome scelto'));
+        await Future<void>.delayed(Duration.zero);
+        bloc.add(const StopRecording());
+      },
+      expect: () => [isA<RecordingInProgress>(), isA<RecordingStopping>(),
+        isA<RecordingCompleted>().having((s) => s.recording.name, 'nome salvato', 'Nome scelto')],
+      verify: (_) => verify(() => mockStopRecordingUseCase.execute(title: 'Nome scelto')).called(1),
+    );
+
+    blocTest<RecordingBloc, recording_bloc.RecordingState>(
+      'titolo manuale in registrazione non viene sovrascritto dalla posizione',
+      build: () => recordingBloc,
+      seed: () => RecordingInProgress(filePath: '/test/audio.wav', format: AudioFormat.wav,
+        sampleRate: 44100, bitRate: 128000, duration: const Duration(seconds: 30),
+        amplitude: 0.5, startTime: DateTime(2026), title: 'Automatico'),
+      act: (bloc) {
+        bloc.add(const UpdateRecordingTitle(title: 'Nome scelto'));
+        bloc.add(const UpdateRecordingTitle(title: 'Posizione in ritardo', isAutomatic: true));
+      },
+      expect: () => [isA<RecordingInProgress>()
+        .having((s) => s.title, 'titolo', 'Nome scelto')
+        .having((s) => s.duration, 'durata preservata', const Duration(seconds: 30))],
+    );
+    blocTest<RecordingBloc, recording_bloc.RecordingState>(
+      'rinomina anche una registrazione in pausa',
+      build: () => recordingBloc,
+      seed: () => RecordingPaused(filePath: '/test/audio.wav', format: AudioFormat.wav,
+        sampleRate: 44100, bitRate: 128000, duration: const Duration(seconds: 30),
+        startTime: DateTime(2026), title: 'Automatico'),
+      act: (bloc) => bloc.add(const UpdateRecordingTitle(title: 'Nome scelto')),
+      expect: () => [isA<RecordingPaused>().having((s) => s.title, 'titolo', 'Nome scelto')],
+    );
+
+    blocTest<RecordingBloc, recording_bloc.RecordingState>(
+      'rinomina aggiorna la card mantenendo selezione e modalità modifica',
+      build: () {
+        final source = TestHelpers.createTestRecording(id: 'rename_test');
+        when(() => mockRecordingRepository.renameRecording(source.id, 'Nome nuovo'))
+            .thenAnswer((_) async => Right(source.rename('Nome nuovo')));
+        return recordingBloc;
+      },
+      seed: () => RecordingLoaded([TestHelpers.createTestRecording(id: 'rename_test')],
+        isEditMode: true, selectedRecordings: const {'rename_test'}),
+      act: (bloc) => bloc.add(const RenameRecording(recordingId: 'rename_test', name: 'Nome nuovo')),
+      expect: () => [isA<RecordingLoaded>()
+        .having((s) => s.recordings.single.name, 'nome', 'Nome nuovo')
+        .having((s) => s.isEditMode, 'modifica', true)
+        .having((s) => s.selectedRecordings, 'selezione', {'rename_test'})],
+    );
+    blocTest<RecordingBloc, recording_bloc.RecordingState>(
+      'errore rinomina conserva la lista e mostra un messaggio',
+      build: () {
+        when(() => mockRecordingRepository.renameRecording('rename_test', 'Nome nuovo'))
+            .thenAnswer((_) async => const Left(RecordingActionFailure(message: 'Errore salvataggio')));
+        return recordingBloc;
+      },
+      seed: () => RecordingLoaded([TestHelpers.createTestRecording(id: 'rename_test')]),
+      act: (bloc) => bloc.add(const RenameRecording(recordingId: 'rename_test', name: 'Nome nuovo')),
+      expect: () => [isA<RecordingLoaded>()
+        .having((s) => s.recordings.length, 'lista preservata', 1)
+        .having((s) => s.actionError, 'errore', 'Errore salvataggio')],
+    );
+
+    blocTest<RecordingBloc, recording_bloc.RecordingState>(
         'emits [Starting, InProgress] when recording starts successfully',
         build: () {
           when(

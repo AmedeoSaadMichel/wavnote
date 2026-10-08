@@ -1,4 +1,4 @@
-// File: presentation/bloc/recording/recording_event.dart
+// File: lib/presentation/bloc/recording/recording_event.dart
 part of 'recording_bloc.dart';
 
 /// Base class for all recording events
@@ -186,10 +186,11 @@ class ClearRecordingSelection extends RecordingEvent {
 class UpdateRecordingTitle extends RecordingEvent {
   final String title;
 
-  const UpdateRecordingTitle({required this.title});
+  final bool isAutomatic;
+  const UpdateRecordingTitle({required this.title, this.isAutomatic = false});
 
   @override
-  List<Object> get props => [title];
+  List<Object> get props => [title, isAutomatic];
 }
 
 /// Event to debug load all recordings
@@ -358,4 +359,12 @@ class StartOverwrite extends RecordingEvent {
 
   @override
   List<Object?> get props => [seekBarIndex, waveData];
+}
+
+class RenameRecording extends RecordingEvent {
+  final String recordingId;
+  final String name;
+  const RenameRecording({required this.recordingId, required this.name});
+  @override
+  List<Object?> get props => [recordingId, name];
 }

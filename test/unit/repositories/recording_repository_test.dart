@@ -45,6 +45,26 @@ void main() {
       }
     });
 
+    test('rinomina persistente senza cambiare percorso, durata o cartella', () async {
+      final source = TestHelpers.createTestRecording(id: 'rename_test', filePath: 'recordings/rename_test.m4a');
+      await repository.createRecording(source);
+      final result = await repository.renameRecording(source.id, '  Nome nuovo  ');
+      expect(result.isRight(), isTrue);
+      final saved = await repository.getRecordingById(source.id);
+      expect(saved!.name, 'Nome nuovo');
+      expect(saved.filePath, source.filePath);
+      expect(saved.duration, source.duration);
+      expect(saved.folderId, source.folderId);
+    });
+    test('rinomina non valida o inesistente non modifica il database', () async {
+      final source = TestHelpers.createTestRecording(id: 'rename_test', filePath: 'recordings/rename_test.m4a');
+      await repository.createRecording(source);
+      expect((await repository.renameRecording(source.id, ' ')).isLeft(), isTrue);
+      expect((await repository.renameRecording(source.id, 'nome/non valido')).isLeft(), isTrue);
+      expect((await repository.renameRecording('missing', 'Nome')).isLeft(), isTrue);
+      expect((await repository.getRecordingById(source.id))!.name, source.name);
+    });
+
     group('CRUD Operations', () {
       test('createRecording saves recording to database', () async {
         // Arrange

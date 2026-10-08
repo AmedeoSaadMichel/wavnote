@@ -676,6 +676,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
               ? RecordingFullscreenView(
                   key: const ValueKey('fullscreen'),
                   title: displayTitle,
+                  onTitleChanged: widget.onTitleChanged,
                   elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   isPaused: widget.isPaused,
@@ -759,6 +760,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                     widget.onSeekBarIndexChanged?.call(index);
                   },
                   title: displayTitle,
+                  onTitleChanged: widget.onTitleChanged,
                   elapsed: displayElapsed,
                   isRecording: widget.isRecording,
                   amplitude: widget.amplitude,

@@ -70,6 +70,25 @@ void main() {
       );
     });
 
+    test('salva il titolo manuale anche se esistono nomi basati sulla posizione', () async {
+      when(() => mockRecordingRepository.createRecording(any()))
+          .thenAnswer((invocation) async => invocation.positionalArguments.first as RecordingEntity);
+      when(() => mockRecordingRepository.getRecordingsByFolder(any()))
+          .thenAnswer((_) async => [testRecording.copyWith(name: 'Via Cerlini 19, Milano')]);
+      final result = await useCase.execute(title: 'Nome scelto');
+      expect(result.isRight(), isTrue);
+      final saved = (result as Right).value as RecordingEntity;
+      expect(saved.name, 'Nome scelto');
+      final persisted = verify(() => mockRecordingRepository.createRecording(captureAny())).captured.single as RecordingEntity;
+      expect(persisted.name, 'Nome scelto');
+    });
+    test('stop nativo mantiene il titolo manuale', () async {
+      when(() => mockRecordingRepository.createRecording(any()))
+          .thenAnswer((invocation) async => invocation.positionalArguments.first as RecordingEntity);
+      final result = await useCase.finalizeStoppedRecording(testRecording, title: 'Nome da controllo nativo');
+      expect((result as Right).value.name, 'Nome da controllo nativo');
+    });
+
     group('Successful Recording Stop', () {
       test('returns Right with saved recording', () async {
         final result = await useCase.execute();

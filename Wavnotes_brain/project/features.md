@@ -77,3 +77,11 @@ _Aggiorna a fine sessione se hai toccato una feature._
 | SwiftLogPlugin bridge (EventChannel) | `services/logging/swift_log_channel_service.dart` | ⚠️ Solo debug, da rimuovere prima del rilascio |
 | Performance logger | `core/utils/performance_logger.dart` | ✅ Presente |
 | Native splash screen | flutter_native_splash (#8E2DE2) | ✅ Configurato |
+
+## Azioni della card registrazione — 2026-10-06
+
+Menu More Actions implementato: Rinomina (nome persistente nel database, validazione e aggiornamento della lista), Mostra in File su iOS / Mostra nel Finder su macOS, Condividi con pannello nativo. iOS mostra il browser documenti con directory iniziale della registrazione; `LSSupportsOpeningDocumentsInPlace` abilita l'accesso della cartella Documents tramite File. Rinomina modifica il titolo della registrazione, preservando il percorso audio. Nessun nuovo package. Test completi: 286 verdi; build iOS/macOS riuscite. Apertura dei pannelli da verificare su device.
+
+- Rinomina durante registrazione: titolo tappabile in vista compatta e fullscreen, dialogo precompilato con Salva/Annulla e validazione; nessuna pausa audio. Il titolo manuale viene mantenuto rispetto ai risultati automatici di geolocalizzazione. Disponibile anche in pausa. Suite Flutter 290 verdi.
+
+- Mostra file su iOS apre ora una vista in-app della cartella reale, con la registrazione visibile ed evidenziata; consente l’anteprima Quick Look. Sostituisce il selettore File che suggeriva soltanto la directory iniziale. Finder macOS invariato.

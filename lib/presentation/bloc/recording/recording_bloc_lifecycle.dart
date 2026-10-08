@@ -6,6 +6,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     StartRecording event,
     Emitter<RecordingState> emit,
   ) async {
+    _hasUserEditedTitle = false;
     final recordings = state is RecordingLoaded
         ? (state as RecordingLoaded).recordings
         : <RecordingEntity>[];
@@ -64,6 +65,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     }
 
     final s = state;
+    final customTitle = _hasUserEditedTitle
+        ? (s is RecordingInProgress ? s.title : (s as RecordingPaused).title)
+        : null;
 
     final seekBasePath = (s is RecordingInProgress)
         ? s.seekBasePath
@@ -207,6 +211,8 @@ extension _RecordingBlocLifecycle on RecordingBloc {
           newName = '$locationName ${highestNumber + 1}';
         }
 
+        if (customTitle != null) newName = customTitle;
+
         final recording =
             RecordingEntity.create(
               name: newName,
@@ -261,6 +267,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       }
     } else {
       final result = await _stopRecordingUseCase.execute(
+        title: customTitle,
         waveformData: event.waveformData,
       );
       result.fold((failure) => emit(RecordingError(failure.message)), (
@@ -474,6 +481,9 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     if (state is! RecordingInProgress && state is! RecordingPaused) return;
 
     final s = state;
+    final customTitle = _hasUserEditedTitle
+        ? (s is RecordingInProgress ? s.title : (s as RecordingPaused).title)
+        : null;
     final folderId = (s is RecordingInProgress)
         ? s.folderId
         : (s as RecordingPaused).folderId;
@@ -527,6 +537,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
     final result = await _stopRecordingUseCase.finalizeStoppedRecording(
       recordingEntity,
+      title: customTitle,
       waveformData: waveformData,
       overrideDuration: duration,
     );

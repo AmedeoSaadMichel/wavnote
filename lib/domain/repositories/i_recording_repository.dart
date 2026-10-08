@@ -1,4 +1,4 @@
-// File: domain/repositories/i_recording_repository.dart
+// File: lib/domain/repositories/i_recording_repository.dart
 import 'package:dartz/dartz.dart';
 import '../entities/recording_entity.dart';
 import '../../core/enums/audio_format.dart';
@@ -26,6 +26,8 @@ abstract class IRecordingRepository {
 
   /// Update an existing recording
   Future<RecordingEntity> updateRecording(RecordingEntity recording);
+
+  Future<Either<Failure, RecordingEntity>> renameRecording(String id, String name);
 
   /// Delete a recording by ID
   Future<Either<Failure, Unit>> deleteRecording(String id);

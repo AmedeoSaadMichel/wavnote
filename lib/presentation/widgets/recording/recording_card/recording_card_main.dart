@@ -134,6 +134,8 @@ class _RecordingCardState extends State<RecordingCard>
   bool _wasPlayingLastUpdate = false;
   bool _isUserDragging = false; // Track if user is dragging the slider
 
+  bool _swipeHandled = false;
+
   // Swipe animation controllers
   late AnimationController _swipeController;
   late Animation<double> _swipeAnimation;
@@ -348,16 +350,23 @@ class _RecordingCardState extends State<RecordingCard>
         Transform.translate(
           offset: Offset(_swipeOffset + _favoriteOffset, 0),
           child: GestureDetector(
+            onHorizontalDragStart: (_) => _swipeHandled = false,
+            onHorizontalDragEnd: (_) => _swipeHandled = false,
+            onHorizontalDragCancel: () => _swipeHandled = false,
             onHorizontalDragUpdate: (details) {
-              // Allow swipe on both collapsed and expanded cards
-              if (details.delta.dx < -5) {
-                // Swipe RIGHT to LEFT - show three action buttons
-                if (!_isSwipeActionsVisible) {
+              if (_swipeHandled || details.delta.dx.abs() <= 5) return;
+              // Un gesto può cambiare stato una sola volta: chiusura oppure apertura.
+              _swipeHandled = true;
+              if (details.delta.dx < 0) {
+                if (_isFavoriteActionVisible) {
+                  _hideFavoriteAction();
+                } else if (!_isSwipeActionsVisible) {
                   _toggleSwipeActions();
                 }
-              } else if (details.delta.dx > 5) {
-                // Swipe LEFT to RIGHT - show favorite button (not in recently deleted)
-                if (!_isFavoriteActionVisible &&
+              } else {
+                if (_isSwipeActionsVisible) {
+                  _hideSwipeActions();
+                } else if (!_isFavoriteActionVisible &&
                     widget.currentFolderId != 'recently_deleted') {
                   _toggleFavoriteAction();
                 }

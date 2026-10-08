@@ -1,8 +1,9 @@
-// File: presentation/widgets/recording/bottom_sheet/recording_compact_view.dart
+// File: lib/presentation/widgets/recording/bottom_sheet/recording_compact_view.dart
 import 'package:flutter/material.dart';
 import '../../../../core/extensions/duration_extensions.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 import 'control_buttons.dart';
+import '../editable_recording_title.dart';
 
 /// Vista compatta del bottom sheet di registrazione.
 ///
@@ -12,6 +13,7 @@ import 'control_buttons.dart';
 ///   bottone record      — fisso 110px
 class RecordingCompactView extends StatelessWidget {
   final String? title;
+  final ValueChanged<String>? onTitleChanged;
   final Duration elapsed;
   final bool isRecording;
   final double amplitude;
@@ -34,6 +36,7 @@ class RecordingCompactView extends StatelessWidget {
   const RecordingCompactView({
     super.key,
     required this.title,
+    this.onTitleChanged,
     required this.elapsed,
     required this.isRecording,
     required this.amplitude,
@@ -153,7 +156,10 @@ class RecordingCompactView extends StatelessWidget {
         if (title != null)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: isReviewMode ? 64 : 16),
-            child: Text(
+            child: EditableRecordingTitle(
+              title: title!,
+              onChanged: onTitleChanged,
+              child: Text(
                 title!,
                 style: const TextStyle(
                   color: Colors.white,
@@ -163,6 +169,7 @@ class RecordingCompactView extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
+              ),
             ),
           ),
 

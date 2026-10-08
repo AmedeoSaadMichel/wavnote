@@ -470,6 +470,11 @@ class _RecordingListScreenState extends State<RecordingListScreen>
       listeners: [
         BlocListener<RecordingBloc, RecordingState>(
           listener: (context, state) {
+            if (state is RecordingLoaded && state.actionError != null) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.actionError!)));
+            }
             handleRecordingStateChange(state);
             unawaited(_syncPreviewPlaybackWithRecordingState(state));
           },

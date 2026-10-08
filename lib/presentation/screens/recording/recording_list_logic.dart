@@ -1,5 +1,8 @@
 // File: lib/presentation/screens/recording/recording_list_logic.dart
 import 'package:flutter/material.dart';
+import '../../../config/dependency_injection.dart';
+import '../../../services/file/recording_file_actions_service.dart';
+import '../../widgets/recording/recording_more_actions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/recording_entity.dart';
 import '../../../domain/entities/folder_entity.dart';
@@ -392,12 +395,10 @@ mixin RecordingListLogic<T extends StatefulWidget> on State<T> {
   }
 
   void showMoreActions(RecordingEntity recording) {
-    print('⚙️ More actions tapped for: ${recording.name}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('More actions - ${recording.name}'),
-        backgroundColor: Colors.grey[600],
-      ),
+    showRecordingMoreActions(context, recording,
+      fileActions: sl<RecordingFileActionsService>(),
+      onRename: (name) => context.read<RecordingBloc>().add(
+        RenameRecording(recordingId: recording.id, name: name)),
     );
   }
 
