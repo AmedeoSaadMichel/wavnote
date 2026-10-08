@@ -1,11 +1,14 @@
 // File: lib/presentation/screens/recording/recording_list_screen.dart
 import 'dart:async';
 import 'dart:io';
+import '../../../services/audio/segment_playback_controller.dart';
+import '../../../domain/entities/recording_session_segment.dart';
 import '../../../domain/repositories/i_recording_repository.dart';
 import '../../../services/file/voice_memo_import_service.dart';
 import '../../widgets/dialogs/voice_memo_import_dialog.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
@@ -66,9 +69,12 @@ class _RecordingListScreenState extends State<RecordingListScreen>
   /// ed evitare che l'interfaccia ricicli vecchi dati residui.
   int _sessionCounter = 0;
 
+  late final RecordingBloc _recorderBloc;
+
   @override
   void initState() {
     super.initState();
+    _recorderBloc = context.read<RecordingBloc>();
     _playbackCoordinator = GetIt.I<RecordingPlaybackCoordinator>();
     _cardIdsNotifier = ValueNotifier((null, null));
     // Inizializza il coordinator (ora è idempotente)
@@ -79,6 +85,13 @@ class _RecordingListScreenState extends State<RecordingListScreen>
 
   @override
   void dispose() {
+    final current = _recorderBloc.state;
+    if (current is RecordingPaused && current.isPlayingPreview) {
+      _recorderBloc.add(
+        StopRecordingPreview(stoppedSeekBarIndex: current.seekBarIndex),
+      );
+    }
+    unawaited(_segmentPlayback.dispose());
     _playbackCoordinator.state.removeListener(_handlePlaybackStateChanged);
     _playbackCoordinator.state.removeListener(_updateCardIds);
     _cardIdsNotifier.dispose();
@@ -335,6 +348,23 @@ class _RecordingListScreenState extends State<RecordingListScreen>
     unawaited(_playRecordingPreview());
   }
 
+  final _segmentPlayback = SegmentPlaybackController();
+
+  Future<void> _stopSegmentPlayback(RecordingBloc bloc) async {
+    await _segmentPlayback.stopAll();
+    await _stopPreviewPlaybackEngineOnly(preservePreparedPreview: false);
+    if (!mounted) return;
+    if (bloc.state is RecordingPaused &&
+        (bloc.state as RecordingPaused).isPlayingPreview) {
+      bloc.add(const StopRecordingPreview());
+    }
+  }
+
+  Future<void> _playSegment(RecordingSessionSegment segment) async {
+    if (context.read<RecordingBloc>().state is! RecordingPaused) return;
+    await _segmentPlayback.toggle(segment);
+  }
+
   Future<void> _playRecordingPreview() async {
     final bloc = context.read<RecordingBloc>();
     final recordingState = bloc.state;
@@ -475,6 +505,9 @@ class _RecordingListScreenState extends State<RecordingListScreen>
                 context,
               ).showSnackBar(SnackBar(content: Text(state.actionError!)));
             }
+            if (state is! RecordingPaused && _segmentPlayback.hasPlayers) {
+              unawaited(_segmentPlayback.stopAll());
+            }
             handleRecordingStateChange(state);
             unawaited(_syncPreviewPlaybackWithRecordingState(state));
           },
@@ -550,7 +583,10 @@ class _RecordingListScreenState extends State<RecordingListScreen>
         if (current is RecordingInProgress ||
             current is RecordingStarting ||
             current is RecordingPaused) {
-          return false;
+          return !listEquals(
+            _extractRecordings(previous),
+            _extractRecordings(current),
+          );
         }
         if (previous.runtimeType != current.runtimeType) return true;
         if (current is RecordingLoaded) return true;
@@ -621,7 +657,8 @@ class _RecordingListScreenState extends State<RecordingListScreen>
           return prev.title != curr.title ||
               prev.isPlayingPreview != curr.isPlayingPreview ||
               prev.seekBarIndex != curr.seekBarIndex ||
-              prev.duration != curr.duration;
+              prev.duration != curr.duration ||
+              prev.sessionSegments != curr.sessionSegments;
         }
         // Negli altri casi ricostruisci sempre (cambio tipo stato, recording in progress, ecc.)
         return true;
@@ -671,12 +708,29 @@ class _RecordingListScreenState extends State<RecordingListScreen>
             recordingState is RecordingInProgress &&
             recordingState.originalFilePathForOverwrite != null;
 
+        final segmentBloc = context.read<RecordingBloc>();
         return RecordingBottomSheet(
+          viewSnapshot: segmentBloc.sessionViewSnapshot,
+          onViewSnapshotChanged: (snapshot) {
+            if (segmentBloc.state.canStopRecording ||
+                segmentBloc.state is RecordingStarting) {
+              segmentBloc.sessionViewSnapshot = snapshot;
+            }
+          },
           title: currentTitle,
           isRecording: isRecording,
           isPaused: isPaused,
           isStarting: isStarting,
           isOverwrite: isOverwrite,
+          sessionSegments: recordingState is RecordingPaused
+              ? recordingState.sessionSegments
+              : const [],
+          segmentPlayback: _segmentPlayback.state,
+          onPlaySegment: _playSegment,
+          onSaveSegment: (segment) async {
+            await context.read<RecordingBloc>().saveSessionSegment(segment);
+          },
+          onStopSegment: () => _stopSegmentPlayback(segmentBloc),
           isPlayingPreview: isPlayingPreview,
           onToggle: () {
             // Incrementa il contatore quando si ferma la registrazione per

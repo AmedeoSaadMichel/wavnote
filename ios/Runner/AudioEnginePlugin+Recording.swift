@@ -370,6 +370,7 @@ extension AudioEnginePlugin {
     }
 
     private func resumeRecordingCore() -> (durationMs: Int?, error: FlutterError?) {
+        stopAllSegmentPlayers()
         logger.debug("▶️ [NATIVE] resumeRecording — isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
         guard isRecording, isPaused else {
             logger.error("▶️ [NATIVE] resumeRecording ERROR: stato invalido")
@@ -431,6 +432,7 @@ extension AudioEnginePlugin {
     }
 
     func stopRecording(raw: Bool = false, result: @escaping FlutterResult) {
+        stopAllSegmentPlayers()
         self.logger.debug("⏹️ [NATIVE] stopRecording — raw=\(raw) isRecording=\(isRecording) isPaused=\(isPaused) segmenti=\(recordingSegments.count)")
         guard isRecording else {
             self.logger.error("⏹️ [NATIVE] stopRecording ERROR: non in registrazione")
@@ -625,6 +627,7 @@ extension AudioEnginePlugin {
     }
 
     func cancelRecording(result: @escaping FlutterResult) {
+        stopAllSegmentPlayers()
         self.logger.error("❌ [NATIVE] cancelRecording")
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()

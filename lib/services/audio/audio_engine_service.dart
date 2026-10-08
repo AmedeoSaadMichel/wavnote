@@ -399,6 +399,16 @@ class AudioEngineService {
     }
   }
 
+  Future<List<double>> extractRecordingWaveform(String filePath) async {
+    final values = await _channel.invokeListMethod<num>('getFileWaveform', {
+      'path': filePath,
+    });
+    return values?.map((value) => value.toDouble()).toList() ?? [];
+  }
+
+  Future<List<String>> getPausedRecordingPaths() async =>
+      await _channel.invokeListMethod<String>('getPausedRecordingPaths') ?? [];
+
   Future<bool> pauseRecording() async {
     if (!_isRecording || _isRecordingPaused) return false;
 

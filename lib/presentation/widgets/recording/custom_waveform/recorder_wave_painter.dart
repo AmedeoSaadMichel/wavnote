@@ -57,7 +57,7 @@ class CustomRecorderWavePainter extends CustomPainter {
   final int futureBarsCount;
 
   /// Palette dei segmenti: indice 0 = colore base, 1..N = colori overwrite.
-  static const List<Color> _kSegmentPalette = [
+  static const List<Color> segmentPalette = [
     Color(0xFF00BCD4), // 0 — cyan (base)
     Color(0xFFFF6B6B), // 1 — coral
     Color(0xFF81C784), // 2 — verde morbido
@@ -66,11 +66,14 @@ class CustomRecorderWavePainter extends CustomPainter {
     Color(0xFF4FC3F7), // 5 — azzurro chiaro
   ];
 
+  static Color segmentColor(int index) =>
+      segmentPalette[index % segmentPalette.length];
+
   /// Restituisce il colore della barra [i] in base al suo segmento.
   /// Se [waveSegments] è vuoto o [i] è fuori range, usa [waveColor].
   Color _getBarColor(int i) {
     if (waveSegments.isEmpty || i >= waveSegments.length) return waveColor;
-    return _kSegmentPalette[waveSegments[i] % _kSegmentPalette.length];
+    return segmentColor(waveSegments[i]);
   }
 
   CustomRecorderWavePainter({

@@ -1,5 +1,9 @@
 // File: lib/presentation/widgets/recording/bottom_sheet/recording_bottom_sheet_main.dart
 import 'package:flutter/material.dart';
+import '../../../../domain/entities/recording_session_view_snapshot.dart';
+import 'package:flutter/foundation.dart';
+import '../../../../domain/entities/recording_session_segment.dart';
+import '../../../../services/audio/segment_playback_controller.dart';
 
 import 'recording_compact_view.dart';
 import 'recording_fullscreen_view.dart';
@@ -14,6 +18,13 @@ import 'recording_fullscreen_view.dart';
 /// - Integration with BLoC pattern for state management
 /// - Proper error handling and user feedback
 class RecordingBottomSheet extends StatefulWidget {
+  final RecordingSessionViewSnapshot? viewSnapshot;
+  final ValueChanged<RecordingSessionViewSnapshot>? onViewSnapshotChanged;
+  final List<RecordingSessionSegment> sessionSegments;
+  final ValueListenable<Map<String, SegmentPlaybackState>>? segmentPlayback;
+  final Future<void> Function(RecordingSessionSegment)? onPlaySegment;
+  final Future<void> Function(RecordingSessionSegment)? onSaveSegment;
+  final Future<void> Function()? onStopSegment;
   final String? title; // Recording title to display
   final bool isRecording; // Whether a recording is currently in progress
   final bool isPaused; // Whether the recording is paused
@@ -75,6 +86,14 @@ class RecordingBottomSheet extends StatefulWidget {
 
   const RecordingBottomSheet({
     super.key,
+    this.viewSnapshot,
+    this.onViewSnapshotChanged,
+    this.sessionSegments = const [],
+    this.segmentPlayback,
+    this.onPlaySegment,
+    this.onSaveSegment,
+    this.onStopSegment,
+
     required this.title,
     required this.isRecording,
     this.isPaused = false,
@@ -132,6 +151,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   /// Segmento corrente usato quando si aggiungono nuove barre.
   int _currentSegment = 0;
+  final Map<String, int> _segmentColors = {};
 
   /// Contatore monotono di overwrite: non si azzera mai al resume semplice,
   /// così ogni overwrite ottiene un colore unico nel tempo.
@@ -168,6 +188,24 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
   void initState() {
     super.initState();
     _initializeAnimations();
+    final snapshot = widget.viewSnapshot;
+    if (snapshot != null &&
+        (widget.isPaused || widget.isRecording || widget.isStarting)) {
+      _waveData.addAll(snapshot.waveData);
+      _waveSegments.addAll(snapshot.waveSegments);
+      _segmentColors.addAll(snapshot.segmentColors);
+      _currentSegment = snapshot.currentSegment;
+      _overwriteCount = snapshot.overwriteCount;
+      _seekBarIndex = widget.blocSeekBarIndex ?? snapshot.seekBarIndex;
+      _seekVersion = snapshot.seekVersion;
+      _futureBarsCount = snapshot.futureBarsCount;
+      _seekTimeOffsetMs = snapshot.seekTimeOffsetMs;
+      _lastConsumedBlocAmplitudeSampleCount = snapshot.consumedSampleCount;
+      _sheetOffset = snapshot.sheetOffset;
+      _hasPausedInSession = snapshot.hasPausedInSession;
+      _titleBeforeStarting = snapshot.titleBeforeStarting;
+      _sheetAnimationController.value = _sheetOffset;
+    }
   }
 
   void _initializeAnimations() {
@@ -380,6 +418,13 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
       if (shouldExpand) _sheetAnimationController.animateTo(1.0);
     }
 
+    // Capture identity even when the user keeps the sheet compact.
+    if (widget.isPaused) {
+      for (final segment in widget.sessionSegments) {
+        _segmentColors.putIfAbsent(segment.recording.id, () => _currentSegment);
+      }
+    }
+
     // Control pulse animation based on recording state
     if (widget.isRecording != oldWidget.isRecording) {
       if (widget.isRecording) {
@@ -497,6 +542,7 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
     _hasPausedInSession = false;
     _waveData.clear();
     _waveSegments.clear();
+    _segmentColors.clear();
     _currentSegment = 0;
     _overwriteCount = 0;
     _futureBarsCount = 0;
@@ -574,6 +620,25 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
 
   @override
   void dispose() {
+    if (widget.isPaused || widget.isRecording || widget.isStarting) {
+      widget.onViewSnapshotChanged?.call(
+        RecordingSessionViewSnapshot(
+          waveData: _waveData,
+          waveSegments: _waveSegments,
+          segmentColors: _segmentColors,
+          currentSegment: _currentSegment,
+          overwriteCount: _overwriteCount,
+          seekBarIndex: _seekBarIndex,
+          seekVersion: _seekVersion,
+          futureBarsCount: _futureBarsCount,
+          seekTimeOffsetMs: _seekTimeOffsetMs,
+          consumedSampleCount: _lastConsumedBlocAmplitudeSampleCount,
+          sheetOffset: _sheetOffset,
+          hasPausedInSession: _hasPausedInSession,
+          titleBeforeStarting: _titleBeforeStarting,
+        ),
+      );
+    }
     _pulseController.dispose();
     _sheetAnimationController.dispose();
     super.dispose();
@@ -682,6 +747,20 @@ class _RecordingBottomSheetState extends State<RecordingBottomSheet>
                   isPaused: widget.isPaused,
                   amplitude: widget.amplitude,
                   waveData: _waveData,
+                  sessionSegments: widget.sessionSegments
+                      .map(
+                        (segment) => segment.withColor(
+                          _segmentColors.putIfAbsent(
+                            segment.recording.id,
+                            () => _currentSegment,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  segmentPlayback: widget.segmentPlayback,
+                  onPlaySegment: widget.onPlaySegment,
+                  onSaveSegment: widget.onSaveSegment,
+                  onStopSegment: widget.onStopSegment,
                   waveSegments: _waveSegments,
                   seekVersion: _seekVersion,
                   futureBarsCount: _futureBarsCount,

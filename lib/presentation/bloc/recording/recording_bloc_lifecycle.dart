@@ -6,6 +6,8 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     StartRecording event,
     Emitter<RecordingState> emit,
   ) async {
+    await _segmentArchive.clear();
+    sessionViewSnapshot = null;
     _hasUserEditedTitle = false;
     final recordings = state is RecordingLoaded
         ? (state as RecordingLoaded).recordings
@@ -277,6 +279,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
         _refreshFolderCounts();
       });
     }
+    if (state is RecordingCompleted) await _segmentArchive.clear();
   }
 
   Future<void> _onPauseRecording(
@@ -358,6 +361,19 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       );
     }
 
+    try {
+      await _segmentArchive.capture(
+        sourcePath: source.filePath,
+        duration: duration,
+        waveform: source.waveformAmplitudeSamples,
+        sampleRate: source.sampleRate,
+        folderId: source.folderId ?? 'all_recordings',
+        title: source.title ?? 'New Recording',
+      );
+    } catch (error) {
+      debugPrint('Impossibile conservare il segmento: $error');
+    }
+
     final pausedState = RecordingPaused(
       filePath: source.filePath,
       folderId: source.folderId,
@@ -376,6 +392,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       waveformAmplitudeSamples: source.waveformAmplitudeSamples,
       waveformAmplitudeSampleCount: source.waveformAmplitudeSampleCount,
       previewFilePath: null,
+      sessionSegments: _segmentArchive.segments,
       seekBarIndex: pausedSeekBarIndex,
     );
 
@@ -547,6 +564,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
       emit(RecordingCompleted(recording: recording));
       _refreshFolderCounts();
     });
+    if (state is RecordingCompleted) await _segmentArchive.clear();
   }
 
   Future<void> _onExternalRecordingCancelled(
@@ -559,6 +577,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
     _stopAmplitudeUpdates();
     _stopDurationUpdates();
     await _audioService.syncNativeRecordingStatus();
+    await _segmentArchive.clear();
     emit(const RecordingCancelled());
   }
 
@@ -572,6 +591,7 @@ extension _RecordingBlocLifecycle on RecordingBloc {
 
       await _deletePausedPreviewIfNeeded();
       await _audioService.cancelRecording();
+      await _segmentArchive.clear();
       emit(const RecordingCancelled());
     } catch (e) {
       debugPrint('❌ Error cancelling recording: $e');

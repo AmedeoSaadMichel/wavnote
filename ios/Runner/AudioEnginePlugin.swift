@@ -86,6 +86,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
     var recordingSettings: [String: Any]?
     /// Segmenti finalizzati (sempre WAV internamente).
     var recordingSegments: [String] = []
+    var segmentPlayers: [String: AVAudioPlayer] = [:]
     /// Formato interno di registrazione (sempre "wav" — Approccio 1).
     var recordingFormat: String = "wav"
     /// Formato finale richiesto dall'utente: "m4a" | "wav" | "flac"
@@ -200,8 +201,10 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
         case "pauseRecording":
             pauseRecording(result: result)
         case "resumeRecording":
+            stopAllSegmentPlayers()
             resumeRecording(result: result)
         case "stopRecording":
+            stopAllSegmentPlayers()
             let raw = (call.arguments as? [String: Any])?["raw"] as? Bool ?? false
             stopRecording(raw: raw, result: result)
         case "convertAudio":
@@ -214,6 +217,7 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
                 result(FlutterError(code: "INVALID_ARGS", message: "Missing wavPath, outputPath or format", details: nil))
             }
         case "cancelRecording":
+            stopAllSegmentPlayers()
             cancelRecording(result: result)
         case "startPlayback":
             if let args = call.arguments as? [String: Any],
@@ -249,6 +253,52 @@ public class AudioEnginePlugin: NSObject, FlutterPlugin {
             }
         case "getAmplitude":
             result(currentAmplitude)
+        case "playSegment":
+            guard isRecording && isPaused,
+                  let args = call.arguments as? [String: Any],
+                  let id = args["id"] as? String, let path = args["path"] as? String else {
+                result(FlutterError(code: "INVALID_STATE", message: "Segment playback requires a paused recorder", details: nil))
+                return
+            }
+            do {
+                let player = try AVAudioPlayer(contentsOf: URL(fileURLWithPath: path))
+                player.prepareToPlay()
+                guard player.play() else {
+                    result(FlutterError(code: "PLAYBACK_ERROR", message: "Cannot play segment", details: nil))
+                    return
+                }
+                segmentPlayers[id]?.stop()
+                segmentPlayers[id] = player
+                result(nil)
+            } catch {
+                result(FlutterError(code: "PLAYBACK_ERROR", message: error.localizedDescription, details: nil))
+            }
+        case "stopSegment":
+            if let args = call.arguments as? [String: Any], let id = args["id"] as? String {
+                segmentPlayers.removeValue(forKey: id)?.stop()
+            }
+            result(nil)
+        case "stopAllSegments":
+            stopAllSegmentPlayers()
+            result(nil)
+        case "segmentPlaybackStatus":
+            var statuses: [String: [String: Any]] = [:]
+            for (id, player) in segmentPlayers {
+                statuses[id] = ["playing": player.isPlaying,
+                                "positionMs": Int(player.currentTime * 1000)]
+            }
+            for id in segmentPlayers.keys.filter({ segmentPlayers[$0]?.isPlaying == false }) {
+                segmentPlayers.removeValue(forKey: id)
+            }
+            result(statuses)
+        case "getFileWaveform":
+            guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else {
+                result(FlutterError(code: "INVALID_ARGS", message: "Missing audio path", details: nil))
+                return
+            }
+            getFileWaveform(path: path, result: result)
+        case "getPausedRecordingPaths":
+            result(isPaused ? recordingSegments : [])
         case "getRecordingStatus":
             getRecordingStatus(result: result)
         case "getPendingLiveActivityControlCompleted":

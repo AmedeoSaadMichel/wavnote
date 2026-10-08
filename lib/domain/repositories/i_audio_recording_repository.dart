@@ -22,6 +22,13 @@ abstract class IAudioRecordingRepository {
   });
 
   Future<RecordingEntity?> stopRecording({bool raw = false});
+
+  /// Finalized native fragments of the current take; empty on fallback engines.
+  Future<List<String>> getPausedRecordingPaths() async => const [];
+
+  /// Decoded audio peaks, one sample per 100 ms (no generated waveform).
+  Future<List<double>> extractRecordingWaveform(String filePath) async =>
+      const [];
   Future<bool> pauseRecording();
   Future<bool> resumeRecording();
   Future<bool> cancelRecording();

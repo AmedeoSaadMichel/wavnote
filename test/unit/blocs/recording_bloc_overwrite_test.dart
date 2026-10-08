@@ -1,7 +1,10 @@
 // File: test/unit/blocs/recording_bloc_overwrite_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:async';
+import 'package:wavnote/domain/entities/recording_session_segment.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:wavnote/domain/entities/recording_entity.dart';
 
 import 'package:wavnote/presentation/bloc/recording/recording_bloc.dart';
 import 'package:wavnote/domain/usecases/recording/overwrite_recording_usecase.dart';
@@ -44,6 +47,7 @@ void main() {
   group('RecordingBloc — OverwriteRecording', () {
     late RecordingBloc bloc;
     late MockAudioService mockAudio;
+    late MockRecordingRepository mockLibrary;
     late MockOverwriteRecordingUseCase mockOverwriteUseCase;
 
     final pausedState = RecordingPaused(
@@ -58,6 +62,7 @@ void main() {
 
     setUp(() {
       mockAudio = MockAudioService();
+      mockLibrary = MockRecordingRepository();
       mockOverwriteUseCase = MockOverwriteRecordingUseCase();
 
       when(() => mockAudio.initialize()).thenAnswer((_) async => true);
@@ -81,7 +86,7 @@ void main() {
 
       bloc = RecordingBloc(
         audioService: mockAudio,
-        recordingRepository: MockRecordingRepository(),
+        recordingRepository: mockLibrary,
         locationRepository: MockLocationRepository(),
         startRecordingUseCase: MockStartUseCase(),
         stopRecordingUseCase: MockStopUseCase(),
@@ -92,6 +97,109 @@ void main() {
     });
 
     tearDown(() async => bloc.close());
+
+    final savedSegment = RecordingEntity.create(
+      name: 'Segmento salvato',
+      filePath: '/docs/segment.wav',
+      folderId: 'all_recordings',
+      format: AudioFormat.wav,
+      duration: const Duration(seconds: 5),
+      fileSize: 1024,
+      sampleRate: 44100,
+    );
+
+    blocTest<RecordingBloc, RecordingState>(
+      'returning to a folder reloads its list without discarding paused takes or trim state',
+      build: () {
+        when(
+          () => mockLibrary.getRecordingsByFolder('all_recordings'),
+        ).thenAnswer((_) async => [savedSegment]);
+        return bloc;
+      },
+      seed: () => pausedState.copyWith(
+        seekBarIndex: 23,
+        previewFilePath: '/tmp/preview.wav',
+        seekBasePath: '/tmp/base.wav',
+        overwriteStartTime: const Duration(seconds: 2),
+        sessionSegments: [
+          RecordingSessionSegment(
+            sourcePath: 'take.wav',
+            recording: savedSegment,
+            colorIndex: 3,
+          ),
+        ],
+      ),
+      act: (b) => b.add(const LoadRecordings(folderId: 'all_recordings')),
+      expect: () => [
+        isA<RecordingPaused>()
+            .having((s) => s.recordings, 'library', [savedSegment])
+            .having((s) => s.filePath, 'current take', pausedState.filePath)
+            .having(
+              (s) => s.sessionSegments.single.colorIndex,
+              'segment color',
+              3,
+            )
+            .having((s) => s.seekBarIndex, 'seek', 23)
+            .having(
+              (s) => s.previewFilePath,
+              'preview file',
+              '/tmp/preview.wav',
+            )
+            .having((s) => s.seekBasePath, 'trim base', '/tmp/base.wav'),
+      ],
+    );
+
+    blocTest<RecordingBloc, RecordingState>(
+      'a delayed folder reload preserves newer recorder seek changes',
+      build: () => bloc,
+      seed: () => pausedState,
+      act: (b) async {
+        final pending = Completer<List<RecordingEntity>>();
+        when(
+          () => mockLibrary.getRecordingsByFolder('all_recordings'),
+        ).thenAnswer((_) => pending.future);
+        b.add(const LoadRecordings(folderId: 'all_recordings'));
+        await Future<void>.delayed(Duration.zero);
+        b.add(const UpdateSeekBarIndex(seekBarIndex: 9));
+        await Future<void>.delayed(Duration.zero);
+        pending.complete([savedSegment]);
+      },
+      expect: () => [
+        isA<RecordingPaused>().having((s) => s.seekBarIndex, 'seek', 9),
+        isA<RecordingPaused>()
+            .having((s) => s.seekBarIndex, 'new seek retained', 9)
+            .having((s) => s.recordings, 'refreshed library', [savedSegment]),
+      ],
+    );
+
+    blocTest<RecordingBloc, RecordingState>(
+      'a failed folder refresh keeps the paused session intact',
+      build: () {
+        when(
+          () => mockLibrary.getRecordingsByFolder('all_recordings'),
+        ).thenThrow(StateError('Database unavailable'));
+        return bloc;
+      },
+      seed: () => pausedState,
+      act: (b) => b.add(const LoadRecordings(folderId: 'all_recordings')),
+      expect: () => <RecordingState>[],
+      verify: (b) => expect(b.state, pausedState),
+    );
+
+    blocTest<RecordingBloc, RecordingState>(
+      'saving a segment refreshes the library while preserving paused recorder and playhead',
+      build: () => bloc,
+      seed: () =>
+          pausedState.copyWith(seekBarIndex: 23, isPlayingPreview: true),
+      act: (b) => b.add(SessionSegmentSaved(savedSegment)),
+      expect: () => [
+        isA<RecordingPaused>()
+            .having((s) => s.recordings, 'background library', [savedSegment])
+            .having((s) => s.filePath, 'active recording', pausedState.filePath)
+            .having((s) => s.seekBarIndex, 'playhead', 23)
+            .having((s) => s.isPlayingPreview, 'preview unchanged', true),
+      ],
+    );
 
     blocTest<RecordingBloc, RecordingState>(
       'StartOverwrite success: emits RecordingStarting then RecordingInProgress with overwrite info',

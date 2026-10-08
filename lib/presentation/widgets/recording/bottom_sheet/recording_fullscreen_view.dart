@@ -1,7 +1,12 @@
 // File: lib/presentation/widgets/recording/bottom_sheet/recording_fullscreen_view.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import '../../../../domain/entities/recording_session_segment.dart';
+import '../../../../services/audio/segment_playback_controller.dart';
+
 import 'control_buttons.dart';
+import 'recording_segment_orbit.dart';
 import '../editable_recording_title.dart';
 import '../custom_waveform/flutter_sound_waveform.dart';
 
@@ -18,6 +23,11 @@ import '../custom_waveform/flutter_sound_waveform.dart';
 /// - Bottone Done (sempre visibile)
 /// - Bottone chat (sempre visibile in alto a destra)
 class RecordingFullscreenView extends StatefulWidget {
+  final List<RecordingSessionSegment> sessionSegments;
+  final ValueListenable<Map<String, SegmentPlaybackState>>? segmentPlayback;
+  final Future<void> Function(RecordingSessionSegment)? onPlaySegment;
+  final Future<void> Function(RecordingSessionSegment)? onSaveSegment;
+  final Future<void> Function()? onStopSegment;
   final String? title;
   final ValueChanged<String>? onTitleChanged;
   final Duration elapsed;
@@ -53,6 +63,12 @@ class RecordingFullscreenView extends StatefulWidget {
 
   const RecordingFullscreenView({
     super.key,
+    this.sessionSegments = const [],
+    this.segmentPlayback,
+    this.onPlaySegment,
+    this.onSaveSegment,
+    this.onStopSegment,
+
     required this.title,
     this.onTitleChanged,
     required this.elapsed,
@@ -83,6 +99,7 @@ class RecordingFullscreenView extends StatefulWidget {
 }
 
 class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
+  bool _segmentsOpen = false;
   late DateTime _now;
   Timer? _clockTimer;
 
@@ -97,8 +114,31 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
   }
 
   @override
+  void didUpdateWidget(covariant RecordingFullscreenView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_segmentsOpen &&
+        (!widget.isPaused ||
+            widget.sessionCounter != oldWidget.sessionCounter)) {
+      _segmentsOpen = false;
+      widget.onStopSegment?.call();
+    }
+  }
+
+  Future<void> _openSegments() async {
+    await widget.onStopSegment?.call();
+    if (!mounted || !widget.isPaused) return;
+    setState(() => _segmentsOpen = true);
+  }
+
+  void _closeSegments() {
+    setState(() => _segmentsOpen = false);
+    widget.onStopSegment?.call();
+  }
+
+  @override
   void dispose() {
     _clockTimer?.cancel();
+    if (_segmentsOpen) widget.onStopSegment?.call();
     super.dispose();
   }
 
@@ -173,8 +213,38 @@ class _RecordingFullscreenViewState extends State<RecordingFullscreenView> {
         // Bottone chat (trascrizione) — sempre visibile in alto a destra
         if (widget.onChat != null)
           Positioned(top: 12, right: 16, child: _buildChatButton()),
+        if (widget.isPaused &&
+            widget.sessionSegments.length > 1 &&
+            widget.onPlaySegment != null &&
+            widget.onSaveSegment != null)
+          Positioned(
+            top: 12,
+            left: 16,
+            child: IconButton(
+              tooltip: 'Segmenti (${widget.sessionSegments.length})',
+              onPressed: _openSegments,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white.withValues(alpha: .15),
+              ),
+              icon: const Icon(
+                Icons.layers_outlined,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
         // Done — sempre visibile
         Positioned(bottom: 40, right: 20, child: _buildDoneButton()),
+        if (_segmentsOpen && widget.isPaused)
+          Positioned.fill(
+            child: RecordingSegmentOrbit(
+              segments: widget.sessionSegments,
+              playback: widget.segmentPlayback,
+              onPlay: widget.onPlaySegment!,
+              onSave: widget.onSaveSegment!,
+              onClose: _closeSegments,
+            ),
+          ),
       ],
     );
   }

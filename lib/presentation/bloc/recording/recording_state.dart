@@ -199,6 +199,7 @@ class RecordingInProgress extends RecordingState {
 /// State when recording is paused
 class RecordingPaused extends RecordingState {
   final List<RecordingEntity> recordings;
+  final List<RecordingSessionSegment> sessionSegments;
   final String filePath;
   final String? folderId;
   final String? folderName;
@@ -241,6 +242,7 @@ class RecordingPaused extends RecordingState {
     this.waveformAmplitudeSampleCount = 0,
     this.previewFilePath,
     this.recordings = const [],
+    this.sessionSegments = const [],
   });
 
   // Getter per risolvere i path assoluti
@@ -270,6 +272,7 @@ class RecordingPaused extends RecordingState {
     waveformAmplitudeSampleCount,
     previewFilePath,
     recordings,
+    sessionSegments,
   ];
 
   RecordingPaused copyWith({
@@ -292,6 +295,7 @@ class RecordingPaused extends RecordingState {
     int? waveformAmplitudeSampleCount,
     String? previewFilePath,
     List<RecordingEntity>? recordings,
+    List<RecordingSessionSegment>? sessionSegments,
   }) {
     return RecordingPaused(
       filePath: filePath ?? this.filePath,
@@ -316,6 +320,7 @@ class RecordingPaused extends RecordingState {
           waveformAmplitudeSampleCount ?? this.waveformAmplitudeSampleCount,
       previewFilePath: previewFilePath ?? this.previewFilePath,
       recordings: recordings ?? this.recordings,
+      sessionSegments: sessionSegments ?? this.sessionSegments,
     );
   }
 }

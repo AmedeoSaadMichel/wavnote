@@ -1,6 +1,9 @@
 // File: lib/presentation/bloc/recording/recording_bloc.dart
 import 'dart:async';
 import 'dart:io';
+import '../../../domain/entities/recording_session_view_snapshot.dart';
+import '../../../domain/entities/recording_session_segment.dart';
+import '../../../services/audio/recording_segment_archive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart'; // IMPORT FONDAMENTALE
 import 'package:flutter/foundation.dart';
 import 'package:equatable/equatable.dart';
@@ -48,6 +51,27 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
   final IAudioTrimmerRepository _trimmerService;
   final FolderBloc? _folderBloc;
 
+  late final RecordingSegmentArchive _segmentArchive = RecordingSegmentArchive(
+    audio: _audioService,
+    trimmer: _trimmerService,
+    repository: _recordingRepository,
+  );
+
+  Future<RecordingEntity> saveSessionSegment(
+    RecordingSessionSegment segment,
+  ) async {
+    if (state is! RecordingPaused) {
+      throw StateError('Metti in pausa la registrazione.');
+    }
+    final saved = await _segmentArchive.save(segment);
+    if (!isClosed) add(SessionSegmentSaved(saved));
+    _refreshFolderCounts();
+    return saved;
+  }
+
+  RecordingSessionViewSnapshot? sessionViewSnapshot;
+  int _recordingsLoadGeneration = 0;
+
   bool _hasUserEditedTitle = false;
 
   StreamSubscription<double>? _amplitudeSubscription;
@@ -93,6 +117,59 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
              trimmerService: trimmerService ?? sl<IAudioTrimmerRepository>(),
            ),
        super(const RecordingInitial()) {
+    on<SessionSegmentSaved>((event, emit) {
+      final current = state;
+      if (current is RecordingPaused) {
+        emit(
+          current.copyWith(
+            recordings: List.unmodifiable([
+              event.recording,
+              ...current.recordings,
+            ]),
+          ),
+        );
+      } else if (current is RecordingInProgress) {
+        emit(
+          current.copyWith(
+            recordings: List.unmodifiable([
+              event.recording,
+              ...current.recordings,
+            ]),
+          ),
+        );
+      } else if (current is RecordingLoaded) {
+        emit(
+          current.copyWith(
+            recordings: List.unmodifiable([
+              event.recording,
+              ...current.recordings,
+            ]),
+          ),
+        );
+      } else if (current is RecordingStarting) {
+        emit(
+          RecordingStarting(
+            recordings: List.unmodifiable([
+              event.recording,
+              ...current.recordings,
+            ]),
+            truncatedWaveData: current.truncatedWaveData,
+          ),
+        );
+      } else if (current is RecordingStopping) {
+        emit(
+          RecordingStopping(
+            recordings: List.unmodifiable([
+              event.recording,
+              ...current.recordings,
+            ]),
+            truncatedWaveData: current.truncatedWaveData,
+          ),
+        );
+      } else {
+        add(LoadRecordings(folderId: event.recording.folderId));
+      }
+    });
     on<StartRecording>(_onStartRecording);
     on<StopRecording>(_onStopRecording);
     on<PauseRecording>(_onPauseRecording);
@@ -156,6 +233,7 @@ class RecordingBloc extends Bloc<RecordingEvent, RecordingState> {
       }
     }
 
+    await _segmentArchive.clear();
     return super.close();
   }
 

@@ -47,6 +47,14 @@ class RecordingServiceRepository implements IAudioRecordingRepository {
       _coordinator.stopRecording(raw: raw);
 
   @override
+  Future<List<double>> extractRecordingWaveform(String filePath) =>
+      _coordinator.extractRecordingWaveform(filePath);
+
+  @override
+  Future<List<String>> getPausedRecordingPaths() =>
+      _coordinator.getPausedRecordingPaths();
+
+  @override
   Future<bool> pauseRecording() => _coordinator.pauseRecording();
 
   @override

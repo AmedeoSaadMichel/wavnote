@@ -20,19 +20,33 @@ extension _RecordingBlocManagement on RecordingBloc {
     LoadRecordings event,
     Emitter<RecordingState> emit,
   ) async {
+    final generation = ++_recordingsLoadGeneration;
+    bool hasSession(RecordingState current) => current.canStopRecording ||
+        current is RecordingStarting || current is RecordingStopping;
     try {
-      emit(const RecordingLoading());
-      final recordings = await _recordingRepository.getRecordingsByFolder(
-        event.folderId,
-      );
-      emit(RecordingLoaded(recordings));
+      // Loading the background library must never discard a live recorder.
+      if (!hasSession(state)) emit(const RecordingLoading());
+      final recordings = await _recordingRepository.getRecordingsByFolder(event.folderId);
+      if (emit.isDone || generation != _recordingsLoadGeneration) return;
+      final current = state;
+      if (current is RecordingPaused) {
+        emit(current.copyWith(recordings: recordings));
+      } else if (current is RecordingInProgress) {
+        emit(current.copyWith(recordings: recordings));
+      } else if (current is RecordingStarting) {
+        emit(RecordingStarting(recordings: recordings, truncatedWaveData: current.truncatedWaveData));
+      } else if (current is RecordingStopping) {
+        emit(RecordingStopping(recordings: recordings, truncatedWaveData: current.truncatedWaveData));
+      } else {
+        emit(RecordingLoaded(recordings));
+      }
     } catch (e) {
-      emit(
-        RecordingError(
-          'Failed to load recordings: $e',
-          errorType: RecordingErrorType.unknown,
-        ),
-      );
+      if (emit.isDone || generation != _recordingsLoadGeneration) return;
+      if (hasSession(state)) {
+        debugPrint('Could not refresh library during recording: $e');
+        return;
+      }
+      emit(RecordingError('Failed to load recordings: $e', errorType: RecordingErrorType.unknown));
     }
   }
 

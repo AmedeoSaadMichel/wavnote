@@ -238,6 +238,22 @@ class AudioServiceCoordinator {
     return result;
   }
 
+  Future<List<double>> extractRecordingWaveform(String filePath) async {
+    if (_useNativeEngine && _engineService != null) {
+      return _engineService!.extractRecordingWaveform(
+        await _resolvePath(filePath),
+      );
+    }
+    return const [];
+  }
+
+  Future<List<String>> getPausedRecordingPaths() async {
+    if (_useNativeEngine && _engineService != null) {
+      return _engineService!.getPausedRecordingPaths();
+    }
+    return const [];
+  }
+
   Future<bool> pauseRecording() async {
     if (_useNativeEngine && _iosNativeActive && _engineService != null) {
       final result = await _engineService!.pauseRecording();

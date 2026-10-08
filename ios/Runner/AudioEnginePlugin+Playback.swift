@@ -6,6 +6,50 @@ import Logging
 extension AudioEnginePlugin {
     // MARK: - Playback
 
+    func stopAllSegmentPlayers() {
+        for player in segmentPlayers.values { player.stop() }
+        segmentPlayers.removeAll()
+    }
+
+    func getFileWaveform(path: String, result: @escaping FlutterResult) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let file = try AVAudioFile(forReading: URL(fileURLWithPath: path))
+                let format = file.processingFormat
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4096) else {
+                    throw NSError(domain: "WavnoteWaveform", code: 1)
+                }
+                let bucketFrames = max(1, Int(format.sampleRate / 10))
+                var samples: [Double] = []
+                var frames = 0
+                var peak: Float = 0
+                while file.framePosition < file.length {
+                    try file.read(into: buffer)
+                    guard buffer.frameLength > 0, let channels = buffer.floatChannelData else { break }
+                    for frame in 0..<Int(buffer.frameLength) {
+                        for channel in 0..<Int(format.channelCount) {
+                            peak = max(peak, abs(channels[channel][frame]))
+                        }
+                        frames += 1
+                        if frames == bucketFrames {
+                            samples.append(Double(min(peak, 1)))
+                            frames = 0
+                            peak = 0
+                        }
+                    }
+                }
+                if frames > 0 { samples.append(Double(min(peak, 1))) }
+                let waveform = samples
+                DispatchQueue.main.async { result(waveform) }
+            } catch {
+                DispatchQueue.main.async {
+                    result(FlutterError(code: "WAVEFORM_ERROR", message: error.localizedDescription, details: nil))
+                }
+            }
+        }
+    }
+
+
     func startPlayback(path: String, position: Int?, result: @escaping FlutterResult) {
         self.logger.debug("▶️ [NATIVE] startPlayback — isRecording=\(isRecording) isPaused=\(isPaused) path=\(path)")
         
@@ -13,7 +57,9 @@ extension AudioEnginePlugin {
         // Altrimenti, se siamo in registrazione/pausa normale, usiamo startPlaybackFromSegments o exportForPlayback.
         let isPreviewPath = path.contains("_preview_")
         
-        if isPreviewPath {
+        let isArchivedTake = URL(fileURLWithPath: path).deletingLastPathComponent()
+            .lastPathComponent.hasPrefix("wavnote_segments_")
+        if isPreviewPath || isArchivedTake {
             startPlaybackInternal(path: path, position: position, result: result)
         } else if isRecording && !isPaused {
             exportForPlayback(sourcePath: path) { [weak self] tempPath, error in

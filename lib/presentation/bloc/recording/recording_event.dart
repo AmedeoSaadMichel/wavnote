@@ -368,3 +368,11 @@ class RenameRecording extends RecordingEvent {
   @override
   List<Object?> get props => [recordingId, name];
 }
+
+/// Refresh the background library without replacing the active recorder state.
+class SessionSegmentSaved extends RecordingEvent {
+  final RecordingEntity recording;
+  const SessionSegmentSaved(this.recording);
+  @override
+  List<Object?> get props => [recording];
+}
